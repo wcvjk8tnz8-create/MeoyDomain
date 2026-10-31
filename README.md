@@ -79,24 +79,15 @@ subdomain-hub/
 
 ## 三、部署步骤
 
-### 1. 准备 Cloudflare API Token
-
-在 <https://dash.cloudflare.com/profile/api-tokens> 创建令牌：
-
-- 权限：`Zone → DNS → Edit`（如需读取 Zone 信息再加 `Zone → Zone → Read`）
-- 区域资源：只包含你的根域名（如 `meoy.top`）
-
-记录下 **Zone ID**（域名概览页右下角）。
-
 ### 1. 获取 Cloudflare 凭据
 
-| 需要什么 | 去哪里拿 | 直链 |
-|---|---|---|
-| **API Token** | 用户头像 → My Profile → API Tokens → Create Token | <https://dash.cloudflare.com/profile/api-tokens> |
-| **Account ID** | Workers & Pages 概览页右侧栏 | <https://dash.cloudflare.com/?to=/:account/workers-and-pages> |
-| **Zone ID** | 选中根域名 → Overview → 右下角 API 区块 | <https://dash.cloudflare.com/> → 你的域名 → Overview |
+| 需要什么 | 去哪里拿 |
+|---|---|
+| **API Token** | <https://dash.cloudflare.com/profile/api-tokens> → Create Custom Token |
+| **Account ID** | <https://dash.cloudflare.com/?to=/:account/workers-and-pages> 右侧栏 |
+| **Zone ID** | 选中根域名 → Overview → 右下角 API 区块 |
 
-API Token 用 **Create Custom Token**，按下面三行配：
+API Token 需要的权限：
 
 | 权限 | 资源 | 作用 |
 |---|---|---|
@@ -104,30 +95,42 @@ API Token 用 **Create Custom Token**，按下面三行配：
 | `Account` → `Workers Scripts` → `Edit` | 你的账户 | 部署 Worker |
 | `Zone` → `DNS` → `Edit` | 你的根域名 | 读写 DNS 记录 |
 
-> 图省事也可以用官方模板 **Edit Cloudflare Workers**（在 API Tokens 页面的模板列表里），它覆盖前两项，再单独补一条 Zone DNS 的编辑权限即可。
->
-> 快捷入口：<https://dash.cloudflare.com/profile/api-tokens> → `Create Custom Token` → `Get started`
+> 省事做法：用官方模板 **Edit Cloudflare Workers**（覆盖前两项），再补一条 Zone DNS 编辑权限。
 
-三个值拿到后按下面填进 GitHub。
-
-### 2. 填 4 个 Secrets，推一次就完事
+### 2. 填 Secrets，推一次就完事
 
 仓库 **Settings → Secrets and variables → Actions → Secrets**：
 
-| 名称 | 值 |
+**必需**（4 个，缺任一个部署会直接报错并提示缺谁）
+
+| 名称 | 必需 | 说明 |
+|---|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` | 必需 | 账户 ID |
+| `CF_ZONE_ID` | 必需 | 根域名的 Zone ID |
+| `CLOUDFLARE_API_TOKEN` | **二选一** | Cloudflare API Token，用于 CI 部署（建 D1、建表、发布） |
+| `CF_API_TOKEN` | **二选一** | 同上，Worker 运行期调 DNS API 用 |
+
+**关于两个 Token**：它们是同一个东西的两种用途，**填一个就行** ——
+
+- 只填 `CLOUDFLARE_API_TOKEN` → 部署和 DNS 都用它
+- 只填 `CF_API_TOKEN` → 部署和 DNS 都用它
+- 两个都填 → 各用各的（可以给不同最小权限，更安全）
+- 两个都不填 → 工作流第一步就报错退出
+
+**可选**
+
+| 名称 | 说明 |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需 Account → D1 编辑 + Workers Scripts 编辑 + Zone → DNS 编辑） |
-| `CLOUDFLARE_ACCOUNT_ID` | 账户 ID（Workers 概览页右侧） |
-| `CF_API_TOKEN` | 调 DNS API 用，可与上面同一个 Token |
-| `CF_ZONE_ID` | 根域名的 Zone ID |
+| `D1_DATABASE_ID` | 一般不填：CI 会自动建库。只有你想用已有的另一个库时才填 |
 
 然后 `git push origin main`，Actions 自动完成全流程：
 
-1. **D1 数据库自动创建** —— 按名字查找，已存在就复用，不存在才创建（重复部署不会重复建库、不会丢数据）
-2. 把 database_id 写进 `wrangler.toml`
-3. 把 `CF_API_TOKEN` / `CF_ZONE_ID` 加密写入 Worker（等同 `wrangler secret put`）
-4. 建表（幂等，只建不存在的表）
-5. `wrangler deploy`
+1. **检查配置** —— 缺哪个必需项就直接报出名字，不用猜
+2. **D1 数据库自动创建** —— 按名字查找，已存在就复用，不存在才创建（重复部署不会重复建库、不会丢数据）
+3. 把 database_id 写进 `wrangler.toml`
+4. 把 `CF_API_TOKEN` / `CF_ZONE_ID` 加密写入 Worker（等同 `wrangler secret put`）
+5. 建表（幂等，只建不存在的表）
+6. `wrangler deploy`
 
 全程不需要 `wrangler login`、不需要手动改配置文件、不需要手动建库。
 

@@ -10,6 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
+    # ══════════════════════════════════════════════════════════
+    #  Token 说明：CLOUDFLARE_API_TOKEN 与 CF_API_TOKEN 二选一
+    #   - 只填 CLOUDFLARE_API_TOKEN → 部署和 DNS 都用这个
+    #   - 只填 CF_API_TOKEN        → 部署和 DNS 都用这个
+    #   - 两个都填                 → 各用各的（可给不同最小权限）
+    #  下面这行做统一取值，后面所有步骤共用
+    # ══════════════════════════════════════════════════════════
+    env:
+      CF_AUTH_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,16 +34,37 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # 校验必需配置是否齐全，缺什么直接说清楚
+      - name: 检查配置
+        run: |
+          miss=0
+          [ -z "$CF_AUTH_TOKEN" ] && { echo "✘ 缺少 API Token：请在 Secrets 里填 CLOUDFLARE_API_TOKEN 或 CF_API_TOKEN（二选一）"; miss=1; }
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && { echo "✘ 缺少 CLOUDFLARE_ACCOUNT_ID（Cloudflare 账户 ID）"; miss=1; }
+          [ -z "$CF_ZONE_ID" ] && { echo "✘ 缺少 CF_ZONE_ID（根域名的 Zone ID）"; miss=1; }
+          if [ "$miss" = "1" ]; then
+            echo ""
+            echo "设置入口：仓库 Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && [ -n "${{ secrets.CF_API_TOKEN }}" ]; then
+            echo "✓ 两个 Token 都已配置，部署用 CLOUDFLARE_API_TOKEN、DNS 用 CF_API_TOKEN"
+          else
+            echo "✓ 已配置单个 Token，部署与 DNS 共用"
+          fi
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+
       # D1 数据库：存在就复用，不存在自动创建，并把 uuid 传给下一步
       - name: 准备 D1 数据库
         run: node scripts/ensure-d1.mjs
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
 
-      # 把 Secrets / Variables 写进 wrangler.toml
-      # D1_DATABASE_ID 由上一步自动写入环境，此处不再覆盖
+      # 把 Variables 写进 wrangler.toml
+      # database_id 由上一步自动写入环境，此处不再覆盖
       - name: 注入配置
         run: node scripts/inject-config.mjs
         env:
@@ -47,36 +79,25 @@ jobs:
       - name: 写入 Worker Secrets
         run: |
           set -e
-          put() {
-            name="$1"; value="$2"
-            if [ -z "$value" ]; then
-              echo "⚠ 跳过 $name（未提供）"
-            else
-              printf '%s' "$value" | npx wrangler secret put "$name" >/dev/null
-              echo "✓ 已写入 $name"
-            fi
-          }
-          put CF_API_TOKEN "$CF_API_TOKEN"
-          put CF_ZONE_ID "$CF_ZONE_ID"
-          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ZONE_ID" ]; then
-            echo "⚠ CF_API_TOKEN / CF_ZONE_ID 未完整配置：站点可访问，但 DNS 记录无法写入 Cloudflare。"
-          fi
+          printf '%s' "$CF_API_TOKEN" | npx wrangler secret put CF_API_TOKEN >/dev/null
+          printf '%s' "$CF_ZONE_ID"   | npx wrangler secret put CF_ZONE_ID   >/dev/null
+          echo "✓ 已写入 CF_API_TOKEN、CF_ZONE_ID"
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
 
       # 建表（幂等：CREATE TABLE IF NOT EXISTS，重复部署不会丢数据）
       - name: 初始化 D1 表结构
         run: npx wrangler d1 execute "${D1_DATABASE_NAME}" --remote --file=./schema.sql
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME || 'subdomain-hub-db' }}
 
       - name: 部署 Worker（含静态资源）
         run: npx wrangler deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
