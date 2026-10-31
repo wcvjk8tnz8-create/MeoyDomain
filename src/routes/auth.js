@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { hashPassword, verifyPassword, randomToken } from '../lib/crypto.js';
 import { ok, fail, now, audit } from '../lib/util.js';
-import { createSession, setSessionCookie, clearSessionCookie, destroySession } from '../middleware/auth.js';
+import { createSession, setSessionCookie, clearSessionCookie, destroySession, UNLIMITED } from '../middleware/auth.js';
 
 const app = new Hono();
 
@@ -29,7 +29,8 @@ app.post('/register', async (c) => {
   const role = count && count.n === 0 ? 'admin' : 'user';
 
   const hash = await hashPassword(String(password));
-  const quota = Number(env.DEFAULT_QUOTA || 5);
+  // 管理员不限量，普通用户用默认配额
+  const quota = role === 'admin' ? UNLIMITED : Number(env.DEFAULT_QUOTA || 5);
   const res = await env.DB.prepare(
     'INSERT INTO users (email, password_hash, role, status, quota, created_at) VALUES (?,?,?,?,?,?)'
   )
@@ -37,10 +38,13 @@ app.post('/register', async (c) => {
     .run();
 
   const userId = res.meta?.last_row_id;
-  await audit(c, userId, 'user.register', mail, role === 'admin' ? '首位用户，自动设为管理员' : '');
+  await audit(c, userId, 'user.register', mail, role === 'admin' ? '首位用户，自动设为管理员（不限配额）' : '');
   const { token } = await createSession(c, userId);
   setSessionCookie(c, token);
-  return ok(c, { user: { id: userId, email: mail, role, status: 'active', quota }, isFirstAdmin: role === 'admin' });
+  return ok(c, {
+    user: { id: userId, email: mail, role, status: 'active', quota, quotaUnlimited: quota < 0 },
+    isFirstAdmin: role === 'admin',
+  });
 });
 
 // 登录

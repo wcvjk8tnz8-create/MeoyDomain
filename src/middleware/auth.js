@@ -2,6 +2,7 @@ import { randomToken } from '../lib/crypto.js';
 import { now, clientIp, fail } from '../lib/util.js';
 
 export const COOKIE = 'sh_session';
+export const UNLIMITED = -1; // quota 为 -1 表示不限量
 const TTL_MS = 30 * 24 * 3600 * 1000; // 30 天
 
 export async function createSession(c, userId) {
@@ -51,12 +52,15 @@ export async function attachUser(c, next) {
     .bind(token)
     .first();
   if (!row || row.expires_at < now()) return next();
+  // quota < 0 表示不限量；管理员始终不限量
+  const quota = row.role === 'admin' ? UNLIMITED : row.quota;
   c.set('user', {
     id: row.user_id,
     email: row.email,
     role: row.role,
     status: row.status,
-    quota: row.quota,
+    quota,
+    quotaUnlimited: quota < 0 || row.role === 'admin',
     ban_reason: row.ban_reason,
     token,
   });

@@ -38,7 +38,12 @@ const listMine = async (c) => {
   )
     .bind(u.id)
     .all();
-  return ok(c, { items: results, quota: u.quota, used: results.length });
+  return ok(c, {
+    items: results,
+    quota: u.quota,
+    quotaUnlimited: !!u.quotaUnlimited,
+    used: results.length,
+  });
 };
 
 app.get('/', listMine);
@@ -64,7 +69,9 @@ const createMine = async (c) => {
   )
     .bind(u.id)
     .first();
-  if ((used?.n || 0) >= u.quota) return fail(c, `已达上限，每个账号最多持有 ${u.quota} 个子域名`);
+  // 管理员（或 quota 为 -1 的用户）不受配额限制
+  if (u.quota >= 0 && (used?.n || 0) >= u.quota)
+    return fail(c, `已达上限，每个账号最多持有 ${u.quota} 个子域名`);
 
   const autoApprove = c.env.REQUIRE_APPROVAL !== '1';
   const status = autoApprove ? 'approved' : 'pending';

@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>管理后台 · 二级域名分发系统</title>
+<title>管理后台 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+<div id="bg"></div>
 <nav class="nav" id="nav"></nav>
 
 <div class="wrap">
@@ -87,7 +88,7 @@ async function load() {
         <td class="mono">${esc(u.email)}</td>
         <td>${u.role === 'admin' ? '<span class="badge type">admin</span>' : '<span class="badge">user</span>'}</td>
         <td>${u.status === 'banned' ? `<span class="badge danger">已封禁</span><div class="hint">${esc(u.ban_reason || '')}</div>` : '<span class="badge ok">正常</span>'}</td>
-        <td>${u.quota}</td>
+        <td>${u.quotaUnlimited ? '<span class="badge inf">∞ 不限</span>' : u.quota}</td>
         <td>${u.sub_count}</td>
         <td class="right nowrap">
           <button class="btn sm" data-quota="${u.id}" data-email="${esc(u.email)}" data-q="${u.quota}" data-role="${u.role}">配额/角色</button>
@@ -98,7 +99,7 @@ async function load() {
       </tr>`).join('');
     tb.querySelectorAll('[data-quota]').forEach((b) => b.onclick = () => {
       openModal('调整 ' + b.dataset.email, `
-        <div class="field"><label>子域名配额</label><input id="q" type="number" value="${b.dataset.q}"></div>
+        <div class="field"><label>子域名配额</label><input id="q" type="number" value="${b.dataset.q}"><div class="hint">填 -1 表示不限量</div></div>
         <div class="field"><label>角色</label><select id="r"><option value="user" ${b.dataset.role === 'user' ? 'selected' : ''}>user</option><option value="admin" ${b.dataset.role === 'admin' ? 'selected' : ''}>admin</option></select></div>
         <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" id="ok">保存</button></div>`);
       document.getElementById('ok').onclick = async () => {

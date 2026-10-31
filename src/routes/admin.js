@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
 import { cfDelete, cfErrorMessage } from '../lib/cf.js';
+import { UNLIMITED } from '../middleware/auth.js';
 
 const app = new Hono();
 
@@ -84,7 +85,8 @@ app.get('/users', async (c) => {
             (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id) AS sub_count
      FROM users u ORDER BY u.created_at DESC LIMIT 500`
   ).all();
-  return ok(c, { items: results });
+  const items = results.map((r) => ({ ...r, quotaUnlimited: r.role === 'admin' || Number(r.quota) < 0 }));
+  return ok(c, { items });
 });
 
 // 封禁 / 解封
@@ -145,12 +147,24 @@ app.post('/users/:id/quota', async (c) => {
   const { quota, role } = await c.req.json().catch(() => ({}));
   if (quota !== undefined) {
     const q = Number(quota);
-    if (!Number.isFinite(q) || q < 0 || q > 500) return fail(c, '配额需在 0-500 之间');
-    await c.env.DB.prepare('UPDATE users SET quota = ? WHERE id = ?').bind(Math.floor(q), id).run();
+    // -1 表示不限量
+    if (!Number.isFinite(q) || q < -1 || q > 500) return fail(c, '配额需在 -1（不限）到 500 之间');
+    await c.env.DB.prepare('UPDATE users SET quota = ? WHERE id = ?').bind(q === -1 ? -1 : Math.floor(q), id).run();
   }
   if (role !== undefined) {
     if (!['user', 'admin'].includes(role)) return fail(c, '角色不合法');
     await c.env.DB.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, id).run();
+    // 提为管理员时自动给不限量；降为普通用户时若原本是不限量，恢复默认配额
+    if (role === 'admin') {
+      await c.env.DB.prepare('UPDATE users SET quota = ? WHERE id = ?').bind(UNLIMITED, id).run();
+    } else {
+      const cur = await c.env.DB.prepare('SELECT quota FROM users WHERE id = ?').bind(id).first();
+      if (cur && Number(cur.quota) < 0) {
+        await c.env.DB.prepare('UPDATE users SET quota = ? WHERE id = ?')
+          .bind(Number(c.env.DEFAULT_QUOTA || 5), id)
+          .run();
+      }
+    }
   }
   await audit(c, u.id, 'user.update', String(id), `quota=${quota} role=${role}`);
   return ok(c, {});

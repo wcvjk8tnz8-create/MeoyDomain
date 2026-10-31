@@ -3,14 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>登录 · 二级域名分发系统</title>
+<title>Meoy · 二级域名分发</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<div class="wrap narrow" style="padding-top:64px">
-  <div class="brand-line" style="margin-bottom:16px">
-    <span class="dot"></span>
-    <span style="font-weight:600;font-size:14px">二级域名分发系统</span>
+<div id="bg"></div>
+
+<div class="wrap narrow" style="padding-top:60px">
+  <div class="brand-line">
+    <div class="brand-mark">M</div>
+    <div>
+      <div class="brand-name">Meoy</div>
+      <div class="brand-sub">二级域名分发 · DNS 管理</div>
+    </div>
   </div>
 
   <div class="card">
@@ -46,7 +51,10 @@
   </div>
 
   <div class="card flat">
-    <h3>说明</h3>
+    <div class="row between" style="margin-bottom:10px">
+      <h3 style="margin:0">说明</h3>
+      <span id="bgsw"></span>
+    </div>
     <div style="color:var(--text-2);font-size:12.5px;line-height:1.9">
       注册后可申请根域名下的二级子域名，配额由管理员配置。<br>
       申请提交后需管理员审核，通过后自行添加 DNS 记录。<br>
@@ -58,6 +66,8 @@
 <div id="toast"></div>
 <script src="/js/api.js"></script>
 <script>
+document.getElementById('bgsw').innerHTML = wallpaperSwitchHtml();
+
 const tabLogin = document.getElementById('tabLogin'), tabReg = document.getElementById('tabReg');
 const paneLogin = document.getElementById('paneLogin'), paneReg = document.getElementById('paneReg');
 tabLogin.onclick = () => { tabLogin.classList.add('active'); tabReg.classList.remove('active'); paneLogin.classList.remove('hidden'); paneReg.classList.add('hidden'); };
@@ -69,7 +79,7 @@ document.getElementById('btnLogin').onclick = async () => {
   if (!email || !password) return toast('请输入邮箱和密码', 'err');
   try {
     const d = await api.post('/api/auth/login', { email, password });
-    toast('登录成功' + (d.user.role === 'admin' ? '，管理员' : ''));
+    toast('登录成功' + (d.user.role === 'admin' ? '，管理员（不限配额）' : ''));
     setTimeout(() => location.href = '/dashboard', 400);
   } catch (e) { toast(e.message, 'err'); }
 };
@@ -81,7 +91,7 @@ document.getElementById('btnReg').onclick = async () => {
   if (password.length < 8) return toast('密码至少 8 位', 'err');
   try {
     const d = await api.post('/api/auth/register', { email, password });
-    toast(d.isFirstAdmin ? '注册成功，已设为管理员' : '注册成功');
+    toast(d.isFirstAdmin ? '注册成功，已设为管理员（不限配额）' : '注册成功');
     setTimeout(() => location.href = '/dashboard', 400);
   } catch (e) { toast(e.message, 'err'); }
 };

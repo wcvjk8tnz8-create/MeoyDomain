@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>我的子域名 · 二级域名分发系统</title>
+<title>我的子域名 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+<div id="bg"></div>
 <nav class="nav" id="nav"></nav>
 
 <div class="wrap">
@@ -61,8 +62,9 @@ async function load() {
   const cfg = await api.get('/api/config');
   rootDomain = cfg.rootDomain;
   document.getElementById('rootDomain').textContent = rootDomain;
-  document.getElementById('quotaTip').textContent =
-    `已使用 ${d.used} / ${d.quota} 个` + (cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效');
+  const quotaHtml = d.quotaUnlimited ? '<span class="badge inf">∞ 不限</span>' : `${d.quota} 个`;
+  document.getElementById('quotaTip').innerHTML =
+    `已使用 ${d.used} / ${quotaHtml}` + (cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效');
   const tb = document.getElementById('list');
   if (!d.items.length) {
     tb.innerHTML = `<tr><td colspan="5" class="empty">还没有子域名，先在上方申请一个</td></tr>`;
