@@ -121,19 +121,25 @@ async function load() {
   });
 }
 
+async function runCheck(v) {
+  const tip = document.getElementById('checkTip');
+  if (!v) { tip.innerHTML = ''; return; }
+  try {
+    const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v));
+    tip.innerHTML = r.available
+      ? `<span style="color:var(--ok)">${esc(r.fqdn)} 可以注册</span>
+         <a href="/whois.html?name=${encodeURIComponent(v)}" target="_blank" style="font-size:11.5px;margin-left:6px">whois 详情</a>`
+      : `<span style="color:var(--danger)">${esc(r.message)}</span>
+         <a href="/whois.html?name=${encodeURIComponent(v)}" target="_blank" style="font-size:11.5px;margin-left:6px">whois 详情</a>`;
+  } catch (err) { tip.innerHTML = ''; }
+}
+
 document.getElementById('label').addEventListener('input', (e) => {
   const v = e.target.value.trim();
   const tip = document.getElementById('checkTip');
-  if (!v) { tip.textContent = ''; return; }
+  if (!v) { tip.innerHTML = ''; return; }
   clearTimeout(checkTimer);
-  checkTimer = setTimeout(async () => {
-    try {
-      const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v));
-      tip.innerHTML = r.available
-        ? `<span style="color:var(--ok)">${esc(r.fqdn)} 可用</span>`
-        : `<span style="color:var(--danger)">${esc(r.message)}</span>`;
-    } catch (err) { tip.textContent = ''; }
-  }, 350);
+  checkTimer = setTimeout(() => runCheck(v), 350);
 });
 
 document.getElementById('btnApply').onclick = async () => {
@@ -145,10 +151,23 @@ document.getElementById('btnApply').onclick = async () => {
     toast(r.status === 'approved' ? '申请成功，已开通' : '已提交，等待管理员审核');
     document.getElementById('label').value = '';
     document.getElementById('note').value = '';
-    document.getElementById('checkTip').textContent = '';
+    document.getElementById('checkTip').innerHTML = '';
     load();
-  } catch (e) { toast(e.message, 'err'); }
+  } catch (e) {
+    toast(e.message, 'err');
+    // 名称可能刚被他人抢注，刷新列表并重新检查
+    load();
+    runCheck(label);
+  }
 };
+
+// 支持从 WHOIS 页带名称跳转过来：/dashboard?apply=xxx
+const preApply = new URLSearchParams(location.search).get('apply');
+if (preApply) {
+  document.getElementById('label').value = preApply;
+  runCheck(preApply);
+  document.getElementById('note').focus();
+}
 
 document.getElementById('btnPwd').onclick = () => {
   openModal('修改密码', `

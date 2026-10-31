@@ -342,6 +342,13 @@ app.post('/settings', async (c) => {
     await set('max_accounts_per_ip', String(Math.floor(n)));
   }
 
+  // WHOIS 持有人显示策略
+  if (body.whoisHolder !== undefined) {
+    const m = String(body.whoisHolder).toLowerCase();
+    if (!['masked', 'none', 'full'].includes(m)) return fail(c, 'WHOIS 显示方式不合法');
+    await set('whois_holder', m);
+  }
+
   await audit(c, u.id, 'admin.settings', 'site', `name=${name} logo=${logo || '(默认)'}`);
   return ok(c, {});
 });

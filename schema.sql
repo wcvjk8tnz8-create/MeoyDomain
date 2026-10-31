@@ -115,6 +115,8 @@ INSERT OR IGNORE INTO settings(key, value) VALUES ('approval_required', '1');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('announcement', '欢迎使用二级域名分发系统');
 -- 同 IP 可注册的账号数上限（管理员可在后台调整）
 INSERT OR IGNORE INTO settings(key, value) VALUES ('max_accounts_per_ip', '2');
+-- WHOIS 持有人邮箱显示方式：masked 脱敏（默认）| none 不显示 | full 完整
+INSERT OR IGNORE INTO settings(key, value) VALUES ('whois_holder', 'masked');
 -- 站点品牌（后台「站点设置」可改）
 INSERT OR IGNORE INTO settings(key, value) VALUES ('site_name', 'Meoy');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('logo_url', '/img/logo.jpg');

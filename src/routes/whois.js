@@ -1,0 +1,86 @@
+import { Hono } from 'hono';
+import { ok, fail } from '../lib/util.js';
+import { lookupLabel } from './subdomains.js';
+
+const app = new Hono();
+
+const STATUS_TEXT = {
+  pending: '审核中',
+  approved: '已注册',
+  rejected: '已驳回',
+  suspended: '已停用',
+  reserved: '系统保留',
+  available: '可注册',
+};
+
+/** 邮箱脱敏：ab***@gmail.com */
+function maskEmail(e) {
+  const s = String(e || '');
+  const at = s.indexOf('@');
+  if (at < 1) return '***';
+  const name = s.slice(0, at);
+  const keep = Math.min(2, name.length);
+  return name.slice(0, keep) + '***' + s.slice(at);
+}
+
+/** whois_holder: masked（默认，脱敏）| none（不显示）| full（完整，需谨慎） */
+async function holderMode(env) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'whois_holder'").first();
+  const v = String(row?.value || 'masked').toLowerCase();
+  return ['masked', 'none', 'full'].includes(v) ? v : 'masked';
+}
+
+/**
+ * WHOIS 查询：公开接口，任何人都可查询某个子域名的注册状态。
+ * 用法： /api/whois?name=me   或  /api/whois?name=me.meoy.top
+ */
+app.get('/whois', async (c) => {
+  const raw = String(c.req.query('name') || c.req.query('q') || c.req.query('fqdn') || '').trim().toLowerCase();
+  if (!raw) return fail(c, '请输入要查询的域名');
+
+  const root = String(c.env.ROOT_DOMAIN || '').toLowerCase().replace(/\.+$/, '');
+
+  // 归一化：允许写完整域名或只写标签
+  let label = raw.replace(/\.+$/, '');
+  if (label.endsWith('.' + root)) label = label.slice(0, -(root.length + 1));
+  // 仍带点说明是别的域名，直接判为不归本站管理
+  if (label.includes('.')) return fail(c, `仅支持查询 ${root} 下的二级子域名`);
+
+  const r = await lookupLabel(c, label);
+  if (!r.ok) return ok(c, { found: false, query: raw, label, fqdn: `${label}.${root}`, available: false, statusText: r.message, message: r.message });
+
+  const u = c.get('user');
+  const isAdmin = !!(u && u.role === 'admin');
+  const isMine = !!(u && r.row && r.row.user_id === u.id);
+
+  // 持有人可见性
+  const mode = await holderMode(c.env);
+  let holder = null;
+  if (r.row && r.row.holder_email) {
+    if (isAdmin || isMine) holder = r.row.holder_email;
+    else if (mode === 'full') holder = r.row.holder_email;
+    else if (mode === 'masked') holder = maskEmail(r.row.holder_email);
+  }
+
+  return ok(c, {
+    query: raw,
+    label,
+    fqdn: r.fqdn,
+    found: !!r.exists,
+    exists: !!r.exists,
+    available: r.available,
+    status: r.status,
+    statusText: STATUS_TEXT[r.status] || r.status,
+    message: r.message,
+    registeredAt: r.row?.created_at || null,
+    recordCount: r.row?.record_count || 0,
+    reason: r.row?.reason || '',
+    holder,
+    mine: isMine,
+    canApply: r.available,
+    reclaimable: !!r.reclaimable,
+    rootDomain: root,
+  });
+});
+
+export default app;

@@ -14,29 +14,73 @@ export async function loadSubdomain(c, id, { admin = false } = {}) {
   return { row };
 }
 
-// 可用性检查
-app.get('/check', async (c) => {
-  const v = validateLabel(c.req.query('label'));
-  if (!v.ok) return ok(c, { available: false, message: v.error });
+/**
+ * 查询某个名称的可用性，返回详细信息。
+ * 关键：结果必须与「真正提交申请」时的判定一致，否则会出现
+ * “页面显示可注册、点申请却说已被注册”的不一致。
+ */
+export async function lookupLabel(c, rawLabel) {
+  const v = validateLabel(rawLabel);
+  if (!v.ok) return { ok: false, fqdn: '', available: false, message: v.error };
+
   const fqdn = `${v.label}.${c.env.ROOT_DOMAIN}`;
   const u = c.get('user');
-  const isAdmin = u && u.role === 'admin';
-  const exists = await c.env.DB.prepare('SELECT id, status FROM subdomains WHERE label = ?').bind(v.label).first();
+  const isAdmin = !!(u && u.role === 'admin');
+  const myId = u ? u.id : null;
+
+  const row = await c.env.DB.prepare(
+    `SELECT s.id, s.label, s.fqdn, s.status, s.user_id, s.created_at, s.reason,
+            (SELECT COUNT(*) FROM dns_records r WHERE r.subdomain_id = s.id) AS record_count,
+            u.email AS holder_email
+     FROM subdomains s LEFT JOIN users u ON u.id = s.user_id
+     WHERE s.label = ?`
+  )
+    .bind(v.label)
+    .first();
+
   const reserved = String(c.env.RESERVED_LABELS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  // 已被驳回的同名记录可以重新申请（先释放旧的即可）
-  if (exists && exists.status !== 'rejected')
-    return ok(c, { available: false, message: '该子域名已被占用', fqdn });
-  // 管理员可申请保留域名
-  if (!isAdmin && reserved.includes(v.label))
-    return ok(c, { available: false, message: '该名称为系统保留，不可申请', fqdn });
-  return ok(c, {
-    available: true,
-    message: isAdmin && reserved.includes(v.label) ? '保留域名 · 管理员可用' : '可以使用',
-    fqdn,
-  });
+  const isReserved = reserved.includes(v.label);
+
+  // 1) 已存在且不是「被驳回」→ 占用
+  if (row && row.status !== 'rejected') {
+    return {
+      ok: true, fqdn, available: false, message: '该子域名已被注册',
+      status: row.status, exists: true, row, isAdmin, isMine: myId && row.user_id === myId,
+    };
+  }
+  // 2) 存在但是被驳回的：只有本人（或管理员）可以重新申请，其他人视为占用
+  //    —— 这里必须与提交申请时的判定保持一致
+  if (row && row.status === 'rejected') {
+    const mine = myId && row.user_id === myId;
+    if (mine || isAdmin) {
+      return {
+        ok: true, fqdn, available: true, message: '你此前申请的该名称被驳回，可重新申请',
+        status: 'rejected', exists: true, row, isAdmin, isMine: mine, reclaimable: true,
+      };
+    }
+    return {
+      ok: true, fqdn, available: false, message: '该子域名暂不可用（原申请人正在处理）',
+      status: 'rejected', exists: true, row, isAdmin, isMine: false,
+    };
+  }
+  // 3) 保留域名
+  if (isReserved && !isAdmin) {
+    return { ok: true, fqdn, available: false, message: '该名称为系统保留，不可申请', status: 'reserved', exists: false, isAdmin };
+  }
+  return {
+    ok: true, fqdn, available: true,
+    message: isReserved ? '保留域名 · 管理员可用' : '可以注册',
+    status: 'available', exists: false, isAdmin,
+  };
+}
+
+// 可用性检查
+app.get('/check', async (c) => {
+  const r = await lookupLabel(c, c.req.query('label'));
+  return ok(c, { available: r.available, message: r.message, fqdn: r.fqdn, status: r.status });
 });
 
 // 计入配额的状态：被驳回（rejected）不占额度
@@ -79,16 +123,14 @@ const createMine = async (c) => {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   const isReserved = reserved.includes(v.label);
-  // 管理员可申请保留域名，普通用户不行
-  if (!isAdmin && isReserved) return fail(c, '该名称为系统保留，不可申请');
 
-  // 同名已存在：被驳回的允许重新申请，其它状态直接拒绝
-  const dup = await c.env.DB.prepare('SELECT id, status, user_id FROM subdomains WHERE label = ?')
-    .bind(v.label)
-    .first();
-  if (dup && dup.status !== 'rejected') return fail(c, '该子域名已被占用');
-  // 别人的驳回记录不能顶掉
-  if (dup && dup.user_id !== u.id && !isAdmin) return fail(c, '该子域名已被占用');
+  // 与 /check、/api/whois 使用同一套判定，避免「显示可注册、提交却说已注册」
+  const lk = await lookupLabel(c, v.label);
+  if (!lk.ok) return fail(c, lk.message);
+  if (!lk.available) return fail(c, lk.message, 409);
+
+  // 需要清理的旧记录：仅「本人/管理员重新申请此前被驳回的名称」
+  const dup = lk.reclaimable && lk.row ? lk.row : null;
 
   // 配额检查（被驳回的不计入），必须在清理旧记录之前，避免校验失败却已删数据
   const used = await c.env.DB.prepare(
@@ -117,12 +159,21 @@ const createMine = async (c) => {
   const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin;
   const status = autoApprove ? 'approved' : 'pending';
   const fqdn = `${v.label}.${c.env.ROOT_DOMAIN}`;
-  const res = await c.env.DB.prepare(
-    `INSERT INTO subdomains (label, fqdn, user_id, status, note, created_at, updated_at, reviewed_at)
-     VALUES (?,?,?,?,?,?,?,?)`
-  )
-    .bind(v.label, fqdn, u.id, status, String(note || '').slice(0, 300), now(), now(), autoApprove ? now() : null)
-    .run();
+  let res;
+  try {
+    res = await c.env.DB.prepare(
+      `INSERT INTO subdomains (label, fqdn, user_id, status, note, created_at, updated_at, reviewed_at)
+       VALUES (?,?,?,?,?,?,?,?)`
+    )
+      .bind(v.label, fqdn, u.id, status, String(note || '').slice(0, 300), now(), now(), autoApprove ? now() : null)
+      .run();
+  } catch (e) {
+    // 并发：同一瞬间被别人抢先注册（label / fqdn 唯一约束兜底）
+    const msg = String(e && e.message ? e.message : e);
+    if (/UNIQUE|constraint/i.test(msg))
+      return fail(c, '手慢一步，该子域名刚刚被他人注册，请换一个名称', 409);
+    throw e;
+  }
 
   const detail = [status];
   if (isAdmin) detail.push('管理员免审核');

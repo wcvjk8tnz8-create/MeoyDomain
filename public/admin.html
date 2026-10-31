@@ -230,6 +230,15 @@ async function load() {
             <input id="sIpLimit" type="number" min="1" max="50" value="${esc(s.max_accounts_per_ip || '2')}" style="max-width:160px">
             <div class="hint">超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响。</div>
           </div>
+          <div class="field">
+            <label>WHOIS 持有人邮箱</label>
+            <select id="sWhois" style="max-width:260px">
+              <option value="masked"${(s.whois_holder || 'masked') === 'masked' ? ' selected' : ''}>脱敏显示（ab***@gmail.com）</option>
+              <option value="none"${s.whois_holder === 'none' ? ' selected' : ''}>不显示</option>
+              <option value="full"${s.whois_holder === 'full' ? ' selected' : ''}>完整公开</option>
+            </select>
+            <div class="hint">本人与管理员始终可见完整地址，不受此项影响。</div>
+          </div>
           <div class="alert info" style="margin-bottom:12px">
             Logo 可以是站内路径（<span class="mono">/img/logo.jpg</span>）或外链图片地址（<span class="mono">https://…</span>）。
             想换成本地图，把图片放进仓库的 <span class="mono">public/img/</span> 再推一次即可。<br>
@@ -256,6 +265,7 @@ async function load() {
           faviconUrl: document.getElementById('sFav').value,
           announcement: document.getElementById('sAnno').value,
           maxAccountsPerIp: document.getElementById('sIpLimit').value,
+          whoisHolder: document.getElementById('sWhois').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo

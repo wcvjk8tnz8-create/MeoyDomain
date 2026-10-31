@@ -165,6 +165,7 @@ async function mountNav(active) {
     <div class="spacer"></div>
     <div class="links">
       <a class="navlink ${active === 'dash' ? 'active' : ''}" href="/dashboard">我的域名</a>
+      <a class="navlink ${active === 'whois' ? 'active' : ''}" href="/whois.html">WHOIS</a>
       ${isAdmin ? `<a class="navlink ${active === 'admin' ? 'active' : ''}" href="/admin">管理后台</a>` : ''}
       ${wallpaperSwitchHtml()}
       <span class="sep"></span>
