@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>二级域名分发系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="wrap narrow" style="padding-top:60px">
+  <div style="text-align:center;margin-bottom:22px">
+    <div style="font-size:26px;font-weight:800">二级域名<span style="color:var(--brand)">分发系统</span></div>
+    <div class="sub" style="margin-top:6px">通过 Cloudflare API 自动下发 DNS 记录 · 支持 12 种记录类型</div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" id="tabLogin">登录</button>
+      <button class="tab" id="tabReg">注册</button>
+    </div>
+
+    <div id="paneLogin">
+      <div class="field">
+        <label>邮箱</label>
+        <input id="lEmail" type="email" placeholder="you@example.com" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input id="lPass" type="password" placeholder="登录密码" autocomplete="current-password">
+      </div>
+      <button class="btn primary" id="btnLogin" style="width:100%;justify-content:center">登录</button>
+    </div>
+
+    <div id="paneReg" class="hidden">
+      <div class="alert info">注册即可申请二级子域名，默认配额由管理员配置；申请后需管理员审核通过。</div>
+      <div class="field">
+        <label>邮箱</label>
+        <input id="rEmail" type="email" placeholder="you@example.com" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input id="rPass" type="password" placeholder="至少 8 位" autocomplete="new-password">
+        <div class="hint">无需邮箱验证码，注册后直接登录。</div>
+      </div>
+      <button class="btn primary" id="btnReg" style="width:100%;justify-content:center">注册并登录</button>
+    </div>
+  </div>
+
+  <div class="card flat">
+    <h3>支持的能力</h3>
+    <div style="color:var(--muted);font-size:13px;line-height:2">
+      · A / AAAA / CNAME / MX / TXT / NS / SOA(只读) / PTR / SRV / CAA / NAPTR / DS 全记录类型<br>
+      · 创建子域名默认不写入任何 DNS 记录，按需添加<br>
+      · 内置 Vercel / Netlify / DNSPod 等根域名验证，验证期锁定防抢占<br>
+      · 管理员审核、封禁与配额管理
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+const tabLogin = document.getElementById('tabLogin'), tabReg = document.getElementById('tabReg');
+const paneLogin = document.getElementById('paneLogin'), paneReg = document.getElementById('paneReg');
+tabLogin.onclick = () => { tabLogin.classList.add('active'); tabReg.classList.remove('active'); paneLogin.classList.remove('hidden'); paneReg.classList.add('hidden'); };
+tabReg.onclick = () => { tabReg.classList.add('active'); tabLogin.classList.remove('active'); paneReg.classList.remove('hidden'); paneLogin.classList.add('hidden'); };
+
+document.getElementById('btnLogin').onclick = async () => {
+  const email = document.getElementById('lEmail').value.trim();
+  const password = document.getElementById('lPass').value;
+  if (!email || !password) return toast('请输入邮箱和密码', 'err');
+  try {
+    const d = await api.post('/api/auth/login', { email, password });
+    toast('登录成功' + (d.user.role === 'admin' ? '（管理员）' : ''));
+    setTimeout(() => location.href = '/dashboard', 400);
+  } catch (e) { toast(e.message, 'err'); }
+};
+
+document.getElementById('btnReg').onclick = async () => {
+  const email = document.getElementById('rEmail').value.trim();
+  const password = document.getElementById('rPass').value;
+  if (!email || !password) return toast('请输入邮箱和密码', 'err');
+  if (password.length < 8) return toast('密码至少 8 位', 'err');
+  try {
+    const d = await api.post('/api/auth/register', { email, password });
+    toast(d.isFirstAdmin ? '注册成功，你已成为首位管理员' : '注册成功');
+    setTimeout(() => location.href = '/dashboard', 400);
+  } catch (e) { toast(e.message, 'err'); }
+};
+
+// 已登录直接进控制台
+api.get('/api/auth/me').then(() => { location.href = '/dashboard'; }).catch(() => {});
+</script>
+</body>
+</html>

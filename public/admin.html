@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理后台 · 二级域名分发系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>管理后台</h1>
+  <div class="sub" id="envTip"></div>
+
+  <div class="stat-grid" id="stats" style="margin-bottom:16px"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="pending">待审核</button>
+    <button class="tab" data-tab="subs">全部子域名</button>
+    <button class="tab" data-tab="users">用户</button>
+    <button class="tab" data-tab="locks">验证锁定</button>
+    <button class="tab" data-tab="audit">审计日志</button>
+  </div>
+
+  <div class="card">
+    <div class="tablewrap"><table>
+      <thead id="thead"></thead>
+      <tbody id="tbody"><tr><td class="empty">加载中…</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="box"></div></div>
+<div id="toast"></div>
+
+<script src="/js/api.js"></script>
+<script>
+let tab = 'pending';
+
+const HEADS = {
+  pending: ['域名', '申请人', '用途', '时间', '操作'],
+  subs: ['域名', '申请人', '状态', '记录', '时间', '操作'],
+  users: ['邮箱', '角色', '状态', '配额', '域名数', '操作'],
+  locks: ['记录名', '类型', '发起人', '锁定时间', '操作'],
+  audit: ['时间', '用户', '动作', '对象', '详情'],
+};
+
+async function load() {
+  const s = await api.get('/api/admin/stats');
+  document.getElementById('stats').innerHTML = [
+    ['用户', s.users], ['已开通域名', s.subdomains], ['待审核', s.pending], ['DNS 记录', s.records], ['验证锁定', s.locked],
+  ].map(([l, v]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('')
+   + `<div class="stat"><div class="v" style="font-size:14px">${esc(s.rootDomain)}</div><div class="l">根域名${s.mock ? ' · MOCK 模式' : ''}</div></div>`;
+  document.getElementById('envTip').textContent = s.mock
+    ? '当前运行在 MOCK 模式：DNS 记录只写入内存，不会真正调用 Cloudflare。'
+    : 'DNS 记录通过 Cloudflare API 实时同步。';
+
+  document.getElementById('thead').innerHTML = '<tr>' + HEADS[tab].map((h) => `<th>${h}</th>`).join('') + '</tr>';
+  const tb = document.getElementById('tbody');
+
+  if (tab === 'pending' || tab === 'subs') {
+    const d = await api.get('/api/admin/subdomains' + (tab === 'pending' ? '?status=pending' : ''));
+    if (!d.items.length) return tb.innerHTML = `<tr><td colspan="6" class="empty">暂无数据</td></tr>`;
+    tb.innerHTML = d.items.map((s) => `
+      <tr>
+        <td><span class="fqdn">${esc(s.fqdn)}</span>${s.reason ? `<div class="hint">${esc(s.reason)}</div>` : ''}</td>
+        <td class="mono" style="color:var(--muted)">${esc(s.owner_email)}</td>
+        ${tab === 'pending' ? `<td>${esc(s.note || '-')}</td>` : `<td>${statusBadge(s.status)}</td><td>${s.record_count}</td>`}
+        <td class="nowrap" style="color:var(--muted)">${fmtTime(s.created_at)}</td>
+        <td class="right nowrap">
+          ${s.status !== 'approved' ? `<button class="btn sm ok" data-act="approve" data-id="${s.id}">通过</button>` : ''}
+          ${s.status !== 'rejected' ? `<button class="btn sm" data-act="reject" data-id="${s.id}">驳回</button>` : ''}
+          ${s.status === 'approved' ? `<button class="btn sm danger" data-act="suspend" data-id="${s.id}">停用</button>` : ''}
+          ${s.status === 'suspended' ? `<button class="btn sm ok" data-act="restore" data-id="${s.id}">恢复</button>` : ''}
+          <button class="btn sm" onclick="location.href='/domain?id=${s.id}'">记录</button>
+          <button class="btn sm danger" data-act="del" data-id="${s.id}">删除</button>
+        </td>
+      </tr>`).join('');
+    bindSubActions(tb);
+  }
+
+  if (tab === 'users') {
+    const d = await api.get('/api/admin/users');
+    tb.innerHTML = d.items.map((u) => `
+      <tr>
+        <td class="mono">${esc(u.email)}</td>
+        <td>${u.role === 'admin' ? '<span class="badge type">admin</span>' : '<span class="badge">user</span>'}</td>
+        <td>${u.status === 'banned' ? `<span class="badge danger">已封禁</span><div class="hint">${esc(u.ban_reason || '')}</div>` : '<span class="badge ok">正常</span>'}</td>
+        <td>${u.quota}</td>
+        <td>${u.sub_count}</td>
+        <td class="right nowrap">
+          <button class="btn sm" data-quota="${u.id}" data-email="${esc(u.email)}" data-q="${u.quota}" data-role="${u.role}">配额/角色</button>
+          ${u.status === 'banned'
+            ? `<button class="btn sm ok" data-unban="${u.id}">解封</button>`
+            : `<button class="btn sm danger" data-ban="${u.id}" data-email="${esc(u.email)}">封禁</button>`}
+        </td>
+      </tr>`).join('');
+    tb.querySelectorAll('[data-quota]').forEach((b) => b.onclick = () => {
+      openModal('调整 ' + b.dataset.email, `
+        <div class="field"><label>子域名配额</label><input id="q" type="number" value="${b.dataset.q}"></div>
+        <div class="field"><label>角色</label><select id="r"><option value="user" ${b.dataset.role === 'user' ? 'selected' : ''}>user</option><option value="admin" ${b.dataset.role === 'admin' ? 'selected' : ''}>admin</option></select></div>
+        <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" id="ok">保存</button></div>`);
+      document.getElementById('ok').onclick = async () => {
+        try { await api.post('/api/admin/users/' + b.dataset.quota + '/quota', { quota: Number(document.getElementById('q').value), role: document.getElementById('r').value }); toast('已保存'); closeModal(); load(); }
+        catch (e) { toast(e.message, 'err'); }
+      };
+    });
+    tb.querySelectorAll('[data-ban]').forEach((b) => b.onclick = () => {
+      openModal('封禁 ' + b.dataset.email, `
+        <div class="alert danger">封禁后：该用户立即下线、无法登录，其全部子域名停用。</div>
+        <div class="field"><label>封禁原因</label><input id="rs" placeholder="违规使用"></div>
+        <label class="check" style="margin-bottom:12px"><input type="checkbox" id="pg"> 同时清空其在 Cloudflare 上的全部 DNS 记录</label>
+        <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" id="ok">确认封禁</button></div>`);
+      document.getElementById('ok').onclick = async () => {
+        try { await api.post('/api/admin/users/' + b.dataset.ban + '/ban', { reason: document.getElementById('rs').value, purgeDns: document.getElementById('pg').checked }); toast('已封禁'); closeModal(); load(); }
+        catch (e) { toast(e.message, 'err'); }
+      };
+    });
+    tb.querySelectorAll('[data-unban]').forEach((b) => b.onclick = async () => {
+      try { await api.post('/api/admin/users/' + b.dataset.unban + '/unban', {}); toast('已解封'); load(); } catch (e) { toast(e.message, 'err'); }
+    });
+  }
+
+  if (tab === 'locks') {
+    const d = await api.get('/api/admin/locks');
+    if (!d.items.length) return tb.innerHTML = `<tr><td colspan="5" class="empty">当前没有处于锁定状态的验证记录</td></tr>`;
+    tb.innerHTML = d.items.map((r) => `
+      <tr class="locked">
+        <td class="mono">${esc(r.name)}</td>
+        <td><span class="badge type">${esc(r.type)}</span></td>
+        <td class="mono" style="color:var(--muted)">${esc(r.owner_email)}</td>
+        <td class="nowrap" style="color:var(--muted)">${fmtTime(r.locked_at)}</td>
+        <td class="right nowrap">
+          <button class="btn sm" data-unlock="${r.id}" data-keep="1">仅解锁</button>
+          <button class="btn sm danger" data-unlock="${r.id}" data-keep="0">解锁并删除</button>
+        </td>
+      </tr>`).join('');
+    tb.querySelectorAll('[data-unlock]').forEach((b) => b.onclick = async () => {
+      try { await api.post('/api/records/' + b.dataset.unlock + '/force-unlock', { delete: b.dataset.keep !== '1' }); toast('已强制解锁'); load(); }
+      catch (e) { toast(e.message, 'err'); }
+    });
+  }
+
+  if (tab === 'audit') {
+    const d = await api.get('/api/admin/audit');
+    tb.innerHTML = d.items.map((a) => `
+      <tr>
+        <td class="nowrap" style="color:var(--muted)">${fmtTime(a.created_at)}</td>
+        <td class="mono" style="color:var(--muted)">${esc(a.email || '系统')}</td>
+        <td><span class="badge">${esc(a.action)}</span></td>
+        <td class="mono">${esc(a.target || '')}</td>
+        <td style="color:var(--muted)">${esc(a.detail || '')}</td>
+      </tr>`).join('');
+  }
+}
+
+function bindSubActions(tb) {
+  const call = async (id, act, body = {}) => {
+    if (act === 'reject' || act === 'suspend') {
+      const reason = prompt(act === 'reject' ? '驳回原因：' : '停用原因：');
+      if (reason === null) return;
+      body.reason = reason;
+    }
+    if (act === 'del' && !confirm('删除该子域名并清空其 DNS 记录？')) return;
+    try {
+      if (act === 'del') await api.del('/api/admin/subdomains/' + id);
+      else await api.post(`/api/admin/subdomains/${id}/${act}`, body);
+      toast('操作成功'); load();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  tb.querySelectorAll('[data-act]').forEach((b) => b.onclick = () => call(b.dataset.id, b.dataset.act));
+}
+
+document.querySelectorAll('.tab').forEach((t) => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
+    t.classList.add('active');
+    tab = t.dataset.tab;
+    load();
+  };
+});
+
+mountNav('admin').then((u) => {
+  if (u && u.role !== 'admin') {
+    document.querySelector('.wrap').innerHTML =
+      '<div class="card"><div class="alert danger">当前账号没有管理员权限。</div><a href="/dashboard">← 返回我的域名</a></div>';
+    return;
+  }
+  load();
+}).catch(() => {});
+</script>
+</body>
+</html>

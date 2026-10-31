@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNS 记录管理 · 二级域名分发系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <div style="margin-bottom:14px">
+    <a href="/dashboard" style="font-size:13px">← 返回我的域名</a>
+    <div class="row between" style="margin-top:6px">
+      <div>
+        <span class="fqdn" id="fqdn"></span> <span class="copy" id="copyFqdn">复制</span>
+        <span id="statusBadge" style="margin-left:8px"></span>
+      </div>
+      <button class="btn sm" id="btnSoa">查看 SOA</button>
+    </div>
+  </div>
+
+  <div id="statusAlert"></div>
+
+  <!-- 根域名验证 -->
+  <div class="card">
+    <h2>根域名验证</h2>
+    <div class="sub" style="margin-bottom:12px">
+      粘贴平台给你的验证记录（主机名 + 值），系统会写入一条 TXT 并<strong>锁定</strong>。
+      锁定期间任何人都无法修改或删除它，只有你在下方点击「确认认证完成」后才会释放 —— 这样别人无法抢注或破坏你的验证。
+    </div>
+    <div class="preset-grid" id="presets"></div>
+    <div class="grid2">
+      <div class="field">
+        <label>主机名（不用带根域名）</label>
+        <input id="vHost" placeholder="_vercel" autocomplete="off">
+        <div class="hint">将生成：<span class="mono" id="vPreview"></span></div>
+      </div>
+      <div class="field">
+        <label>验证值（TXT）</label>
+        <textarea id="vValue" placeholder="粘贴平台提供的验证值"></textarea>
+      </div>
+    </div>
+    <div class="row end">
+      <button class="btn primary" id="btnVerify">写入并锁定验证记录</button>
+    </div>
+  </div>
+
+  <!-- 常用模板 -->
+  <div class="card flat">
+    <h3>快捷解析模板</h3>
+    <div class="row" id="tpls" style="gap:8px"></div>
+  </div>
+
+  <!-- DNS 记录 -->
+  <div class="card">
+    <div class="row between" style="margin-bottom:10px">
+      <h2 style="margin:0">DNS 记录</h2>
+      <button class="btn primary sm" id="btnAdd">+ 添加记录</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>类型</th><th>主机名</th><th>记录值</th><th>TTL</th><th>状态</th><th class="right">操作</th></tr></thead>
+        <tbody id="recList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="box"></div></div>
+<div id="toast"></div>
+
+<script src="/js/api.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const subId = params.get('id');
+let cfg = null, sub = null, records = [], presets = [];
+
+const TEMPLATES = [
+  { n: 'Vercel (CNAME)', type: 'CNAME', host: '', content: 'cname.vercel-dns.com', proxied: false },
+  { n: 'Netlify (CNAME)', type: 'CNAME', host: '', content: 'your-site.netlify.app', proxied: false },
+  { n: 'Cloudflare Pages', type: 'CNAME', host: '', content: 'your-project.pages.dev', proxied: false },
+  { n: 'GitHub Pages (A)', type: 'A', host: '', content: '185.199.108.153', proxied: false },
+  { n: 'www 别名', type: 'CNAME', host: 'www', content: '@target', proxied: false },
+  { n: 'SPF 拒绝全部', type: 'TXT', host: '', content: 'v=spf1 -all', proxied: false },
+  { n: 'DMARC 拒绝', type: 'TXT', host: '_dmarc', content: 'v=DMARC1; p=reject; adkim=s; aspf=s', proxied: false },
+];
+
+async function loadAll() {
+  cfg = await api.get('/api/config');
+  presets = cfg.verifyPresets;
+  const d = await api.get('/api/subdomains/' + subId);
+  sub = d.subdomain;
+  records = d.records;
+  document.getElementById('fqdn').textContent = sub.fqdn;
+  document.getElementById('statusBadge').innerHTML = statusBadge(sub.status);
+  renderPresets();
+  renderTpl();
+  renderRecords();
+  renderStatusAlert();
+  updatePreview();
+}
+
+function renderStatusAlert() {
+  const el = document.getElementById('statusAlert');
+  if (sub.status === 'pending') el.innerHTML = `<div class="alert warn">该子域名仍在审核中，审核通过后才能添加 DNS 记录。</div>`;
+  else if (sub.status === 'rejected') el.innerHTML = `<div class="alert danger">申请已被驳回：${esc(sub.reason || '')}</div>`;
+  else if (sub.status === 'suspended') el.innerHTML = `<div class="alert danger">已停用：${esc(sub.reason || '')}，无法操作 DNS 记录。</div>`;
+  else el.innerHTML = '';
+}
+
+function renderPresets() {
+  document.getElementById('presets').innerHTML = presets.map((p, i) => `
+    <div class="preset ${i === 0 ? 'active' : ''}" data-key="${p.key}" data-host="${esc(p.host)}" title="${esc(p.hint)}">
+      <div class="n">${esc(p.label)}</div><div class="h">${esc(p.host || '自定义')}</div>
+    </div>`).join('');
+  document.querySelectorAll('.preset').forEach((el) => {
+    el.onclick = () => {
+      document.querySelectorAll('.preset').forEach((x) => x.classList.remove('active'));
+      el.classList.add('active');
+      if (el.dataset.host) document.getElementById('vHost').value = el.dataset.host;
+      updatePreview();
+    };
+  });
+}
+
+function updatePreview() {
+  const h = document.getElementById('vHost').value.trim();
+  document.getElementById('vPreview').textContent = (h && h !== '@' ? h + '.' : '') + (sub ? sub.fqdn : '');
+}
+document.getElementById('vHost').addEventListener('input', updatePreview);
+
+function renderTpl() {
+  document.getElementById('tpls').innerHTML = TEMPLATES
+    .map((t, i) => `<button class="btn sm" data-tpl="${i}">${esc(t.n)}</button>`).join('');
+  document.querySelectorAll('[data-tpl]').forEach((b) => {
+    b.onclick = () => {
+      const t = TEMPLATES[b.dataset.tpl];
+      const body = { type: t.type, host: t.host, content: t.content, ttl: 1, proxied: t.proxied };
+      if (t.content === '@target') { body.content = sub.fqdn; }
+      openRecordForm(null, body);
+    };
+  });
+}
+
+function renderRecords() {
+  const tb = document.getElementById('recList');
+  if (!records.length) {
+    tb.innerHTML = `<tr><td colspan="6" class="empty">暂无 DNS 记录。创建子域名时不会自动添加任何记录，点右上角手动添加。</td></tr>`;
+    return;
+  }
+  tb.innerHTML = records.map((r) => {
+    const val = r.display || r.content;
+    const short = val.length > 60 ? val.slice(0, 60) + '…' : val;
+    const lock = r.verify_lock;
+    return `
+    <tr class="${lock ? 'locked' : ''}">
+      <td><span class="badge type">${esc(r.type)}</span></td>
+      <td class="mono">${esc(r.host === '@' ? sub.fqdn : r.host)}</td>
+      <td class="mono" title="${esc(val)}">${esc(short)}</td>
+      <td class="nowrap" style="color:var(--muted)">${r.ttl === 1 ? '自动' : r.ttl}</td>
+      <td class="nowrap">
+        ${r.proxied ? '<span class="badge proxy">已代理</span> ' : ''}
+        ${lock ? `<span class="badge lock">🔒 验证锁定</span>` : '<span class="badge ok">正常</span>'}
+        ${lock && r.verify_preset ? `<div class="hint">${esc(presetLabel(r.verify_preset))} · ${fmtTime(r.locked_at)}</div>` : ''}
+      </td>
+      <td class="right nowrap">
+        ${lock
+          ? `<button class="btn sm ok" data-confirm="${r.id}">确认认证完成</button>`
+          : `<button class="btn sm" data-edit="${r.id}">编辑</button>
+             <button class="btn sm danger" data-del="${r.id}">删除</button>`}
+      </td>
+    </tr>`;
+  }).join('');
+
+  tb.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
+    if (!confirm('删除该记录？Cloudflare 上的记录会同步删除。')) return;
+    try { await api.del('/api/records/' + b.dataset.del); toast('已删除'); loadAll(); } catch (e) { toast(e.message, 'err'); }
+  });
+  tb.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => {
+    const r = records.find((x) => x.id === Number(b.dataset.edit));
+    openRecordForm(r);
+  });
+  tb.querySelectorAll('[data-confirm]').forEach((b) => b.onclick = () => {
+    const r = records.find((x) => x.id === Number(b.dataset.confirm));
+    openModal('确认认证完成', `
+      <div class="alert ok">验证记录 <span class="mono">${esc(r.name)}</span> 即将解锁。</div>
+      <p style="color:var(--muted);font-size:13px">大多数平台的验证记录在验证完成后就不再需要，建议删除以释放该主机名；如果平台要求长期保留（例如 Google 站点验证），请勾选保留。</p>
+      <label class="check" style="margin:12px 0"><input type="checkbox" id="keepRec"> 保留这条 TXT 记录（仅解除锁定）</label>
+      <div class="row end">
+        <button class="btn" onclick="closeModal()">取消</button>
+        <button class="btn primary" id="okConfirm">确认认证完成</button>
+      </div>`);
+    document.getElementById('okConfirm').onclick = async () => {
+      try {
+        await api.post('/api/records/' + r.id + '/verify-confirm', { keep: document.getElementById('keepRec').checked });
+        toast('已解锁'); closeModal(); loadAll();
+      } catch (e) { toast(e.message, 'err'); }
+    };
+  });
+}
+
+function presetLabel(key) {
+  const p = presets.find((x) => x.key === key);
+  return p ? p.label : key;
+}
+
+// ---------- 添加 / 编辑记录 ----------
+function openRecordForm(rec, presetBody) {
+  const types = cfg.recordTypes;
+  const cur = rec ? rec.type : (presetBody ? presetBody.type : 'A');
+  const spec = types.find((t) => t.key === cur);
+
+  const typeOptions = types.map((t) =>
+    `<option value="${t.key}" ${t.key === cur ? 'selected' : ''}>${t.key}${t.readonly ? '（只读）' : ''} — ${esc(t.desc)}</option>`).join('');
+  const ttlOptions = cfg.ttlChoices.map((t) => `<option value="${t.value}">${esc(t.label)}</option>`).join('');
+
+  openModal(rec ? '编辑记录' : '添加记录', `
+    <div class="field">
+      <label>记录类型</label>
+      <select id="fType">${typeOptions}</select>
+      <div class="hint" id="fDesc">${esc(spec.desc)}</div>
+      ${spec.note ? `<div class="alert warn" style="margin-top:8px">${esc(spec.note)}</div>` : ''}
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label>主机名</label>
+        <input id="fHost" placeholder="留空或 @ 表示 ${esc(sub.fqdn)}">
+        <div class="hint">填写后生成 <span class="mono" id="fPreview"></span></div>
+      </div>
+      <div class="field">
+        <label>TTL</label>
+        <select id="fTtl">${ttlOptions}</select>
+      </div>
+    </div>
+    <div id="fExtra"></div>
+    <div class="field">
+      <label>${esc(spec.valueLabel || '记录值')}</label>
+      ${spec.multiline
+        ? `<textarea id="fContent" placeholder="${esc(spec.placeholder || '')}"></textarea>`
+        : `<input id="fContent" placeholder="${esc(spec.placeholder || '')}">`}
+    </div>
+    <div id="fProxyWrap" class="field ${spec.canProxy ? '' : 'hidden'}">
+      <label class="check"><input type="checkbox" id="fProxied"> 开启 Cloudflare 代理（橙色云，仅 TTL 自动时可用）</label>
+    </div>
+    <div class="field">
+      <label>备注（选填）</label>
+      <input id="fComment" placeholder="给自己看的说明">
+    </div>
+    <div class="row end">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn primary" id="fSave">保存</button>
+    </div>`);
+
+  const typeSel = document.getElementById('fType');
+  typeSel.onchange = () => {
+    const saved = { host: document.getElementById('fHost').value, content: document.getElementById('fContent').value };
+    openRecordForm(rec, { ...presetBody, type: typeSel.value, ...saved });
+    const h = document.getElementById('fHost'); if (h) h.value = saved.host;
+    const c = document.getElementById('fContent'); if (c) c.value = saved.content;
+  };
+
+  const fillExtra = () => {
+    const sp = types.find((t) => t.key === typeSel.value);
+    document.getElementById('fExtra').innerHTML = (sp.fields || []).map((f) => {
+      const v = rec && rec.data ? rec.data[f.key] : (presetBody && presetBody[f.key] !== undefined ? presetBody[f.key] : f.default);
+      if (f.type === 'select') {
+        return `<div class="field"><label>${esc(f.label)}</label><select data-f="${f.key}">${
+          f.options.map((o) => `<option value="${o}" ${String(o) === String(v) ? 'selected' : ''}>${o}</option>`).join('')
+        }</select></div>`;
+      }
+      return `<div class="field"><label>${esc(f.label)}</label><input data-f="${f.key}" type="${f.type}" value="${esc(v ?? '')}" placeholder="${esc(f.placeholder || '')}">${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
+    }).join('');
+    updatePreview2();
+  };
+
+  function updatePreview2() {
+    const h = document.getElementById('fHost').value.trim();
+    document.getElementById('fPreview').textContent = (h && h !== '@' ? h + '.' : '') + sub.fqdn;
+  }
+  document.getElementById('fHost').addEventListener('input', updatePreview2);
+  fillExtra();
+
+  // 预填
+  const init = rec || presetBody || {};
+  document.getElementById('fHost').value = init.host ?? '';
+  document.getElementById('fContent').value = init.content ?? '';
+  document.getElementById('fTtl').value = String(init.ttl ?? 1);
+  document.getElementById('fProxied').checked = !!init.proxied;
+  document.getElementById('fComment').value = init.comment ?? '';
+  updatePreview2();
+
+  document.getElementById('fSave').onclick = async () => {
+    const type = document.getElementById('fType').value;
+    const body = {
+      type,
+      host: document.getElementById('fHost').value.trim(),
+      content: document.getElementById('fContent').value.trim(),
+      ttl: Number(document.getElementById('fTtl').value),
+      proxied: document.getElementById('fProxied').checked,
+      comment: document.getElementById('fComment').value.trim(),
+    };
+    document.querySelectorAll('#fExtra [data-f]').forEach((el) => {
+      body[el.dataset.f] = el.type === 'number' ? Number(el.value) : el.value;
+    });
+    try {
+      if (rec) await api.patch('/api/records/' + rec.id, body);
+      else await api.post('/api/subdomains/' + subId + '/records', body);
+      toast(rec ? '已更新' : '已添加'); closeModal(); loadAll();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+}
+
+document.getElementById('btnAdd').onclick = () => openRecordForm(null);
+
+document.getElementById('btnVerify').onclick = async () => {
+  const active = document.querySelector('.preset.active');
+  const host = document.getElementById('vHost').value.trim();
+  const value = document.getElementById('vValue').value.trim();
+  if (!host) return toast('请填写验证主机名，如 _vercel', 'err');
+  if (!value) return toast('请粘贴平台给出的验证值', 'err');
+  try {
+    await api.post('/api/subdomains/' + subId + '/verify', { preset: active ? active.dataset.key : 'custom', host, value });
+    toast('验证记录已写入并锁定');
+    document.getElementById('vValue').value = '';
+    loadAll();
+  } catch (e) { toast(e.message, 'err'); }
+};
+
+document.getElementById('btnSoa').onclick = async () => {
+  try {
+    const d = await api.get('/api/soa');
+    const s = d.soa && d.soa.data;
+    openModal('区域 SOA（只读）', `
+      ${s ? `
+      <div class="kv">
+        <div class="k">区域</div><div class="mono">${esc(d.soa.name)}</div>
+        <div class="k">主 NS</div><div class="mono">${esc(s.mname)}</div>
+        <div class="k">管理员</div><div class="mono">${esc(s.rname)}</div>
+        <div class="k">序列号</div><div class="mono">${esc(s.serial)}</div>
+        <div class="k">刷新</div><div class="mono">${esc(s.refresh)}</div>
+        <div class="k">重试</div><div class="mono">${esc(s.retry)}</div>
+        <div class="k">过期</div><div class="mono">${esc(s.expire)}</div>
+        <div class="k">最小 TTL</div><div class="mono">${esc(s.minimum)}</div>
+      </div>` : '<div class="empty">未能获取 SOA 信息</div>'}
+      <div class="alert info" style="margin-top:12px">${esc(d.note)}</div>
+      <div class="row end"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+  } catch (e) { toast(e.message, 'err'); }
+};
+
+document.getElementById('copyFqdn').onclick = () => copyText(sub.fqdn);
+
+mountNav('dash').then(loadAll).catch(() => {});
+</script>
+</body>
+</html>

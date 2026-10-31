@@ -1,0 +1,10 @@
+# 本地开发用（复制为 .dev.vars 后填写）
+# 生产环境请用：npx wrangler secret put CF_API_TOKEN / CF_ZONE_ID
+
+# Cloudflare API Token：需要权限 Zone → DNS → Edit，Zone 范围选择你的根域名
+CF_API_TOKEN=your_cloudflare_api_token_here
+# 根域名的 Zone ID（Cloudflare 面板右下角可查）
+CF_ZONE_ID=your_zone_id_here
+
+# 调试模式：1 = 不真实调用 Cloudflare，用内存模拟（本地跑通流程用）
+CF_MOCK=1

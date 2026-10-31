@@ -1,0 +1,22 @@
+{
+  "name": "subdomain-hub",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "二级域名分发系统 · Cloudflare Workers + D1 + Cloudflare DNS API",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "db:create": "wrangler d1 create subdomain-hub-db",
+    "db:init": "wrangler d1 execute subdomain-hub-db --remote --file=./schema.sql",
+    "db:init:local": "wrangler d1 execute subdomain-hub-db --local --file=./schema.sql",
+    "admin": "node scripts/admin.mjs"
+  },
+  "dependencies": {
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

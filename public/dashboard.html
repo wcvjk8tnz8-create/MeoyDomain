@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的子域名 · 二级域名分发系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <div class="row between" style="margin-bottom:14px">
+    <div><h1>我的子域名</h1><div class="sub" id="quotaTip" style="margin:0"></div></div>
+    <button class="btn sm" id="btnPwd">修改密码</button>
+  </div>
+
+  <div class="card">
+    <h2>申请新的子域名</h2>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:1;min-width:200px">
+        <label>子域名</label>
+        <div class="row" style="gap:0;flex-wrap:nowrap">
+          <input id="label" placeholder="mail" style="border-radius:10px 0 0 10px" autocomplete="off">
+          <span class="mono" style="padding:0 12px;background:var(--card-2);border:1px solid var(--line);border-left:none;border-radius:0 10px 10px 0;display:flex;align-items:center;white-space:nowrap">.<span id="rootDomain"></span></span>
+        </div>
+        <div class="hint" id="checkTip"></div>
+      </div>
+      <div style="flex:2;min-width:220px">
+        <label>用途说明（选填，管理员审核参考）</label>
+        <input id="note" placeholder="例如：个人博客 / 邮件服务">
+      </div>
+      <button class="btn primary" id="btnApply">申请</button>
+    </div>
+    <div class="alert info" style="margin-top:12px">
+      创建子域名时<strong>不会</strong>自动写入任何 DNS 记录；审核通过后再到「DNS 记录」页按需添加。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>子域名列表</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>域名</th><th>状态</th><th>记录数</th><th>申请时间</th><th class="right">操作</th></tr></thead>
+        <tbody id="list"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="box"></div></div>
+<div id="toast"></div>
+
+<script src="/js/api.js"></script>
+<script>
+let rootDomain = '';
+let checkTimer = null;
+
+async function load() {
+  const d = await api.get('/api/subdomains');
+  const cfg = await api.get('/api/config');
+  rootDomain = cfg.rootDomain;
+  document.getElementById('rootDomain').textContent = rootDomain;
+  document.getElementById('quotaTip').textContent = `已使用 ${d.used} / ${d.quota} 个` + (cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效');
+  const tb = document.getElementById('list');
+  if (!d.items.length) {
+    tb.innerHTML = `<tr><td colspan="5" class="empty">还没有子域名，先在上方申请一个吧</td></tr>`;
+    return;
+  }
+  tb.innerHTML = d.items.map((s) => `
+    <tr>
+      <td><span class="fqdn">${esc(s.fqdn)}</span> ${s.reason ? `<div class="hint">${esc(s.reason)}</div>` : ''}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td>${s.record_count}</td>
+      <td class="nowrap" style="color:var(--muted)">${fmtTime(s.created_at)}</td>
+      <td class="right nowrap">
+        <button class="btn sm" onclick="location.href='/domain?id=${s.id}'">管理 DNS</button>
+        <button class="btn sm danger" data-del="${s.id}">释放</button>
+      </td>
+    </tr>`).join('');
+  tb.querySelectorAll('[data-del]').forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm('确定释放该子域名？它在 Cloudflare 上的所有 DNS 记录会一并删除。')) return;
+      try { await api.del('/api/subdomains/' + b.dataset.del); toast('已释放'); load(); }
+      catch (e) { toast(e.message, 'err'); }
+    };
+  });
+}
+
+document.getElementById('label').addEventListener('input', (e) => {
+  const v = e.target.value.trim();
+  const tip = document.getElementById('checkTip');
+  if (!v) { tip.textContent = ''; return; }
+  clearTimeout(checkTimer);
+  checkTimer = setTimeout(async () => {
+    try {
+      const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v));
+      tip.innerHTML = r.available
+        ? `<span style="color:var(--ok)">✓ ${esc(r.fqdn)} 可用</span>`
+        : `<span style="color:var(--danger)">✗ ${esc(r.message)}</span>`;
+    } catch (err) { tip.textContent = ''; }
+  }, 350);
+});
+
+document.getElementById('btnApply').onclick = async () => {
+  const label = document.getElementById('label').value.trim();
+  const note = document.getElementById('note').value.trim();
+  if (!label) return toast('请输入子域名', 'err');
+  try {
+    const r = await api.post('/api/subdomains', { label, note });
+    toast(r.status === 'approved' ? '申请成功，已开通' : '已提交，等待管理员审核');
+    document.getElementById('label').value = '';
+    document.getElementById('note').value = '';
+    document.getElementById('checkTip').textContent = '';
+    load();
+  } catch (e) { toast(e.message, 'err'); }
+};
+
+document.getElementById('btnPwd').onclick = () => {
+  openModal('修改密码', `
+    <div class="field"><label>原密码</label><input id="op" type="password"></div>
+    <div class="field"><label>新密码（至少 8 位）</label><input id="np" type="password"></div>
+    <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" id="okPwd">保存</button></div>`);
+  document.getElementById('okPwd').onclick = async () => {
+    try {
+      await api.post('/api/auth/password', { oldPassword: document.getElementById('op').value, newPassword: document.getElementById('np').value });
+      toast('已更新，其它设备已下线'); closeModal();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+};
+
+mountNav('dash').then(load).catch(() => {});
+</script>
+</body>
+</html>

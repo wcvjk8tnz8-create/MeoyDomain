@@ -1,0 +1,35 @@
+name = "subdomain-hub"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+# 静态前端（登录页 / 控制台 / 域名管理页 / 管理后台）
+[assets]
+directory = "public"
+binding = "ASSETS"
+# 静态资源优先；匹配不到时才交给 Worker 处理 /api（wrangler 4 可写成 run_worker_first = ["/api/*"]）
+run_worker_first = false
+
+# D1 数据库
+[[d1_databases]]
+binding = "DB"
+database_name = "subdomain-hub-db"
+# 先执行 `npx wrangler d1 create subdomain-hub-db`，把返回的 id 填到这里（32 位十六进制）
+database_id = "00000000000000000000000000000000"
+
+[vars]
+# 根域名（用户申请到的子域名都挂在这个域下）
+ROOT_DOMAIN = "meoy.top"
+# 每个用户默认可持有的子域名数量
+DEFAULT_QUOTA = "5"
+# 是否开放注册（"0" = 关闭注册，仅管理员可开号）
+ALLOW_SIGNUP = "1"
+# 新申请的子域名是否需要管理员审核（"1" = 需要审核）
+REQUIRE_APPROVAL = "1"
+# 保留子域（逗号分隔，禁止申请）
+RESERVED_LABELS = "www,ns1,ns2,ns3,mail,admin,api,cdn,ftp,smtp,pop,imap,mx,test,blog,shop,app,dns,root,support,help,docs,status,panel,cloud,dev,git,ssh,mysql,db,web,forum,portal,vpn,proxy"
+# 调试用：置为 "1" 时不真实调用 Cloudflare API，改为内存模拟（方便本地跑通流程）
+CF_MOCK = "0"
+
+# 以下敏感值用 secret 写入，不要写在这里：
+#   npx wrangler secret put CF_API_TOKEN
+#   npx wrangler secret put CF_ZONE_ID
