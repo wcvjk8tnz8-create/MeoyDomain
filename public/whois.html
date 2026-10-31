@@ -13,6 +13,7 @@
 <div class="wrap" style="max-width:760px">
   <h1>WHOIS 查询</h1>
   <div class="sub" id="rootTip">查询某个二级子域名的注册状态</div>
+  <div class="hint" id="hostTip" style="margin:0 0 12px"></div>
 
   <div class="card">
     <div class="row" style="align-items:flex-end;flex-wrap:nowrap">
@@ -20,7 +21,7 @@
         <label>域名</label>
         <div class="row" style="gap:0;flex-wrap:nowrap">
           <input id="q" placeholder="me" style="border-radius:var(--radius-s) 0 0 var(--radius-s);border-right:none" autocomplete="off">
-          <span class="mono" id="rootSuffix" style="padding:0 11px;background:rgba(255,255,255,.08);border:1px solid var(--glass-line);border-radius:0 var(--radius-s) var(--radius-s) 0;display:flex;align-items:center;white-space:nowrap;color:var(--text-2)">.meoy.top</span>
+          <span class="mono" id="rootSuffix" style="padding:0 11px;background:rgba(0,229,255,.08);border:1px solid var(--line);border-radius:0 var(--radius-s) var(--radius-s) 0;display:flex;align-items:center;white-space:nowrap;color:var(--c1);font-size:12px">.meoy.top</span>
         </div>
       </div>
       <button class="btn primary" id="btnQuery" style="flex:0 0 auto">查询</button>
@@ -102,9 +103,21 @@ document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 
   } catch {}
   try { await api.get('/api/auth/me'); isLoggedIn = true; } catch { isLoggedIn = false; }
 
-  // 支持 /whois.html?name=xxx 直接查询
-  const pre = new URLSearchParams(location.search).get('name');
+  // 支持 /whois.html?name=xxx 或 /whois.html/xxx 直接查询
+  let pre = new URLSearchParams(location.search).get('name');
+  if (!pre) {
+    const seg = location.pathname.split('/').filter(Boolean);
+    const last = seg[seg.length - 1] || '';
+    if (last && last.toLowerCase() !== 'whois.html') pre = decodeURIComponent(last);
+  }
   if (pre) { document.getElementById('q').value = pre; doQuery(); }
+
+  // 当前处于 whois.<根域名> 时给出提示
+  const hp = location.hostname.toLowerCase().split('.');
+  if (hp.length >= 3 && hp[0] === 'whois') {
+    document.getElementById('hostTip').innerHTML =
+      `<span class="badge inf">whois 子域</span> <span style="margin-left:6px">直接访问 ${esc(location.hostname)} 即进入本页；${esc(location.hostname)}/<b>名称</b> 可直接查询。</span>`;
+  }
 })();
 
 mountNav('dash').then(async (u) => {
@@ -113,7 +126,7 @@ mountNav('dash').then(async (u) => {
     const nav = document.getElementById('nav');
     if (nav) {
       nav.innerHTML = `
-        <div class="logo"><img src="/img/logo.jpg" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:8px"><span class="logo-text">Meoy</span></div>
+        <div class="logo"><img src="/img/logo.jpg" alt="" style="width:30px;height:30px;object-fit:contain;border-radius:3px"><span class="logo-text">Meoy</span></div>
         <div class="spacer"></div>
         <div class="links">
           <a class="navlink" href="/">登录</a>

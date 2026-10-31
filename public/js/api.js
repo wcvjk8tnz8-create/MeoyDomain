@@ -145,22 +145,48 @@ function statusBadge(s) {
 }
 
 /* ---------- 顶部导航 ---------- */
-async function mountNav(active) {
+/**
+ * 挂载导航。
+ * @param active 当前页签
+ * @param opts.optional 为 true 时未登录也不跳转（用于服务条款等公开页）
+ */
+async function mountNav(active, opts = {}) {
   const nav = document.getElementById('nav');
   if (!nav) return null;
   let user = null;
   try {
     user = (await api.get('/api/auth/me')).user;
   } catch {
-    location.href = '/';
+    if (!opts.optional) { location.href = '/'; return null; }
+  }
+  if (!user) {
+    const b0 = await loadBranding();
+    nav.innerHTML = `
+      <div class="logo">
+        <img src="${esc(b0.logoUrl)}" alt="${esc(b0.siteName)}" style="width:30px;height:30px;object-fit:contain;border-radius:3px">
+        <span class="logo-text">${esc(b0.siteName)}</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="links">
+        <a class="navlink ${active === 'whois' ? 'active' : ''}" href="/whois.html">WHOIS</a>
+        <a class="navlink ${active === 'terms' ? 'active' : ''}" href="/terms.html">条款</a>
+        ${wallpaperSwitchHtml()}
+        <span class="sep"></span>
+        <a class="btn sm primary" href="/">登录 / 注册</a>
+      </div>`;
+    document.querySelectorAll('.bgswitch button').forEach((btn) => {
+      btn.onclick = () => applyWallpaper(btn.dataset.wp);
+    });
     return null;
   }
   const isAdmin = user.role === 'admin';
   const b = await loadBranding();
+  let rootHost = '';
+  try { rootHost = (await api.get('/api/config')).rootDomain || ''; } catch {}
   nav.innerHTML = `
     <div class="logo">
-      <img src="${esc(b.logoUrl)}" alt="${esc(b.siteName)}" style="width:34px;height:34px;object-fit:contain;border-radius:8px">
-      <span class="logo-text">${esc(b.siteName)}<em>子域名分发</em></span>
+      <img src="${esc(b.logoUrl)}" alt="${esc(b.siteName)}" style="width:30px;height:30px;object-fit:contain;border-radius:3px">
+      <span class="logo-text">${esc(b.siteName)}<em>${esc(rootHost || 'subdomain')}</em></span>
     </div>
     <div class="spacer"></div>
     <div class="links">
@@ -195,5 +221,29 @@ window.closeModal = closeModal;
 document.addEventListener('click', (e) => {
   if (e.target.id === 'modal') closeModal();
 });
+
+/* ---------- WHOIS 子域名自动跳转 ----------
+   访问 whois.<根域名>（如 whois.meoy.top）自动进入 WHOIS 查询页。
+   支持直接查询：whois.meoy.top/google → /whois.html?name=google
+   同步执行，不依赖任何异步配置。 */
+const WHOIS_SUBDOMAIN = 'whois'; // 想换前缀改这里
+
+(function whoisSubdomainRedirect() {
+  try {
+    const parts = location.hostname.toLowerCase().split('.');
+    // whois.meoy.top（3 段及以上）；根域名与 localhost 不触发
+    if (parts.length < 3 || parts[0] !== WHOIS_SUBDOMAIN) return;
+    const p = location.pathname.replace(/^\/+|\/+$/g, '');
+    if (p === 'whois.html') return;                 // 已在查询页
+    if (!p || p === 'index.html') {                 // 根路径 → 查询页
+      location.replace('/whois.html');
+      return;
+    }
+    // /something → 查询 something（静态资源与接口路径除外）
+    if (!/\.(html|css|js|png|jpg|jpeg|ico|svg|json)$/i.test(p) && !p.startsWith('api/')) {
+      location.replace('/whois.html?name=' + encodeURIComponent(p));
+    }
+  } catch { /* 忽略 */ }
+})();
 
 mountWallpaper();

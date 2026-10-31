@@ -27,6 +27,7 @@
   try {
     await api.get('/api/auth/me');
     document.getElementById('backLink').href = '/dashboard';
+    document.getElementById('backLink').textContent = '返回控制台';
   } catch {
     document.getElementById('backLink').href = '/';
     document.getElementById('backLink').textContent = '返回登录';
@@ -47,10 +48,9 @@
   }
 })();
 
-mountNav('dash').then(async (u) => {
+// 公开页面：未登录也可查看，导航显示登录入口
+mountNav('terms', { optional: true }).then(async () => {
   applyBranding(await loadBranding());
-  const nav = document.getElementById('nav');
-  if (nav && !u) nav.style.display = 'none';
 }).catch(() => {});
 </script>
 </body>

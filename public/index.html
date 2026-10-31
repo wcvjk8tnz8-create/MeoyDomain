@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>账户登录 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
+<script>
+  // whois.<根域名> 直接进 WHOIS 查询页（提前执行，避免首页闪一下）
+  (function () {
+    try {
+      var parts = location.hostname.toLowerCase().split('.');
+      if (parts.length >= 3 && parts[0] === 'whois') {
+        location.replace('/whois.html' + (location.search || ''));
+      }
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 <div id="bg"></div>
