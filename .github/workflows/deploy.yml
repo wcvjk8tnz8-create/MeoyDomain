@@ -31,8 +31,9 @@ jobs:
           node-version: 20
           cache: npm
 
+      # 用 npm ci 保证与 package-lock.json 完全一致（本机无需手动 install）
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # 校验必需配置是否齐全，缺什么直接说清楚
       - name: 检查配置
