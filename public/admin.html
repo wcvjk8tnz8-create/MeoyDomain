@@ -160,12 +160,14 @@ async function load() {
             <div class="field" style="margin:0"><label>Logo 地址</label><input id="sLogo" value="${esc(s.logo_url || '')}" placeholder="/img/logo.jpg"></div>
           </div>
           <div class="grid2" style="margin-bottom:12px">
-            <div class="field" style="margin:0"><label>图标地址（favicon）</label><input id="sFav" value="${esc(s.favicon_url || '')}" placeholder="/img/favicon.png"></div>
+            <div class="field" style="margin:0"><label>图标地址（favicon）</label><input id="sFav" value="${esc(s.favicon_url || '')}" placeholder="/favicon.ico"></div>
             <div class="field" style="margin:0"><label>站点公告</label><input id="sAnno" value="${esc(s.announcement || '')}" placeholder="留空则不显示"></div>
           </div>
           <div class="alert info" style="margin-bottom:12px">
             Logo 可以是站内路径（<span class="mono">/img/logo.jpg</span>）或外链图片地址（<span class="mono">https://…</span>）。
-            想换成本地图，把图片放进仓库的 <span class="mono">public/img/</span> 再推一次即可。
+            想换成本地图，把图片放进仓库的 <span class="mono">public/img/</span> 再推一次即可。<br>
+            图标建议用 <span class="mono">.ico</span>（兼容最好，浏览器默认会请求 <span class="mono">/favicon.ico</span>），
+            也可以用 <span class="mono">.png</span>。
           </div>
           <div class="row">
             <button class="btn primary" id="saveSet">保存</button>

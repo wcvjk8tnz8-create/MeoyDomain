@@ -45,7 +45,7 @@ app.get('/api/config', async (c) => {
     verifyPresets: VERIFY_PRESETS,
     siteName: s.site_name || 'Meoy',
     logoUrl: s.logo_url || '/img/logo.jpg',
-    faviconUrl: s.favicon_url || '/img/favicon.png',
+    faviconUrl: s.favicon_url || '/favicon.ico',
   });
 });
 

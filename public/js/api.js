@@ -59,7 +59,7 @@ document.addEventListener('click', (e) => {
 });
 
 /* ---------- 站点品牌（站点名 / Logo，管理员可在后台改） ---------- */
-const DEFAULT_BRAND = { siteName: 'Meoy', logoUrl: '/img/logo.jpg', faviconUrl: '/img/favicon.png' };
+const DEFAULT_BRAND = { siteName: 'Meoy', logoUrl: '/img/logo.jpg', faviconUrl: '/favicon.ico' };
 let brandPromise = null;
 
 function loadBranding() {

@@ -16,6 +16,26 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at INTEGER
 );
 
+-- 注册登记表：记录注册 IP、UA 与条款同意情况（独立表，避免改动 users 结构）
+CREATE TABLE IF NOT EXISTS registrations (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER NOT NULL,
+  ip           TEXT,
+  ua           TEXT,
+  agreed_terms INTEGER NOT NULL DEFAULT 0,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reg_ip    ON registrations(ip);
+CREATE INDEX IF NOT EXISTS idx_reg_user  ON registrations(user_id);
+
+-- IP 封禁名单（某 IP 下的账号超限时由管理员一键封禁）
+CREATE TABLE IF NOT EXISTS ip_bans (
+  ip         TEXT PRIMARY KEY,
+  reason     TEXT,
+  created_by INTEGER,
+  created_at INTEGER NOT NULL
+);
+
 -- 会话表
 CREATE TABLE IF NOT EXISTS sessions (
   token      TEXT    PRIMARY KEY,
@@ -93,7 +113,12 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO settings(key, value) VALUES ('signup_open', '1');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('approval_required', '1');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('announcement', '欢迎使用二级域名分发系统');
+-- 同 IP 可注册的账号数上限（管理员可在后台调整）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('max_accounts_per_ip', '2');
 -- 站点品牌（后台「站点设置」可改）
 INSERT OR IGNORE INTO settings(key, value) VALUES ('site_name', 'Meoy');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('logo_url', '/img/logo.jpg');
-INSERT OR IGNORE INTO settings(key, value) VALUES ('favicon_url', '/img/favicon.png');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('favicon_url', '/favicon.ico');
+
+-- 迁移：早期默认 favicon 为 png，现统一为根目录的 .ico（仅改仍是旧默认值的库）
+UPDATE settings SET value = '/favicon.ico' WHERE key = 'favicon_url' AND value = '/img/favicon.png';

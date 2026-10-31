@@ -243,7 +243,7 @@ app.post('/settings', async (c) => {
 // 恢复默认 Logo（重新指向内置图片）
 app.post('/settings/reset-logo', async (c) => {
   const u = c.get('user');
-  for (const [k, v] of [['logo_url', '/img/logo.jpg'], ['favicon_url', '/img/favicon.png']]) {
+  for (const [k, v] of [['logo_url', '/img/logo.jpg'], ['favicon_url', '/favicon.ico']]) {
     await c.env.DB.prepare(
       'INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
     )
