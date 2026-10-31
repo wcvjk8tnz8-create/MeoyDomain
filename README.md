@@ -86,6 +86,7 @@
 | `reason` | 驳回或停用原因 |
 
 **whois 子域名自动跳转**：访问 `whois.<根域名>`（如 `whois.meoy.top`）自动进入查询页；`whois.meoy.top/<名称>` 直接查询该名称。
+防循环三重保护：只在入口页（`/`、`/index.html`）触发；识别 `whois` 与 `whois.html` 两种形态（部分托管会规范化掉 `.html`）；同一次会话内对同一目标只跳一次，落地后即清除标记。即使 `whois.html` 缺失被回退到首页也不会无限刷新。
 需要先把 `whois` 这个主机名指向本 Worker —— 在 Cloudflare 的 Worker 设置里添加**自定义域/路由** `whois.meoy.top/*`（或在 DNS 里加一条指向 Worker 的记录并开启代理）。前缀可在 `public/js/api.js` 顶部的 `WHOIS_SUBDOMAIN` 改。
 
 持有人显示策略（后台「站点设置」可改）：`masked` 脱敏（默认）/ `none` 不显示 / `full` 完整公开；**本人与管理员始终可见完整地址**。

@@ -7,12 +7,19 @@
 <link rel="stylesheet" href="/css/style.css">
 <script>
   // whois.<根域名> 直接进 WHOIS 查询页（提前执行，避免首页闪一下）
+  // 只在入口页（/ 或 /index.html）触发，且同一次会话只跳一次，避免循环刷新
   (function () {
     try {
       var parts = location.hostname.toLowerCase().split('.');
-      if (parts.length >= 3 && parts[0] === 'whois') {
-        location.replace('/whois.html' + (location.search || ''));
-      }
+      if (parts.length < 3 || parts[0] !== 'whois') return;
+      var p = location.pathname.replace(/^\/+|\/+$/g, '');
+      if (p !== '' && p !== 'index.html') return;          // 非入口页不处理
+      if (/^whois(\.html)?$/i.test(p.split('/')[0] || '')) return; // 已在 whois 页
+      var target = '/whois.html' + (location.search || '');
+      var key = 'meoy_whois_rd';
+      if (sessionStorage.getItem(key) === target) return;  // 上次跳转没落地 → 停手
+      sessionStorage.setItem(key, target);
+      location.replace(target);
     } catch (e) {}
   })();
 </script>

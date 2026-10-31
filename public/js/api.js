@@ -233,17 +233,36 @@ const WHOIS_SUBDOMAIN = 'whois'; // 想换前缀改这里
     const parts = location.hostname.toLowerCase().split('.');
     // whois.meoy.top（3 段及以上）；根域名与 localhost 不触发
     if (parts.length < 3 || parts[0] !== WHOIS_SUBDOMAIN) return;
+
     const p = location.pathname.replace(/^\/+|\/+$/g, '');
-    if (p === 'whois.html') return;                 // 已在查询页
-    if (!p || p === 'index.html') {                 // 根路径 → 查询页
-      location.replace('/whois.html');
+
+    // ① 已经在 WHOIS 页（whois.html / whois / whois/xxx / 带查询串）→ 清除标记并停止
+    //    注意：部分托管会把 /whois.html 规范化成 /whois，两种形态都要识别
+    const seg = p.split('/');
+    if (/^whois(\.html)?$/i.test(seg[0] || '')) {
+      try { sessionStorage.removeItem('meoy_whois_rd'); } catch {}
       return;
     }
-    // /something → 查询 something（静态资源与接口路径除外）
-    if (!/\.(html|css|js|png|jpg|jpeg|ico|svg|json)$/i.test(p) && !p.startsWith('api/')) {
-      location.replace('/whois.html?name=' + encodeURIComponent(p));
+
+    // ② 只有停在入口页（/ 或 /index.html）时才跳转，避免任何路径被反复改写
+    if (p !== '' && p !== 'index.html') {
+      // 非入口页：/google 这类直接查询（静态资源与接口路径除外）
+      if (/\.(html|css|js|png|jpg|jpeg|ico|svg|json)$/i.test(p) || p.startsWith('api/')) return;
+      whoisGo('/whois.html?name=' + encodeURIComponent(p));
+      return;
     }
+    whoisGo('/whois.html');
   } catch { /* 忽略 */ }
+
+  // 同一次会话内对同一目标只跳一次，杜绝任何原因造成的循环刷新
+  function whoisGo(target) {
+    try {
+      const key = 'meoy_whois_rd';
+      if (sessionStorage.getItem(key) === target) return;
+      sessionStorage.setItem(key, target);
+    } catch {}
+    location.replace(target);
+  }
 })();
 
 mountWallpaper();
