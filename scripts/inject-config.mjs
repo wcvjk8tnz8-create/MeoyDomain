@@ -23,16 +23,16 @@ console.log('注入配置：');
 
 // D1 database_id：占位值必须被替换，否则部署会失败
 const d1 = process.env.D1_DATABASE_ID;
-if (!d1) {
+if (d1) {
+  apply('database_id', d1);
+} else {
   const m = toml.match(/database_id\s*=\s*["']([^"']+)["']/);
   if (!m || PLACEHOLDER_ID.test(m[1])) {
-    console.error('✘ 未提供 D1_DATABASE_ID，且 wrangler.toml 里仍是占位值。');
-    console.error('  请在 Settings → Secrets 添加 D1_DATABASE_ID，或用 npm run db:create 后手动填写。');
-    process.exit(1);
+    console.log('  · 未拿到 database_id（上一未自动生成 / 未配置），保持原值');
+    console.log('    若部署报错，请检查 CLOUDFLARE_API_TOKEN 是否具备 D1 编辑权限。');
+  } else {
+    console.log('  · database_id 已手动填写，跳过');
   }
-  console.log('  · database_id 已手动填写，跳过');
-} else {
-  apply('database_id', d1);
 }
 
 // 其余可选变量

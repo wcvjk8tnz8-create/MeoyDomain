@@ -88,33 +88,28 @@ subdomain-hub/
 
 记录下 **Zone ID**（域名概览页右下角）。
 
-### 2. 创建 D1 数据库（只需一次）
+### 2. 填 4 个 Secrets，推一次就完事
 
-```bash
-npm install
-npx wrangler login
-npx wrangler d1 create subdomain-hub-db
-```
+仓库 **Settings → Secrets and variables → Actions → Secrets**：
 
-输出里会有一行 `database_id = "xxxx"`，复制那串 32 位十六进制。
+| 名称 | 值 |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需 Account → D1 编辑 + Workers Scripts 编辑 + Zone → DNS 编辑） |
+| `CLOUDFLARE_ACCOUNT_ID` | 账户 ID（Workers 概览页右侧） |
+| `CF_API_TOKEN` | 调 DNS API 用，可与上面同一个 Token |
+| `CF_ZONE_ID` | 根域名的 Zone ID |
 
-### 3. 填 4 个 Secrets，推一次就完事
+然后 `git push origin main`，Actions 自动完成全流程：
 
-仓库 **Settings → Secrets and variables → Actions**：
+1. **D1 数据库自动创建** —— 按名字查找，已存在就复用，不存在才创建（重复部署不会重复建库、不会丢数据）
+2. 把 database_id 写进 `wrangler.toml`
+3. 把 `CF_API_TOKEN` / `CF_ZONE_ID` 加密写入 Worker（等同 `wrangler secret put`）
+4. 建表（幂等，只建不存在的表）
+5. `wrangler deploy`
 
-| 位置 | 名称 | 值 |
-|---|---|---|
-| Secrets | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（Account → Workers Scripts 编辑 + Zone → DNS 编辑） |
-| Secrets | `CLOUDFLARE_ACCOUNT_ID` | 账户 ID（Workers 概览页右侧） |
-| Secrets | `CF_API_TOKEN` | 同上，用于调 DNS API（可与上面同一个 Token） |
-| Secrets | `CF_ZONE_ID` | 根域名的 Zone ID |
-| Secrets | `D1_DATABASE_ID` | 上一步拿到的 database_id |
+全程不需要 `wrangler login`、不需要手动改配置文件、不需要手动建库。
 
-然后 `git push origin main` —— GitHub Actions 会自动完成：注入配置 → 写入 Worker 加密环境变量 → 建表 → 部署。**不需要手动改 `wrangler.toml`，也不需要手动跑 `wrangler secret put`。**
-
-> `D1_DATABASE_ID` 是唯一必需的：脚本会在 CI 里把它写进 `wrangler.toml`。若你更愿意直接改文件，填好真实 ID 后不配这个 Secret 也能正常部署。
-
-**可选调整**（Settings → Variables，明文即可，不用加密）：
+**可选调整**（Settings → Variables，明文即可）：
 
 | 名称 | 说明 | 默认 |
 |---|---|---|
@@ -123,11 +118,14 @@ npx wrangler d1 create subdomain-hub-db
 | `ALLOW_SIGNUP` | `1` 开放注册 / `0` 关闭 | `1` |
 | `REQUIRE_APPROVAL` | `1` 需审核 / `0` 即时开通 | `1` |
 | `RESERVED_LABELS` | 保留子域名（逗号分隔） | www/mail/admin… |
+| `D1_DATABASE_NAME` | D1 数据库名 | `subdomain-hub-db` |
 | `CF_MOCK` | `1` = 不调真实 Cloudflare | `0` |
 
 改完 Variables 后手动 **Actions → Run workflow** 一次即可生效。
 
-### 4. 本地命令行部署（不想用 Actions 时）
+> 如果你不想让 CI 建库，也可以本地 `npx wrangler d1 create subdomain-hub-db` 后把真实 `database_id` 填进 `wrangler.toml`；此时 CI 检测到已填写就直接用，不会重复创建。
+
+### 3. 本地命令行部署（不想用 Actions 时）
 
 ```bash
 npx wrangler secret put CF_API_TOKEN
