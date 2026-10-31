@@ -3,40 +3,68 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Meoy · 二级域名分发</title>
+<title>账户登录 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 <div id="bg"></div>
 
-<div class="wrap narrow" style="padding-top:60px">
-  <div class="brand-line">
-    <img id="brandLogo" src="/img/logo.jpg" alt="Meoy" class="brand-logo">
-    <div>
-      <div class="brand-name" data-site-name>Meoy</div>
-      <div class="brand-sub">二级域名分发 · DNS 管理</div>
-    </div>
+<!-- 顶部导航 -->
+<header class="site-nav">
+  <div class="site-nav-in">
+    <a class="brand" href="/">
+      <img id="navLogo" src="/img/logo.jpg" alt="Meoy">
+      <span class="brand-name" data-site-name>Meoy</span>
+    </a>
+    <div class="spacer"></div>
+    <nav class="site-links">
+      <a href="#" id="navReg">注册账号</a>
+      <a href="/">返回首页</a>
+      <a href="/terms.html">服务条款</a>
+      <span id="bgsw"></span>
+    </nav>
   </div>
+</header>
 
-  <div class="card">
+<div class="auth-wrap">
+  <!-- 左：登录 / 注册 -->
+  <section class="auth-card">
     <div class="tabs">
       <button class="tab active" id="tabLogin">登录</button>
       <button class="tab" id="tabReg">注册</button>
+      <span class="spacer"></span>
     </div>
 
+    <!-- 登录 -->
     <div id="paneLogin">
+      <h2 class="auth-title">欢迎回来</h2>
+      <p class="auth-sub">登录后即可管理你的二级子域名与 DNS 记录</p>
+
       <div class="field">
         <label>邮箱</label>
-        <input id="lEmail" type="email" placeholder="you@example.com" autocomplete="username">
+        <input id="lEmail" type="email" placeholder="yourname@gmail.com" autocomplete="username">
       </div>
       <div class="field">
         <label>密码</label>
-        <input id="lPass" type="password" placeholder="登录密码" autocomplete="current-password">
+        <input id="lPass" type="password" placeholder="请输入密码" autocomplete="current-password">
       </div>
-      <button class="btn primary" id="btnLogin" style="width:100%;justify-content:center">登录</button>
+
+      <div class="row between" style="margin-bottom:14px">
+        <label class="check" style="margin:0">
+          <input type="checkbox" id="lRemember" checked>
+          <span>记住我（90 天免登录）</span>
+        </label>
+        <a href="/terms.html" target="_blank" style="font-size:12px">服务条款</a>
+      </div>
+
+      <button class="btn primary block" id="btnLogin">登录账户</button>
     </div>
 
+    <!-- 注册 -->
     <div id="paneReg" class="hidden">
+      <h2 class="auth-title">创建账号</h2>
+      <p class="auth-sub">注册后即可申请根域名下的二级子域名</p>
+
       <div class="field">
         <label>邮箱</label>
         <input id="rEmail" type="email" placeholder="yourname@gmail.com" autocomplete="username">
@@ -47,46 +75,86 @@
         <input id="rPass" type="password" placeholder="至少 8 位" autocomplete="new-password">
         <div class="hint">无需邮箱验证，注册后直接登录。</div>
       </div>
+
       <div class="alert warn" style="margin-bottom:10px" id="ipRule">
         同一网络最多注册 2 个账号，超限账号一经发现将被全部封禁。
       </div>
+
       <label class="check" style="margin-bottom:12px">
         <input type="checkbox" id="rAgree">
         <span id="agreeLabel">我已阅读并同意《服务条款与免责声明》，了解并接受禁止滥用与免责条款</span>
       </label>
-      <button class="btn primary" id="btnReg" style="width:100%;justify-content:center">注册并登录</button>
-    </div>
-  </div>
 
-  <div class="card flat">
-    <div class="row between" style="margin-bottom:10px">
-      <h3 style="margin:0">说明</h3>
-      <span id="bgsw"></span>
+      <button class="btn primary block" id="btnReg">注册账户</button>
     </div>
-    <div style="color:var(--text-2);font-size:12.5px;line-height:1.9">
-      注册后可申请根域名下的二级子域名，配额由管理员配置。<br>
-      申请提交后需管理员审核，通过后自行添加 DNS 记录。<br>
-      支持 A、AAAA、CNAME、MX、TXT、NS、SRV、CAA、NAPTR、DS 等类型。
+  </section>
+
+  <!-- 右：信息模块（参考 DNSHE 的侧栏布局） -->
+  <aside class="auth-side">
+    <div class="side-mod">
+      <h3>账户控制台</h3>
+      <p>登录后可在控制台查看你名下的全部子域名，管理 A、AAAA、CNAME、MX、TXT、NS、SRV、CAA、NAPTR、DS 等记录，并对接 Vercel、Netlify 等平台的根域名验证。</p>
     </div>
-  </div>
+
+    <div class="side-mod">
+      <h3>注册域名</h3>
+      <ol>
+        <li>注册账号并同意服务条款</li>
+        <li>提交子域名申请，填写用途说明</li>
+        <li>等待管理员审核（通常很快）</li>
+        <li>通过后自行添加所需 DNS 记录</li>
+      </ol>
+      <p class="dim">创建子域名时不会写入任何 DNS 记录。</p>
+    </div>
+
+    <div class="side-mod">
+      <h3>产品服务</h3>
+      <ul class="svc">
+        <li><b>免费二级域名</b><span>根域名下自由申请</span></li>
+        <li><b>多类型解析</b><span>覆盖 10 余种主流记录</span></li>
+        <li><b>根域名验证</b><span>Vercel / Netlify / DNSPod</span></li>
+        <li><b>Cloudflare 加持</b><span>全球 Anycast 解析</span></li>
+      </ul>
+    </div>
+
+    <div class="side-mod warn">
+      <h3>账户安全提醒</h3>
+      <p>本站不会以任何理由索要你的密码。请勿使用弱密码或在多处复用同一密码。</p>
+      <p class="dim">严禁用于钓鱼、欺诈、恶意程序、垃圾邮件等滥用行为，违者立即封禁。</p>
+      <a href="/terms.html" target="_blank">查看禁止滥用清单 →</a>
+    </div>
+  </aside>
 </div>
 
 <div id="toast"></div>
 <script src="/js/api.js"></script>
 <script>
 document.getElementById('bgsw').innerHTML = wallpaperSwitchHtml();
+loadBranding().then((b) => {
+  applyBranding(b);
+  document.getElementById('navLogo').src = b.logoUrl;
+});
 
 const tabLogin = document.getElementById('tabLogin'), tabReg = document.getElementById('tabReg');
 const paneLogin = document.getElementById('paneLogin'), paneReg = document.getElementById('paneReg');
-tabLogin.onclick = () => { tabLogin.classList.add('active'); tabReg.classList.remove('active'); paneLogin.classList.remove('hidden'); paneReg.classList.add('hidden'); };
-tabReg.onclick = () => { tabReg.classList.add('active'); tabLogin.classList.remove('active'); paneReg.classList.remove('hidden'); paneLogin.classList.add('hidden'); };
+function switchTo(which) {
+  const login = which === 'login';
+  tabLogin.classList.toggle('active', login);
+  tabReg.classList.toggle('active', !login);
+  paneLogin.classList.toggle('hidden', !login);
+  paneReg.classList.toggle('hidden', login);
+}
+tabLogin.onclick = () => switchTo('login');
+tabReg.onclick = () => switchTo('reg');
+document.getElementById('navReg').onclick = (e) => { e.preventDefault(); switchTo('reg'); };
 
 document.getElementById('btnLogin').onclick = async () => {
   const email = document.getElementById('lEmail').value.trim();
   const password = document.getElementById('lPass').value;
+  const remember = document.getElementById('lRemember').checked;
   if (!email || !password) return toast('请输入邮箱和密码', 'err');
   try {
-    const d = await api.post('/api/auth/login', { email, password });
+    const d = await api.post('/api/auth/login', { email, password, remember });
     toast('登录成功' + (d.user.role === 'admin' ? '，管理员（不限配额）' : ''));
     setTimeout(() => location.href = '/dashboard', 400);
   } catch (e) { toast(e.message, 'err'); }
@@ -105,7 +173,6 @@ document.getElementById('btnReg').onclick = async () => {
   } catch (e) { toast(e.message, 'err'); }
 };
 
-// 规则摘要（邮箱白名单 + 单 IP 账号上限）
 api.get('/api/rules').then((r) => {
   const names = r.allowedEmailDomains.map((d) => d.split('.')[0]);
   document.getElementById('mailHint').textContent =
@@ -115,11 +182,6 @@ api.get('/api/rules').then((r) => {
   document.getElementById('agreeLabel').innerHTML =
     `我已阅读并同意<a href="/terms.html" target="_blank">《服务条款与免责声明》</a>，了解并接受禁止滥用与免责条款`;
 }).catch(() => {});
-
-loadBranding().then((b) => {
-  applyBranding(b);
-  document.getElementById('brandLogo').src = b.logoUrl;
-});
 
 api.get('/api/auth/me').then(() => { location.href = '/dashboard'; }).catch(() => {});
 </script>

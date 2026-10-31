@@ -97,8 +97,8 @@ app.post('/register', async (c) => {
     mail,
     (role === 'admin' ? '首位用户，自动设为管理员（不限配额）' : '') || `ip=${ip || '未知'}`
   );
-  const { token } = await createSession(c, userId);
-  setSessionCookie(c, token);
+  const { token, maxAge } = await createSession(c, userId, true);
+  setSessionCookie(c, token, maxAge);
   return ok(c, {
     user: { id: userId, email: mail, role, status: 'active', quota, quotaUnlimited: quota < 0 },
     isFirstAdmin: role === 'admin',
@@ -107,7 +107,7 @@ app.post('/register', async (c) => {
 
 // 登录
 app.post('/login', async (c) => {
-  const { email, password } = await c.req.json().catch(() => ({}));
+  const { email, password, remember } = await c.req.json().catch(() => ({}));
   const mail = String(email || '').trim().toLowerCase();
   if (!mail || !password) return fail(c, '请输入邮箱和密码');
 
@@ -135,9 +135,9 @@ app.post('/login', async (c) => {
         .run();
     }
   }
-  const { token } = await createSession(c, user.id);
-  setSessionCookie(c, token);
-  await audit(c, user.id, 'user.login', mail);
+  const { token, maxAge } = await createSession(c, user.id, remember !== false);
+  setSessionCookie(c, token, maxAge);
+  await audit(c, user.id, 'user.login', mail, remember === false ? '未记住登录（1 天）' : '记住登录（90 天）');
   return ok(c, { user: publicUser(user) });
 });
 

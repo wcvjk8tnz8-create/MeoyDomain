@@ -3,24 +3,27 @@ import { now, clientIp, fail } from '../lib/util.js';
 
 export const COOKIE = 'sh_session';
 export const UNLIMITED = -1; // quota 为 -1 表示不限量
-const TTL_MS = 30 * 24 * 3600 * 1000; // 30 天
+const TTL_MS = 30 * 24 * 3600 * 1000; // 默认 30 天
+const TTL_REMEMBER_MS = 90 * 24 * 3600 * 1000; // 记住我：90 天
+const TTL_SHORT_MS = 24 * 3600 * 1000; // 未勾选：1 天
 
-export async function createSession(c, userId) {
+export async function createSession(c, userId, remember = true) {
   const token = randomToken(32);
-  const expires = now() + TTL_MS;
+  const ttl = remember ? TTL_REMEMBER_MS : TTL_SHORT_MS;
+  const expires = now() + ttl;
   await c.env.DB.prepare(
     'INSERT INTO sessions (token, user_id, expires_at, created_at, ip, ua) VALUES (?,?,?,?,?,?)'
   )
     .bind(token, userId, expires, now(), clientIp(c), (c.req.header('user-agent') || '').slice(0, 200))
     .run();
-  return { token, expires };
+  return { token, expires, maxAge: Math.floor(ttl / 1000) };
 }
 
-export function setSessionCookie(c, token) {
+export function setSessionCookie(c, token, maxAge = TTL_MS / 1000) {
   const secure = new URL(c.req.url).protocol === 'https:' ? 'Secure; ' : '';
   c.header(
     'Set-Cookie',
-    `${COOKIE}=${token}; HttpOnly; ${secure}SameSite=Lax; Path=/; Max-Age=${TTL_MS / 1000}`,
+    `${COOKIE}=${token}; HttpOnly; ${secure}SameSite=Lax; Path=/; Max-Age=${Math.floor(maxAge)}`,
     { append: true }
   );
 }
