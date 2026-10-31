@@ -28,6 +28,20 @@ CREATE TABLE IF NOT EXISTS registrations (
 CREATE INDEX IF NOT EXISTS idx_reg_ip    ON registrations(ip);
 CREATE INDEX IF NOT EXISTS idx_reg_user  ON registrations(user_id);
 
+-- NS 委派：把子域名托管到第三方 DNS（anyns.io / DNSHE / Cloudflare / 自定义）
+CREATE TABLE IF NOT EXISTS delegations (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  subdomain_id  INTEGER NOT NULL UNIQUE,
+  provider      TEXT    NOT NULL,            -- anyns | dnshe | cloudflare | custom
+  zone_name     TEXT    NOT NULL,
+  ns_list       TEXT    NOT NULL,            -- JSON 数组
+  provider_zone TEXT,                        -- 服务商侧的 zone id（若通过 API 创建）
+  created_by    INTEGER,
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_delegations_sub ON delegations(subdomain_id);
+
 -- IP 封禁名单（某 IP 下的账号超限时由管理员一键封禁）
 CREATE TABLE IF NOT EXISTS ip_bans (
   ip         TEXT PRIMARY KEY,

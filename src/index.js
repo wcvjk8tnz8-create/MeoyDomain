@@ -5,6 +5,7 @@ import { RECORD_TYPES, TTL_CHOICES, VERIFY_PRESETS, TYPE_NAMES } from './lib/rec
 import authRoutes from './routes/auth.js';
 import termsRoutes from './routes/terms.js';
 import whoisRoutes from './routes/whois.js';
+import delegationRoutes from './routes/delegation.js';
 import subdomainRoutes from './routes/subdomains.js';
 import recordRoutes from './routes/records.js';
 import adminRoutes from './routes/admin.js';
@@ -59,12 +60,16 @@ app.route('/api', whoisRoutes);
 
 // 需要登录的接口
 app.use('/api/subdomains/*', requireAuth);
+app.use('/api/delegation/*', requireAuth);
 app.use('/api/records/*', requireAuth);
 app.use('/api/soa', requireAuth);
 app.use('/api/admin/*', requireAuth, requireAdmin);
 
 app.route('/api', recordRoutes);
 app.route('/api/subdomains', subdomainRoutes);
+// NS 委派：/api/delegation/providers 与 /api/subdomains/:id/delegation
+app.route('/api/delegation', delegationRoutes);
+app.route('/api/subdomains', delegationRoutes);
 app.route('/api/admin', adminRoutes);
 
 // API 兜底

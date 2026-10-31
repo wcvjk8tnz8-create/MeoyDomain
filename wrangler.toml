@@ -25,8 +25,9 @@ DEFAULT_QUOTA = "5"
 ALLOW_SIGNUP = "1"
 # 新申请的子域名是否需要管理员审核（"1" = 需要审核）
 REQUIRE_APPROVAL = "1"
-# 保留子域（逗号分隔，禁止申请）
-RESERVED_LABELS = "www,ns1,ns2,ns3,mail,admin,api,cdn,ftp,smtp,pop,imap,mx,test,blog,shop,app,dns,root,support,help,docs,status,panel,cloud,dev,git,ssh,mysql,db,web,forum,portal,vpn,proxy"
+# 保留子域（逗号分隔，禁止申请；管理员仍可申请）
+# 注意：whois 用于 WHOIS 查询页、bbs/forum 等留给站点自身功能，务必保留
+RESERVED_LABELS = "www,ns1,ns2,ns3,ns4,mail,admin,api,cdn,ftp,smtp,pop,imap,mx,test,blog,shop,app,dns,dns1,dns2,root,support,help,docs,status,panel,cloud,dev,git,ssh,mysql,db,web,forum,bbs,home,search,whois,dnshe,anyns,ns,cdn1,cname,static,assets,img,image,img1,cdn2,img2"
 # 调试用：置为 "1" 时不真实调用 Cloudflare API，改为内存模拟（方便本地跑通流程）
 CF_MOCK = "0"
 

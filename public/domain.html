@@ -55,6 +55,15 @@
     </div>
   </div>
 
+  <div class="card">
+    <h2>域名托管（NS 委派）</h2>
+    <div class="sub" style="margin-bottom:12px">
+      把该子域名的解析权整体交给第三方 DNS（anyns.io / DNSHE / Cloudflare 等）。
+      系统会在父区域写入 NS 记录，之后该域名下的全部记录由目标服务商负责，本站不再接管解析。
+    </div>
+    <div id="delegationBox"><div class="empty">加载中…</div></div>
+  </div>
+
   <div class="card flat">
     <h3>常用模板</h3>
     <div class="row" id="tpls" style="gap:6px"></div>
@@ -109,6 +118,147 @@ async function loadAll() {
   renderRecords();
   renderStatusAlert();
   updatePreview();
+  await loadDelegation();
+}
+
+/* ---------------- NS 委派（域名托管） ---------------- */
+let providers = [];
+let deleg = null;
+
+async function loadDelegation() {
+  const box = document.getElementById('delegationBox');
+  if (!providers.length) {
+    try { providers = (await api.get('/api/delegation/providers')).items; } catch { providers = []; }
+  }
+  try {
+    const d = await api.get('/api/subdomains/' + subId + '/delegation');
+    deleg = d.delegation;
+  } catch { deleg = null; }
+
+  if (deleg) {
+    box.innerHTML = `
+      <div class="row between" style="margin-bottom:10px">
+        <div>
+          <span class="badge inf">已托管</span>
+          <b style="margin-left:8px">${esc(deleg.providerName)}</b>
+        </div>
+        <button class="btn sm danger" id="btnUnDelegate">取消托管</button>
+      </div>
+      <div class="kv" style="margin-bottom:10px">
+        <div class="k">委派区域</div><div class="mono">${esc(deleg.zone_name)}</div>
+        <div class="k">NS 服务器</div><div class="mono">${deleg.ns.map((n) => esc(n)).join('<br>')}</div>
+        ${deleg.provider_zone ? `<div class="k">服务商 ID</div><div class="mono">${esc(deleg.provider_zone)}</div>` : ''}
+      </div>
+      <div class="alert info">
+        已把 <span class="mono">${esc(deleg.zone_name)}</span> 的解析权交给 ${esc(deleg.providerName)}。
+        请到其控制台添加并管理该域名的解析记录；本站 DNS 记录页不再对它生效。
+      </div>
+      ${deleg.provider === 'dnshe' ? `
+        <div class="row" style="margin-top:10px;align-items:flex-end">
+          <div style="flex:1;min-width:180px">
+            <label>DNSHE API Token（用于检查委派状态）</label>
+            <input id="chkToken" type="password" placeholder="留空则不检查">
+          </div>
+          <button class="btn sm" id="btnChkDel">检查委派</button>
+        </div>
+        <div class="hint" id="chkOut"></div>` : ''}
+    `;
+    document.getElementById('btnUnDelegate').onclick = async () => {
+      if (!confirm(`确定取消托管？将删除父区域的 ${deleg.ns.length} 条 NS 记录，解析权回到本站。\n\n注意：目标服务商上该域名的解析记录不会自动删除，请自行清理。`)) return;
+      try {
+        await api.del('/api/subdomains/' + subId + '/delegation');
+        toast('已取消托管');
+        await loadDelegation();
+      } catch (e) { toast(e.message, 'err'); }
+    };
+    const chk = document.getElementById('btnChkDel');
+    if (chk) chk.onclick = async () => {
+      const t = document.getElementById('chkToken').value.trim();
+      const out = document.getElementById('chkOut');
+      if (!t) return toast('请填写 API Token', 'err');
+      out.textContent = '检查中…';
+      try {
+        const r = await api.post('/api/subdomains/' + subId + '/delegation/check', { apiToken: t });
+        out.innerHTML = r.supported
+          ? `<span style="color:var(--ok)">已查询</span> <span class="mono">${esc(JSON.stringify(r.raw).slice(0, 220))}</span>`
+          : esc(r.message);
+      } catch (e) { out.textContent = '检查失败：' + e.message; }
+    };
+    return;
+  }
+
+  // 未托管：选择服务商
+  box.innerHTML = `
+    <div class="preset-grid" id="dlgProviders"></div>
+    <div id="dlgForm"></div>`;
+  const grid = document.getElementById('dlgProviders');
+  grid.innerHTML = providers.map((p, i) => `
+    <div class="preset ${p.key === 'anyns' ? 'on' : ''}" data-p="${esc(p.key)}">
+      <b>${esc(p.name)}</b>
+      <span>${esc(p.desc)}</span>
+    </div>`).join('');
+
+  let current = 'anyns';
+  const renderForm = () => {
+    const p = providers.find((x) => x.key === current) || providers[0];
+    const needNs = p.requireCustomNs || !p.ns.length;
+    document.getElementById('dlgForm').innerHTML = `
+      <div class="alert info" style="margin-bottom:12px">${esc(p.note || p.desc)}</div>
+      ${needNs ? `
+        <div class="field">
+          <label>NS 服务器（每行一个，至少 2 个）</label>
+          <textarea id="dlgNs" placeholder="ns1.example.com&#10;ns2.example.com"></textarea>
+        </div>` : `
+        <div class="field">
+          <label>将写入的 NS</label>
+          <div class="mono" style="font-size:12.5px">${(p.ns || []).map((n) => esc(n)).join('<br>')}</div>
+          ${p.nsAlt ? `<div class="hint">备用：${p.nsAlt.map((n) => esc(n)).join(' / ')}</div>` : ''}
+        </div>`}
+      ${p.api ? `
+        <div class="field">
+          <label>${esc(p.name)} API Token（选填）</label>
+          <input id="dlgToken" type="password" placeholder="填了会自动在服务商创建解析区域并取回官方 NS">
+          <div class="hint">Token 只在本次请求中使用，不会保存到服务器。</div>
+        </div>` : ''}
+      <div class="row end">
+        ${p.panel ? `<a class="btn sm ghost" href="${esc(p.panel)}" target="_blank">打开 ${esc(p.name)} 控制台</a>` : ''}
+        <button class="btn primary" id="btnDelegate">托管到 ${esc(p.name)}</button>
+      </div>
+      <div class="hint" id="dlgOut"></div>`;
+
+    document.getElementById('btnDelegate').onclick = async () => {
+      const nsRaw = needNs ? document.getElementById('dlgNs').value : '';
+      const token = p.api && document.getElementById('dlgToken') ? document.getElementById('dlgToken').value.trim() : '';
+      const out = document.getElementById('dlgOut');
+      try {
+        out.textContent = '处理中…';
+        const r = await api.post('/api/subdomains/' + subId + '/delegation', {
+          provider: p.key,
+          customNs: nsRaw,
+          apiToken: token,
+        });
+        toast('已托管到 ' + p.name);
+        if (r.needManualAdd) {
+          out.innerHTML = `<span style="color:var(--warn)">NS 已写入。</span> 还需到 ${esc(p.name)} 控制台添加域名 <span class="mono">${esc(r.delegation.zone_name)}</span> 才能生效。`;
+        } else if (r.apiNote) {
+          out.textContent = r.apiNote;
+        } else {
+          out.textContent = '';
+        }
+        await loadDelegation();
+        renderRecords();
+      } catch (e) { out.textContent = e.message; toast(e.message, 'err'); }
+    };
+  };
+  grid.querySelectorAll('[data-p]').forEach((el) => {
+    el.onclick = () => {
+      grid.querySelectorAll('.preset').forEach((x) => x.classList.remove('on'));
+      el.classList.add('on');
+      current = el.dataset.p;
+      renderForm();
+    };
+  });
+  renderForm();
 }
 
 function renderStatusAlert() {
