@@ -88,7 +88,7 @@ subdomain-hub/
 
 记录下 **Zone ID**（域名概览页右下角）。
 
-### 2. 创建 D1 数据库
+### 2. 创建 D1 数据库（只需一次）
 
 ```bash
 npm install
@@ -96,50 +96,50 @@ npx wrangler login
 npx wrangler d1 create subdomain-hub-db
 ```
 
-把返回的 `database_id` 填进 `wrangler.toml`。
+输出里会有一行 `database_id = "xxxx"`，复制那串 32 位十六进制。
 
-### 3. 写配置与密钥
+### 3. 填 4 个 Secrets，推一次就完事
 
-`wrangler.toml` 的 `[vars]`：
+仓库 **Settings → Secrets and variables → Actions**：
 
-| 变量 | 说明 | 默认 |
+| 位置 | 名称 | 值 |
+|---|---|---|
+| Secrets | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（Account → Workers Scripts 编辑 + Zone → DNS 编辑） |
+| Secrets | `CLOUDFLARE_ACCOUNT_ID` | 账户 ID（Workers 概览页右侧） |
+| Secrets | `CF_API_TOKEN` | 同上，用于调 DNS API（可与上面同一个 Token） |
+| Secrets | `CF_ZONE_ID` | 根域名的 Zone ID |
+| Secrets | `D1_DATABASE_ID` | 上一步拿到的 database_id |
+
+然后 `git push origin main` —— GitHub Actions 会自动完成：注入配置 → 写入 Worker 加密环境变量 → 建表 → 部署。**不需要手动改 `wrangler.toml`，也不需要手动跑 `wrangler secret put`。**
+
+> `D1_DATABASE_ID` 是唯一必需的：脚本会在 CI 里把它写进 `wrangler.toml`。若你更愿意直接改文件，填好真实 ID 后不配这个 Secret 也能正常部署。
+
+**可选调整**（Settings → Variables，明文即可，不用加密）：
+
+| 名称 | 说明 | 默认 |
 |---|---|---|
 | `ROOT_DOMAIN` | 根域名 | `meoy.top` |
 | `DEFAULT_QUOTA` | 每用户子域名数 | `5` |
 | `ALLOW_SIGNUP` | `1` 开放注册 / `0` 关闭 | `1` |
 | `REQUIRE_APPROVAL` | `1` 需审核 / `0` 即时开通 | `1` |
 | `RESERVED_LABELS` | 保留子域名（逗号分隔） | www/mail/admin… |
-| `CF_MOCK` | `1` = 不真实调用 Cloudflare（本地调试） | `0` |
+| `CF_MOCK` | `1` = 不调真实 Cloudflare | `0` |
 
-敏感值用 secret：
+改完 Variables 后手动 **Actions → Run workflow** 一次即可生效。
+
+### 4. 本地命令行部署（不想用 Actions 时）
 
 ```bash
 npx wrangler secret put CF_API_TOKEN
 npx wrangler secret put CF_ZONE_ID
-```
-
-### 4. 初始化表结构并部署
-
-```bash
-npm run db:init      # 远程 D1 建表
+npm run db:init
 npm run deploy
 ```
 
 部署后访问分配的 `*.workers.dev` 域名，第一个注册的用户即管理员。
 如需绑定自己的域名：Workers → Settings → Domains & Routes 添加自定义域，然后在 Cloudflare DNS 里给它加一条 CNAME（会自动创建）。
 
-### 5. 接入 GitHub Actions 自动部署（可选）
-
-推送到 `main` 分支即自动 `wrangler deploy`。在仓库 Settings → Secrets → Actions 添加：
-
-| Secret | 值 |
-|---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需 Workers 编辑权限） |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID（Workers 概览页右侧） |
-
-注意：这个 Token 和 `CF_API_TOKEN` 可以是同一个，权限建议给到 `Account → Workers Scripts → Edit` + `Zone → DNS → Edit`。
-
-### 6. 常用运维命令
+### 5. 常用运维命令
 
 ```bash
 npm run dev          # 本地开发（会用 .dev.vars）

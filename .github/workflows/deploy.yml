@@ -23,9 +23,51 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Deploy Worker (含静态资源)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+      # 把 Secrets / Variables 写进 wrangler.toml（D1_DATABASE_ID 必填，其余可选）
+      - name: 注入配置
+        run: node scripts/inject-config.mjs
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          ROOT_DOMAIN: ${{ vars.ROOT_DOMAIN }}
+          DEFAULT_QUOTA: ${{ vars.DEFAULT_QUOTA }}
+          ALLOW_SIGNUP: ${{ vars.ALLOW_SIGNUP }}
+          REQUIRE_APPROVAL: ${{ vars.REQUIRE_APPROVAL }}
+          RESERVED_LABELS: ${{ vars.RESERVED_LABELS }}
+          CF_MOCK: ${{ vars.CF_MOCK }}
+
+      # 敏感值写入 Worker 的加密环境变量（等同 wrangler secret put）
+      - name: 写入 Worker Secrets
+        run: |
+          set -e
+          put() {
+            name="$1"; value="$2"
+            if [ -z "$value" ]; then
+              echo "⚠ 跳过 $name（未提供）"
+            else
+              printf '%s' "$value" | npx wrangler secret put "$name" >/dev/null
+              echo "✓ 已写入 $name"
+            fi
+          }
+          put CF_API_TOKEN "$CF_API_TOKEN"
+          put CF_ZONE_ID "$CF_ZONE_ID"
+          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ZONE_ID" ]; then
+            echo "⚠ CF_API_TOKEN / CF_ZONE_ID 未完整配置：站点可访问，但 DNS 记录无法写入 Cloudflare。"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+
+      # 建表（幂等：CREATE TABLE IF NOT EXISTS）
+      - name: 初始化 D1 表结构
+        run: npx wrangler d1 execute subdomain-hub-db --remote --file=./schema.sql
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: 部署 Worker（含静态资源）
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
