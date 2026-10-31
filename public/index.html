@@ -39,13 +39,21 @@
     <div id="paneReg" class="hidden">
       <div class="field">
         <label>邮箱</label>
-        <input id="rEmail" type="email" placeholder="you@example.com" autocomplete="username">
+        <input id="rEmail" type="email" placeholder="yourname@gmail.com" autocomplete="username">
+        <div class="hint" id="mailHint">仅支持 Gmail / QQ 邮箱</div>
       </div>
       <div class="field">
         <label>密码</label>
         <input id="rPass" type="password" placeholder="至少 8 位" autocomplete="new-password">
         <div class="hint">无需邮箱验证，注册后直接登录。</div>
       </div>
+      <div class="alert warn" style="margin-bottom:10px" id="ipRule">
+        同一网络最多注册 2 个账号，超限账号一经发现将被全部封禁。
+      </div>
+      <label class="check" style="margin-bottom:12px">
+        <input type="checkbox" id="rAgree">
+        <span id="agreeLabel">我已阅读并同意《服务条款与免责声明》，了解并接受禁止滥用与免责条款</span>
+      </label>
       <button class="btn primary" id="btnReg" style="width:100%;justify-content:center">注册并登录</button>
     </div>
   </div>
@@ -89,12 +97,24 @@ document.getElementById('btnReg').onclick = async () => {
   const password = document.getElementById('rPass').value;
   if (!email || !password) return toast('请输入邮箱和密码', 'err');
   if (password.length < 8) return toast('密码至少 8 位', 'err');
+  if (!document.getElementById('rAgree').checked) return toast('请先勾选同意《服务条款与免责声明》', 'err');
   try {
-    const d = await api.post('/api/auth/register', { email, password });
+    const d = await api.post('/api/auth/register', { email, password, agreeTerms: true });
     toast(d.isFirstAdmin ? '注册成功，已设为管理员（不限配额）' : '注册成功');
     setTimeout(() => location.href = '/dashboard', 400);
   } catch (e) { toast(e.message, 'err'); }
 };
+
+// 规则摘要（邮箱白名单 + 单 IP 账号上限）
+api.get('/api/rules').then((r) => {
+  const names = r.allowedEmailDomains.map((d) => d.split('.')[0]);
+  document.getElementById('mailHint').textContent =
+    `仅支持 ${names.join(' / ')} 邮箱，其它域名无法注册`;
+  document.getElementById('ipRule').textContent =
+    `同一网络最多注册 ${r.maxAccountsPerIp} 个账号，超限账号一经发现将被全部封禁。`;
+  document.getElementById('agreeLabel').innerHTML =
+    `我已阅读并同意<a href="/terms.html" target="_blank">《服务条款与免责声明》</a>，了解并接受禁止滥用与免责条款`;
+}).catch(() => {});
 
 loadBranding().then((b) => {
   applyBranding(b);

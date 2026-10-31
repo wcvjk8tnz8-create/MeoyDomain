@@ -3,6 +3,7 @@ import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
 import { RECORD_TYPES, TTL_CHOICES, VERIFY_PRESETS, TYPE_NAMES } from './lib/records.js';
 import authRoutes from './routes/auth.js';
+import termsRoutes from './routes/terms.js';
 import subdomainRoutes from './routes/subdomains.js';
 import recordRoutes from './routes/records.js';
 import adminRoutes from './routes/admin.js';
@@ -51,6 +52,7 @@ app.get('/api/config', async (c) => {
 
 // 认证
 app.route('/api/auth', authRoutes);
+app.route('/api', termsRoutes);
 
 // 需要登录的接口
 app.use('/api/subdomains/*', requireAuth);

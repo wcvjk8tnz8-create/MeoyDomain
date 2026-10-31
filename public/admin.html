@@ -21,6 +21,7 @@
     <button class="tab" data-tab="subs">全部子域名</button>
     <button class="tab" data-tab="users">用户</button>
     <button class="tab" data-tab="locks">验证锁定</button>
+    <button class="tab" data-tab="ips">同 IP 账号</button>
     <button class="tab" data-tab="settings">站点设置</button>
     <button class="tab" data-tab="audit">审计日志</button>
   </div>
@@ -46,6 +47,7 @@ const HEADS = {
   users: ['邮箱', '角色', '状态', '配额', '域名数', '操作'],
   locks: ['记录名', '类型', '发起人', '锁定时间', '操作'],
   settings: ['站点品牌', '值'],
+  ips: ['IP', '账号数', '邮箱', '最近注册', '状态', '操作'],
   audit: ['时间', '用户', '动作', '对象', '详情'],
 };
 
@@ -145,6 +147,66 @@ async function load() {
     });
   }
 
+  if (tab === 'ips') {
+    const d = await api.get('/api/admin/ips');
+    if (!d.items.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="empty">暂无注册 IP 记录</td></tr>`;
+      return;
+    }
+    tb.innerHTML = d.items.map((r) => {
+      const emails = (r.emails || '').split(',').filter(Boolean);
+      const shown = emails.slice(0, 3).join('、') + (emails.length > 3 ? ` 等 ${emails.length} 个` : '');
+      const badge = r.ipBanned
+        ? `<span class="badge danger">IP 已封禁</span>`
+        : r.overLimit
+          ? `<span class="badge danger">超限</span>`
+          : '<span class="badge ok">正常</span>';
+      return `
+      <tr class="${r.overLimit && !r.ipBanned ? 'locked' : ''}">
+        <td class="mono">${esc(r.ip)}</td>
+        <td><b>${r.accounts}</b> <span style="color:var(--muted)">/ ${d.limit}</span></td>
+        <td class="mono" style="font-size:11.5px;max-width:280px">${esc(shown)}</td>
+        <td class="nowrap" style="color:var(--muted)">${fmtTime(r.last_at)}</td>
+        <td>${badge}${r.banned_count ? `<div class="hint">已封 ${r.banned_count} 个</div>` : ''}</td>
+        <td class="right nowrap">
+          ${r.ipBanned
+            ? `<button class="btn sm ok" data-ipunban="${esc(r.ip)}">解封 IP</button>`
+            : `<button class="btn sm danger" data-ipban="${esc(r.ip)}" data-n="${r.accounts}">封禁全部</button>`}
+        </td>
+      </tr>`;
+    }).join('');
+
+    tb.querySelectorAll('[data-ipban]').forEach((b) => b.onclick = () => {
+      const ip = b.dataset.ipban;
+      openModal('封禁该 IP 下的全部账号', `
+        <div class="alert danger">将封禁 <b>${ip}</b> 下的 ${b.dataset.n} 个账号：立即踢下线、停用其全部子域名。管理员账号不会被封。</div>
+        <div class="field"><label>封禁原因</label><input id="ipr" value="同一 IP 注册账号超限，违反服务条款"></div>
+        <label class="check" style="margin-bottom:8px"><input type="checkbox" id="ipb" checked> 同时封禁该 IP（禁止再注册/登录）</label>
+        <label class="check" style="margin-bottom:14px"><input type="checkbox" id="ipp"> 同时清空其在 Cloudflare 上的全部 DNS 记录</label>
+        <div class="row end">
+          <button class="btn" onclick="closeModal()">取消</button>
+          <button class="btn danger" id="ok">确认封禁</button>
+        </div>`);
+      document.getElementById('ok').onclick = async () => {
+        try {
+          const r = await api.post('/api/admin/ips/ban', {
+            ip,
+            reason: document.getElementById('ipr').value,
+            banIp: document.getElementById('ipb').checked,
+            purgeDns: document.getElementById('ipp').checked,
+          });
+          toast(`已封禁 ${r.banned} 个账号` + (r.purged ? `，清空 ${r.purged} 条 DNS` : ''));
+          closeModal(); load();
+        } catch (e) { toast(e.message, 'err'); }
+      };
+    });
+    tb.querySelectorAll('[data-ipunban]').forEach((b) => b.onclick = async () => {
+      try { await api.post('/api/admin/ips/unban', { ip: b.dataset.ipunban }); toast('已解除 IP 封禁'); load(); }
+      catch (e) { toast(e.message, 'err'); }
+    });
+    return;
+  }
+
   if (tab === 'settings') {
     const d = await api.get('/api/admin/settings');
     const s = d.items;
@@ -162,6 +224,11 @@ async function load() {
           <div class="grid2" style="margin-bottom:12px">
             <div class="field" style="margin:0"><label>图标地址（favicon）</label><input id="sFav" value="${esc(s.favicon_url || '')}" placeholder="/favicon.ico"></div>
             <div class="field" style="margin:0"><label>站点公告</label><input id="sAnno" value="${esc(s.announcement || '')}" placeholder="留空则不显示"></div>
+          </div>
+          <div class="field">
+            <label>同一 IP 最多注册账号数</label>
+            <input id="sIpLimit" type="number" min="1" max="50" value="${esc(s.max_accounts_per_ip || '2')}" style="max-width:160px">
+            <div class="hint">超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响。</div>
           </div>
           <div class="alert info" style="margin-bottom:12px">
             Logo 可以是站内路径（<span class="mono">/img/logo.jpg</span>）或外链图片地址（<span class="mono">https://…</span>）。
@@ -188,6 +255,7 @@ async function load() {
           logoUrl: document.getElementById('sLogo').value,
           faviconUrl: document.getElementById('sFav').value,
           announcement: document.getElementById('sAnno').value,
+          maxAccountsPerIp: document.getElementById('sIpLimit').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo

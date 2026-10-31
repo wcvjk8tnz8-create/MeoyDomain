@@ -209,6 +209,104 @@ app.post('/reconcile/:id', async (c) => {
   return ok(c, { warnings: errs });
 });
 
+// 按 IP 聚合账号（用于发现同一网络下的批量注册）
+app.get('/ips', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.ip AS ip,
+            COUNT(DISTINCT r.user_id) AS accounts,
+            MAX(r.created_at) AS last_at,
+            GROUP_CONCAT(DISTINCT u.email) AS emails,
+            SUM(CASE WHEN u.status = 'banned' THEN 1 ELSE 0 END) AS banned_count
+     FROM registrations r LEFT JOIN users u ON u.id = r.user_id
+     WHERE r.ip IS NOT NULL AND r.ip <> ''
+     GROUP BY r.ip
+     ORDER BY accounts DESC, last_at DESC LIMIT 300`
+  ).all();
+  const limitRow = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'max_accounts_per_ip'").first();
+  const bannedIps = await c.env.DB.prepare('SELECT ip, reason FROM ip_bans').all();
+  const bannedMap = Object.fromEntries((bannedIps.results || []).map((b) => [b.ip, b.reason]));
+  return ok(c, {
+    items: results.map((r) => ({
+      ...r,
+      emails: r.emails || '',
+      overLimit: r.accounts > Number(limitRow?.value || 2),
+      ipBanned: bannedMap[r.ip] !== undefined,
+      ipBanReason: bannedMap[r.ip] || '',
+    })),
+    limit: Number(limitRow?.value || 2),
+  });
+});
+
+// 一键封禁：该 IP 下的全部账号（并可选加入 IP 封禁名单）
+app.post('/ips/ban', async (c) => {
+  const u = c.get('user');
+  const { ip, reason, banIp, purgeDns } = await c.req.json().catch(() => ({}));
+  const target = String(ip || '').trim();
+  if (!target) return fail(c, '缺少 IP');
+
+  const rows = await c.env.DB.prepare(
+    `SELECT DISTINCT r.user_id AS id, u.email FROM registrations r
+     JOIN users u ON u.id = r.user_id WHERE r.ip = ? AND u.role <> 'admin'`
+  )
+    .bind(target)
+    .all();
+
+  const list = rows.results || [];
+  if (!list.length) return fail(c, '该 IP 下没有可封禁的账号');
+
+  const why = String(reason || '').trim() || `同一 IP 注册账号超限（${list.length} 个）`;
+  let purged = 0;
+
+  for (const row of list) {
+    await c.env.DB.prepare("UPDATE users SET status = 'banned', ban_reason = ? WHERE id = ?")
+      .bind(why, row.id)
+      .run();
+    // 踢下线
+    await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(row.id).run();
+    // 停用其全部子域名
+    await c.env.DB.prepare("UPDATE subdomains SET status = 'suspended', reason = ? WHERE user_id = ?")
+      .bind(why, row.id)
+      .run();
+
+    if (purgeDns) {
+      const recs = await c.env.DB.prepare(
+        `SELECT r.id, r.cf_record_id FROM dns_records r
+         JOIN subdomains s ON s.id = r.subdomain_id WHERE s.user_id = ?`
+      )
+        .bind(row.id)
+        .all();
+      for (const r of recs.results || []) {
+        await cfDelete(c.env, r.cf_record_id);
+        await c.env.DB.prepare('DELETE FROM dns_records WHERE id = ?').bind(r.id).run();
+        purged++;
+      }
+    }
+    await audit(c, row.id, 'user.ban', row.email, why);
+  }
+
+  if (banIp !== false) {
+    await c.env.DB.prepare(
+      'INSERT INTO ip_bans (ip, reason, created_by, created_at) VALUES (?,?,?,?) ON CONFLICT(ip) DO UPDATE SET reason = excluded.reason'
+    )
+      .bind(target, why, u.id, now())
+      .run();
+  }
+
+  await audit(c, u.id, 'admin.ip_ban', target, `封禁 ${list.length} 个账号 · ${why}${purgeDns ? ` · 清空 ${purged} 条 DNS` : ''}`);
+  return ok(c, { banned: list.length, emails: list.map((x) => x.email), purged });
+});
+
+// 解除 IP 封禁
+app.post('/ips/unban', async (c) => {
+  const u = c.get('user');
+  const { ip } = await c.req.json().catch(() => ({}));
+  const target = String(ip || '').trim();
+  if (!target) return fail(c, '缺少 IP');
+  await c.env.DB.prepare('DELETE FROM ip_bans WHERE ip = ?').bind(target).run();
+  await audit(c, u.id, 'admin.ip_unban', target, '');
+  return ok(c, {});
+});
+
 // 站点设置：站点名 / Logo / 公告
 app.get('/settings', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT key, value FROM settings').all();
@@ -233,8 +331,15 @@ app.post('/settings', async (c) => {
 
   if (name) await set('site_name', name);
   await set('logo_url', logo || '/img/logo.jpg');
-  await set('favicon_url', favicon || '/img/favicon.png');
+  await set('favicon_url', favicon || '/favicon.ico');
   if (body.announcement !== undefined) await set('announcement', anno);
+
+  // 同 IP 账号上限
+  if (body.maxAccountsPerIp !== undefined && body.maxAccountsPerIp !== '') {
+    const n = Number(body.maxAccountsPerIp);
+    if (!Number.isFinite(n) || n < 1 || n > 50) return fail(c, '单 IP 账号数需在 1-50 之间');
+    await set('max_accounts_per_ip', String(Math.floor(n)));
+  }
 
   await audit(c, u.id, 'admin.settings', 'site', `name=${name} logo=${logo || '(默认)'}`);
   return ok(c, {});

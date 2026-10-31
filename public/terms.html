@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>服务条款与免责声明 · Meoy</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="bg"></div>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap" style="max-width:820px">
+  <div style="margin-bottom:14px">
+    <a href="/dashboard" id="backLink" style="font-size:12.5px">返回</a>
+  </div>
+  <h1>服务条款与免责声明</h1>
+  <div class="sub" id="meta"></div>
+
+  <div class="card" id="body">加载中…</div>
+</div>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+(async () => {
+  try {
+    await api.get('/api/auth/me');
+    document.getElementById('backLink').href = '/dashboard';
+  } catch {
+    document.getElementById('backLink').href = '/';
+    document.getElementById('backLink').textContent = '返回登录';
+  }
+  try {
+    const d = await api.get('/api/terms');
+    document.getElementById('meta').textContent = `版本 ${d.version} · 注册即视为同意本条款`;
+    let html = '';
+    d.sections.forEach((s) => {
+      html += `<h3 id="${s.id}">${esc(s.title)}</h3>`;
+      (s.blocks || []).forEach((b) => (html += `<p>${esc(b)}</p>`));
+      if (s.list) html += `<ul>${s.list.map((li) => `<li>${esc(li)}</li>`).join('')}</ul>`;
+      if (s.note) html += `<p><strong>${esc(s.note)}</strong></p>`;
+    });
+    document.getElementById('body').innerHTML = html;
+  } catch (e) {
+    document.getElementById('body').innerHTML = '<div class="empty">加载失败</div>';
+  }
+})();
+
+mountNav('dash').then(async (u) => {
+  applyBranding(await loadBranding());
+  const nav = document.getElementById('nav');
+  if (nav && !u) nav.style.display = 'none';
+}).catch(() => {});
+</script>
+</body>
+</html>
