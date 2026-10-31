@@ -218,8 +218,17 @@ app.post('/subdomains/:id/verify', async (c) => {
   if (!value) return fail(c, '请粘贴平台给出的验证值');
   if (value.length > 2048) return fail(c, '验证值过长');
 
-  const hostRes = resolveHost(host, sub.fqdn, sub.label);
+  // 作用域：root = 根域名（_vercel.meoy.top），sub = 当前子域名（_vercel.xxx.meoy.top）
+  const scope = String(body.scope || 'root') === 'sub' ? 'sub' : 'root';
+  const rootDomain = String(c.env.ROOT_DOMAIN || '').toLowerCase().replace(/\.+$/, '');
+  if (scope === 'root' && !rootDomain) return fail(c, '未配置 ROOT_DOMAIN，无法在根域名下写入验证记录');
+  const base = scope === 'root' ? rootDomain : sub.fqdn;
+  const baseLabel = scope === 'root' ? '' : sub.label;
+
+  const hostRes = resolveHost(host, base, baseLabel);
   if (!hostRes.ok) return fail(c, hostRes.error);
+  // 根域名作用域下不允许直接占用根域名本身（@ / 空）
+  if (scope === 'root' && hostRes.host === '@') return fail(c, '根域名验证请填写具体主机名，如 _vercel');
 
   // 同一记录名上已存在锁定的验证记录 → 拒绝抢占
   const locked = await c.env.DB.prepare(
@@ -262,7 +271,7 @@ app.post('/subdomains/:id/verify', async (c) => {
       1,
       0,
       null,
-      `根域名验证：${preset ? preset.label : '自定义'}`,
+      `根域名验证：${preset ? preset.label : '自定义'}（${scope === 'root' ? '根域名' : '子域名'}）`,
       1,
       presetKey,
       now(),
@@ -272,7 +281,7 @@ app.post('/subdomains/:id/verify', async (c) => {
     )
     .run();
 
-  await audit(c, u.id, 'verify.start', hostRes.name, presetKey);
+  await audit(c, u.id, 'verify.start', hostRes.name, `${presetKey} scope=${scope}`);
   const rec = await c.env.DB.prepare('SELECT * FROM dns_records WHERE id = ?').bind(res.meta?.last_row_id).first();
   return ok(c, { record: shape(rec) }, 201);
 });

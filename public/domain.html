@@ -30,10 +30,18 @@
       粘贴平台给出的验证记录（主机名 + 值），系统会写入一条 TXT 并锁定。锁定期间任何人都不能修改或删除，
       只有发起者点击「确认认证完成」后才会释放，避免被抢注或破坏。
     </div>
+    <div class="field">
+      <label>写入位置</label>
+      <div class="row" style="gap:6px">
+        <button class="btn sm primary" id="scopeRoot" data-scope="root">根域名 · <span class="mono" id="rootLbl"></span></button>
+        <button class="btn sm" id="scopeSub" data-scope="sub">本子域名 · <span class="mono" id="subLbl"></span></button>
+      </div>
+      <div class="hint">Vercel / Netlify / DNSPod 等验证根域名所有权时，记录写在根域名下（如 <span class="mono">_vercel.meoy.top</span>）；若平台只校验你自己的子域名，再选「本子域名」。</div>
+    </div>
     <div class="preset-grid" id="presets"></div>
     <div class="grid2">
       <div class="field">
-        <label>主机名（无需带根域名）</label>
+        <label>主机名（无需带域名后缀）</label>
         <input id="vHost" placeholder="_vercel" autocomplete="off">
         <div class="hint">将生成 <span class="mono" id="vPreview"></span></div>
       </div>
@@ -74,6 +82,7 @@
 const params = new URLSearchParams(location.search);
 const subId = params.get('id');
 let cfg = null, sub = null, records = [], presets = [];
+let verifyScope = 'root'; // root = 根域名（_vercel.meoy.top），sub = 当前子域名
 
 const TEMPLATES = [
   { n: 'Vercel CNAME', type: 'CNAME', host: '', content: 'cname.vercel-dns.com', proxied: false },
@@ -92,6 +101,8 @@ async function loadAll() {
   sub = d.subdomain;
   records = d.records;
   document.getElementById('fqdn').textContent = sub.fqdn;
+  document.getElementById('rootLbl').textContent = cfg.rootDomain;
+  document.getElementById('subLbl').textContent = sub.fqdn;
   document.getElementById('statusBadge').innerHTML = statusBadge(sub.status);
   renderPresets();
   renderTpl();
@@ -125,9 +136,19 @@ function renderPresets() {
 
 function updatePreview() {
   const h = document.getElementById('vHost').value.trim();
-  document.getElementById('vPreview').textContent = (h && h !== '@' ? h + '.' : '') + (sub ? sub.fqdn : '');
+  const base = !sub ? '' : verifyScope === 'root' ? cfg.rootDomain : sub.fqdn;
+  document.getElementById('vPreview').textContent = (h && h !== '@' ? h + '.' : '') + base;
 }
 document.getElementById('vHost').addEventListener('input', updatePreview);
+
+document.getElementById('scopeRoot').onclick = () => setVerifyScope('root');
+document.getElementById('scopeSub').onclick = () => setVerifyScope('sub');
+function setVerifyScope(s) {
+  verifyScope = s;
+  document.getElementById('scopeRoot').classList.toggle('primary', s === 'root');
+  document.getElementById('scopeSub').classList.toggle('primary', s === 'sub');
+  updatePreview();
+}
 
 function renderTpl() {
   document.getElementById('tpls').innerHTML = TEMPLATES
@@ -155,7 +176,7 @@ function renderRecords() {
     return `
     <tr class="${lock ? 'locked' : ''}">
       <td><span class="badge type">${esc(r.type)}</span></td>
-      <td class="mono">${esc(r.host === '@' ? sub.fqdn : r.host)}</td>
+      <td class="mono">${esc(r.name)}</td>
       <td class="mono" title="${esc(val)}">${esc(short)}</td>
       <td class="nowrap" style="color:var(--muted)">${r.ttl === 1 ? '自动' : r.ttl}</td>
       <td class="nowrap">
@@ -316,7 +337,12 @@ document.getElementById('btnVerify').onclick = async () => {
   if (!host) return toast('请填写验证主机名，如 _vercel', 'err');
   if (!value) return toast('请粘贴平台给出的验证值', 'err');
   try {
-    await api.post('/api/subdomains/' + subId + '/verify', { preset: active ? active.dataset.key : 'custom', host, value });
+    await api.post('/api/subdomains/' + subId + '/verify', {
+      preset: active ? active.dataset.key : 'custom',
+      host,
+      value,
+      scope: verifyScope,
+    });
     toast('验证记录已写入并锁定');
     document.getElementById('vValue').value = '';
     loadAll();

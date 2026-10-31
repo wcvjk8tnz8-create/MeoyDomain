@@ -31,6 +31,13 @@
 
 在「子域名管理 → DNS 记录」页点击「根域名验证」，选择预设（Vercel `_vercel`、Netlify `_netlify`、DNSPod `_dnsauth`/`_dnspod`、阿里云、Cloudflare、GitHub Pages、Google）或自定义主机名，粘贴平台给的 TXT 值即可写入。
 
+**写入位置**（默认根域名）：
+
+| 作用域 | 生成记录 | 适用 |
+|---|---|---|
+| 根域名 | `_vercel.meoy.top` | Vercel / Netlify / DNSPod 校验**根域名所有权**时 |
+| 本子域名 | `_vercel.xxx.meoy.top` | 平台只校验你自己的子域名时 |
+
 **锁定机制**：验证记录写入后立即 `锁定`：
 
 - 锁定期间**任何人都不能修改或删除**这条记录（按钮被禁用，接口也会拒绝）
