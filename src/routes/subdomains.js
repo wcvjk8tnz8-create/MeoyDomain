@@ -26,7 +26,9 @@ app.get('/check', async (c) => {
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  if (exists) return ok(c, { available: false, message: '该子域名已被占用', fqdn });
+  // 已被驳回的同名记录可以重新申请（先释放旧的即可）
+  if (exists && exists.status !== 'rejected')
+    return ok(c, { available: false, message: '该子域名已被占用', fqdn });
   // 管理员可申请保留域名
   if (!isAdmin && reserved.includes(v.label))
     return ok(c, { available: false, message: '该名称为系统保留，不可申请', fqdn });
@@ -37,20 +39,28 @@ app.get('/check', async (c) => {
   });
 });
 
+// 计入配额的状态：被驳回（rejected）不占额度
+export const QUOTA_STATUSES = "('pending','approved','suspended')";
+
 // 我的子域名列表（同时兼容 /api/subdomains 与 /api/subdomains/）
 const listMine = async (c) => {
   const u = c.get('user');
   const { results } = await c.env.DB.prepare(
     `SELECT s.*, (SELECT COUNT(*) FROM dns_records r WHERE r.subdomain_id = s.id) AS record_count
-     FROM subdomains s WHERE s.user_id = ? ORDER BY s.created_at DESC`
+     FROM subdomains s WHERE s.user_id = ?
+     ORDER BY (s.status = 'rejected'), s.created_at DESC`
   )
     .bind(u.id)
     .all();
+  // 被驳回的不计入已用额度
+  const used = results.filter((s) => s.status !== 'rejected').length;
+  const rejected = results.length - used;
   return ok(c, {
-    items: results,
+    items: results.map((s) => ({ ...s, countsTowardQuota: s.status !== 'rejected' })),
     quota: u.quota,
     quotaUnlimited: !!u.quotaUnlimited,
-    used: results.length,
+    used,
+    rejected,
   });
 };
 
@@ -72,17 +82,36 @@ const createMine = async (c) => {
   // 管理员可申请保留域名，普通用户不行
   if (!isAdmin && isReserved) return fail(c, '该名称为系统保留，不可申请');
 
-  const dup = await c.env.DB.prepare('SELECT id FROM subdomains WHERE label = ?').bind(v.label).first();
-  if (dup) return fail(c, '该子域名已被占用');
+  // 同名已存在：被驳回的允许重新申请，其它状态直接拒绝
+  const dup = await c.env.DB.prepare('SELECT id, status, user_id FROM subdomains WHERE label = ?')
+    .bind(v.label)
+    .first();
+  if (dup && dup.status !== 'rejected') return fail(c, '该子域名已被占用');
+  // 别人的驳回记录不能顶掉
+  if (dup && dup.user_id !== u.id && !isAdmin) return fail(c, '该子域名已被占用');
 
+  // 配额检查（被驳回的不计入），必须在清理旧记录之前，避免校验失败却已删数据
   const used = await c.env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ? AND status IN ('pending','approved','suspended')"
+    `SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ? AND status IN ${QUOTA_STATUSES}`
   )
     .bind(u.id)
     .first();
   // 管理员（或 quota 为 -1 的用户）不受配额限制
   if (u.quota >= 0 && (used?.n || 0) >= u.quota)
     return fail(c, `已达上限，每个账号最多持有 ${u.quota} 个子域名`);
+
+  // 清掉此前被驳回的同名记录（连同其 DNS），再重新申请
+  if (dup) {
+    const oldRecs = await c.env.DB.prepare('SELECT id, cf_record_id FROM dns_records WHERE subdomain_id = ?')
+      .bind(dup.id)
+      .all();
+    for (const r of oldRecs.results || []) {
+      if (r.cf_record_id) await cfDelete(c.env, r.cf_record_id);
+    }
+    await c.env.DB.prepare('DELETE FROM dns_records WHERE subdomain_id = ?').bind(dup.id).run();
+    await c.env.DB.prepare('DELETE FROM subdomains WHERE id = ?').bind(dup.id).run();
+    await audit(c, u.id, 'subdomain.reapply', `${v.label}.${c.env.ROOT_DOMAIN}`, '清除此前被驳回的同名记录');
+  }
 
   // 免审核：全局关闭审核，或管理员申请（管理员自建即开通，含保留域名）
   const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin;

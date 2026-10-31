@@ -217,6 +217,9 @@ tbody tr:last-child td { border-bottom: none; }
 td.mono, .mono { font-family: var(--mono); font-size: 12px; word-break: break-all; }
 tr.locked td { background: rgba(167, 139, 250, .16); }
 tr.locked:hover td { background: rgba(167, 139, 250, .24); }
+tr.rejected td { background: rgba(255, 122, 138, .1); }
+tr.rejected:hover td { background: rgba(255, 122, 138, .16); }
+tr.rejected .fqdn { opacity: .8; }
 
 /* ---------- 徽章 ---------- */
 .badge {

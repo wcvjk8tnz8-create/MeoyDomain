@@ -67,9 +67,10 @@ async function load() {
   document.getElementById('rootDomain').textContent = rootDomain;
   const quotaHtml = d.quotaUnlimited ? '<span class="badge inf">∞ 不限</span>' : `${d.quota} 个`;
   const isAdmin = document.querySelector('.navlink[href="/admin"]') !== null;
-  const tip = isAdmin
+  let tip = isAdmin
     ? ' · 管理员申请即时开通，可占用保留域名且不限数量'
     : cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效';
+  if (d.rejected > 0) tip += ` · 另有 ${d.rejected} 个被驳回（不占配额）`;
   document.getElementById('quotaTip').innerHTML = `已使用 ${d.used} / ${quotaHtml}` + tip;
   if (isAdmin) {
     document.getElementById('applyTip').innerHTML =
@@ -84,21 +85,37 @@ async function load() {
     tb.innerHTML = `<tr><td colspan="5" class="empty">还没有子域名，先在上方申请一个</td></tr>`;
     return;
   }
-  tb.innerHTML = d.items.map((s) => `
-    <tr>
-      <td><span class="fqdn">${esc(s.fqdn)}</span> ${s.reason ? `<div class="hint">${esc(s.reason)}</div>` : ''}</td>
-      <td>${statusBadge(s.status)}</td>
+  tb.innerHTML = d.items.map((s) => {
+    const rejected = s.status === 'rejected';
+    const note = rejected
+      ? `<div class="alert danger" style="margin:6px 0 0;padding:6px 9px;font-size:12px">
+           驳回原因：${esc(s.reason || '未说明')}<br>
+           <span style="opacity:.85">该域名不占用配额。修正后可释放它再重新申请。</span>
+         </div>`
+      : s.reason && s.status === 'suspended'
+        ? `<div class="hint" style="color:var(--danger)">停用原因：${esc(s.reason)}</div>`
+        : s.reason ? `<div class="hint">${esc(s.reason)}</div>` : '';
+    return `
+    <tr class="${rejected ? 'rejected' : ''}">
+      <td><span class="fqdn"${rejected ? ' style="opacity:.75;text-decoration:line-through"' : ''}>${esc(s.fqdn)}</span>${note}</td>
+      <td>${statusBadge(s.status)}${rejected ? '<div class="hint">不占配额</div>' : ''}</td>
       <td>${s.record_count}</td>
       <td class="nowrap" style="color:var(--muted)">${fmtTime(s.created_at)}</td>
       <td class="right nowrap">
-        <button class="btn sm" onclick="location.href='/domain?id=${s.id}'">DNS 记录</button>
-        <button class="btn sm danger" data-del="${s.id}">释放</button>
+        ${rejected ? '' : `<button class="btn sm" onclick="location.href='/domain?id=${s.id}'">DNS 记录</button>`}
+        <button class="btn sm ${rejected ? '' : 'danger'}" data-del="${s.id}">${rejected ? '移除' : '释放'}</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   tb.querySelectorAll('[data-del]').forEach((b) => {
+    const s = d.items.find((x) => String(x.id) === String(b.dataset.del));
+    const rejected = s && s.status === 'rejected';
     b.onclick = async () => {
-      if (!confirm('确定释放该子域名？其在 Cloudflare 上的所有 DNS 记录会一并删除。')) return;
-      try { await api.del('/api/subdomains/' + b.dataset.del); toast('已释放'); load(); }
+      const msg = rejected
+        ? '移除这条被驳回的申请？移除后可以重新申请该名称。'
+        : '确定释放该子域名？其在 Cloudflare 上的所有 DNS 记录会一并删除。';
+      if (!confirm(msg)) return;
+      try { await api.del('/api/subdomains/' + b.dataset.del); toast(rejected ? '已移除，可重新申请' : '已释放'); load(); }
       catch (e) { toast(e.message, 'err'); }
     };
   });

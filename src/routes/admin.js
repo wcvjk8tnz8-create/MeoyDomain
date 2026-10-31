@@ -82,7 +82,8 @@ app.delete('/subdomains/:id', async (c) => {
 app.get('/users', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.role, u.status, u.quota, u.ban_reason, u.created_at, u.last_login_at,
-            (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id) AS sub_count
+            (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id AND s.status <> 'rejected') AS sub_count,
+            (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id AND s.status = 'rejected') AS rejected_count
      FROM users u ORDER BY u.created_at DESC LIMIT 500`
   ).all();
   const items = results.map((r) => ({ ...r, quotaUnlimited: r.role === 'admin' || Number(r.quota) < 0 }));
