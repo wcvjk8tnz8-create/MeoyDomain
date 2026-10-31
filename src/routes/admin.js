@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
 import { cfDelete, cfErrorMessage } from '../lib/cf.js';
 import { UNLIMITED } from '../middleware/auth.js';
+import { ensurePoints, addPoints } from '../lib/points.js';
+import { pointRules } from './points.js';
 
 const app = new Hono();
 
@@ -83,11 +85,43 @@ app.get('/users', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.role, u.status, u.quota, u.ban_reason, u.created_at, u.last_login_at,
             (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id AND s.status <> 'rejected') AS sub_count,
-            (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id AND s.status = 'rejected') AS rejected_count
+            (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id AND s.status = 'rejected') AS rejected_count,
+            (SELECT points FROM user_points p WHERE p.user_id = u.id) AS points
      FROM users u ORDER BY u.created_at DESC LIMIT 500`
   ).all();
-  const items = results.map((r) => ({ ...r, quotaUnlimited: r.role === 'admin' || Number(r.quota) < 0 }));
+  const items = results.map((r) => ({
+    ...r,
+    quotaUnlimited: r.role === 'admin' || Number(r.quota) < 0,
+    points: r.role === 'admin' ? -1 : (r.points ?? null),
+  }));
   return ok(c, { items });
+});
+
+// 调整用户积分（delta 为增减，或设置 setPoints；-1 表示无限）
+app.post('/users/:id/points', async (c) => {
+  const me = c.get('user');
+  const id = Number(c.req.param('id'));
+  const { delta, set: setValue, reason } = await c.req.json().catch(() => ({}));
+
+  const target = await c.env.DB.prepare('SELECT id, email, role FROM users WHERE id = ?').bind(id).first();
+  if (!target) return fail(c, '用户不存在', 404);
+  if (target.role === 'admin') return fail(c, '管理员积分不限，无需调整');
+
+  const rules = await pointRules(c.env);
+  let after;
+  if (setValue !== undefined && setValue !== null && setValue !== '') {
+    const n = Number(setValue);
+    if (!Number.isFinite(n) && n !== -1) return fail(c, '积分数值不合法');
+    const cur = await ensurePoints(c.env.DB, id, rules);
+    after = await addPoints(c.env.DB, id, n - cur, 'admin_set', String(reason || '管理员设置'));
+  } else {
+    const d = Number(delta);
+    if (!Number.isFinite(d)) return fail(c, '请提供 delta 或 set');
+    await ensurePoints(c.env.DB, id, rules);
+    after = await addPoints(c.env.DB, id, Math.trunc(d), 'admin_adjust', String(reason || '管理员调整'));
+  }
+  await audit(c, me.id, 'admin.points', target.email, `调整为 ${after}`);
+  return ok(c, { points: after });
 });
 
 // 封禁 / 解封
@@ -341,6 +375,23 @@ app.post('/settings', async (c) => {
     if (!Number.isFinite(n) || n < 1 || n > 50) return fail(c, '单 IP 账号数需在 1-50 之间');
     await set('max_accounts_per_ip', String(Math.floor(n)));
   }
+
+  // 积分规则
+  const numRule = async (key, val, min, max, label) => {
+    if (val === undefined || val === '') return true;
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < min || n > max) {
+      c.__ruleErr = `${label}需在 ${min}-${max} 之间`;
+      return false;
+    }
+    await set(key, String(Math.floor(n)));
+    return true;
+  };
+  if (!(await numRule('checkin_points', body.checkinPoints, 0, 1000, '每日签到积分'))) return fail(c, c.__ruleErr);
+  if (!(await numRule('domain_cost', body.domainCost, 0, 10000, '域名消耗积分'))) return fail(c, c.__ruleErr);
+  if (!(await numRule('short_domain_cost', body.shortDomainCost, 0, 100000, '单字域名消耗积分'))) return fail(c, c.__ruleErr);
+  if (!(await numRule('short_domain_len', body.shortDomainLen, 1, 10, '单字域名长度上限'))) return fail(c, c.__ruleErr);
+  if (!(await numRule('initial_points', body.initialPoints, 0, 10000, '新用户初始积分'))) return fail(c, c.__ruleErr);
 
   // WHOIS 持有人显示策略
   if (body.whoisHolder !== undefined) {

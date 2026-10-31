@@ -75,8 +75,13 @@ async function doQuery() {
       </div>
       <div class="alert ${cls}" style="margin:14px 0 0">${esc(r.message)}</div>
       ${r.available ? `
+        <div class="hint" style="margin-top:8px;font-family:var(--mono)">
+          ${r.unlimited ? '管理员不限积分'
+            : `${r.short ? '<b style="color:var(--warn)">单字域名</b> ' : ''}需要 ${r.cost} 分` +
+              (r.points === null ? '（登录后可见余额）' : ` · 你的余额 ${r.points} 分${r.enough ? '' : '（不足）'}`)}
+        </div>
         <div class="row end" style="margin-top:14px">
-          ${isLoggedIn ? `<button class="btn primary" id="goApply">申请这个域名</button>`
+          ${isLoggedIn ? `<button class="btn primary" id="goApply"${r.enough || r.unlimited ? '' : ' disabled'}>${r.enough || r.unlimited ? '申请这个域名' : '积分不足'}</button>`
                        : `<a class="btn primary" href="/?q=${encodeURIComponent(r.label)}">登录后申请</a>`}
         </div>` : ''}
       ${r.reclaimable ? '<div class="hint" style="margin-top:8px">这是你此前被驳回的申请，可直接重新提交。</div>' : ''}

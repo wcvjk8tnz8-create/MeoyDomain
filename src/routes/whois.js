@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { ok, fail } from '../lib/util.js';
 import { lookupLabel } from './subdomains.js';
+import { UNLIMITED_POINTS, ensurePoints, domainCost } from '../lib/points.js';
+import { pointRules } from './points.js';
 
 const app = new Hono();
 
@@ -80,6 +82,24 @@ app.get('/whois', async (c) => {
     canApply: r.available,
     reclaimable: !!r.reclaimable,
     rootDomain: root,
+    ...(await (async () => {
+      // 未登录时给出价格，登录后附带自己的余额
+      const rules = await pointRules(c.env);
+      const { cost, short } = domainCost(
+        label,
+        { domainCost: rules.domainCost, shortCost: rules.shortCost, shortLen: rules.shortLen },
+        isAdmin
+      );
+      const pts = u && !isAdmin ? await ensurePoints(c.env.DB, u.id, rules) : null;
+      return {
+        cost: isAdmin ? 0 : cost,
+        short,
+        points: pts === null ? null : pts,
+        unlimited: isAdmin,
+        enough: isAdmin || pts === null || pts < 0 || pts >= cost,
+        needLogin: !u,
+      };
+    })()),
   });
 });
 

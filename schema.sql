@@ -42,6 +42,35 @@ CREATE TABLE IF NOT EXISTS delegations (
 );
 CREATE INDEX IF NOT EXISTS idx_delegations_sub ON delegations(subdomain_id);
 
+-- 积分余额（独立表，不动 users 结构；-1 表示不限，仅管理员）
+CREATE TABLE IF NOT EXISTS user_points (
+  user_id    INTEGER PRIMARY KEY,
+  points     INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+
+-- 积分流水：签到获得，申请/兑换子域名消耗（单字域名更贵）
+CREATE TABLE IF NOT EXISTS point_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL,
+  delta      INTEGER NOT NULL,               -- 正数为获得，负数为消耗
+  balance    INTEGER NOT NULL,               -- 变动后的余额
+  reason     TEXT    NOT NULL,               -- checkin | apply | admin_adjust | ...
+  detail     TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_point_logs_user ON point_logs(user_id, created_at DESC);
+
+-- 每日签到（同一天只能领一次，按站点时区计）
+CREATE TABLE IF NOT EXISTS checkins (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL,
+  day        TEXT    NOT NULL,               -- YYYY-MM-DD
+  points     INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_user_day ON checkins(user_id, day);
+
 -- IP 封禁名单（某 IP 下的账号超限时由管理员一键封禁）
 CREATE TABLE IF NOT EXISTS ip_bans (
   ip         TEXT PRIMARY KEY,
@@ -129,6 +158,12 @@ INSERT OR IGNORE INTO settings(key, value) VALUES ('approval_required', '1');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('announcement', '欢迎使用二级域名分发系统');
 -- 同 IP 可注册的账号数上限（管理员可在后台调整）
 INSERT OR IGNORE INTO settings(key, value) VALUES ('max_accounts_per_ip', '2');
+-- 积分规则
+INSERT OR IGNORE INTO settings(key, value) VALUES ('checkin_points', '5');      -- 每日签到奖励
+INSERT OR IGNORE INTO settings(key, value) VALUES ('domain_cost', '5');         -- 申请一个子域名消耗
+INSERT OR IGNORE INTO settings(key, value) VALUES ('short_domain_cost', '35');  -- 单字域名消耗
+INSERT OR IGNORE INTO settings(key, value) VALUES ('short_domain_len', '1');    -- 长度 <= 该值视为单字域名
+INSERT OR IGNORE INTO settings(key, value) VALUES ('initial_points', '10');     -- 新用户初始积分
 -- WHOIS 持有人邮箱显示方式：masked 脱敏（默认）| none 不显示 | full 完整
 INSERT OR IGNORE INTO settings(key, value) VALUES ('whois_holder', 'masked');
 -- 站点品牌（后台「站点设置」可改）

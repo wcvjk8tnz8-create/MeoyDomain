@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
 import { validateLabel } from '../lib/records.js';
 import { cfDelete, cfErrorMessage } from '../lib/cf.js';
+import { UNLIMITED_POINTS, ensurePoints, addPoints, domainCost } from '../lib/points.js';
+import { pointRules } from './points.js';
 
 const app = new Hono();
 
@@ -80,7 +82,28 @@ export async function lookupLabel(c, rawLabel) {
 // 可用性检查
 app.get('/check', async (c) => {
   const r = await lookupLabel(c, c.req.query('label'));
-  return ok(c, { available: r.available, message: r.message, fqdn: r.fqdn, status: r.status });
+  const u = c.get('user');
+  const isAdmin = !!(u && u.role === 'admin');
+  const rules = await pointRules(c.env);
+  const label = String(c.req.query('label') || '').toLowerCase();
+  const { cost, short } = domainCost(
+    label,
+    { domainCost: rules.domainCost, shortCost: rules.shortCost, shortLen: rules.shortLen },
+    isAdmin
+  );
+  let points = UNLIMITED_POINTS;
+  if (u && !isAdmin) points = await ensurePoints(c.env.DB, u.id, rules);
+  return ok(c, {
+    available: r.available,
+    message: r.message,
+    fqdn: r.fqdn,
+    status: r.status,
+    cost: isAdmin ? 0 : cost,
+    short,
+    points,
+    unlimited: isAdmin || u === null ? isAdmin : false,
+    enough: isAdmin || !u || points < 0 || points >= cost,
+  });
 });
 
 // 计入配额的状态：被驳回（rejected）不占额度
@@ -142,6 +165,26 @@ const createMine = async (c) => {
   if (u.quota >= 0 && (used?.n || 0) >= u.quota)
     return fail(c, `已达上限，每个账号最多持有 ${u.quota} 个子域名`);
 
+  // 积分校验：普通域名一个价，单字域名更贵；管理员不消耗
+  const rules = await pointRules(c.env);
+  const { cost, short } = domainCost(
+    v.label,
+    { domainCost: rules.domainCost, shortCost: rules.shortCost, shortLen: rules.shortLen },
+    isAdmin
+  );
+  let points = UNLIMITED_POINTS;
+  if (!isAdmin) {
+    points = await ensurePoints(c.env.DB, u.id, rules);
+    if (points >= 0 && points < cost) {
+      return fail(
+        c,
+        `积分不足：${short ? '单字域名' : '该子域名'}需要 ${cost} 分，当前 ${points} 分`,
+        402,
+        { need: cost, have: points, short }
+      );
+    }
+  }
+
   // 清掉此前被驳回的同名记录（连同其 DNS），再重新申请
   if (dup) {
     const oldRecs = await c.env.DB.prepare('SELECT id, cf_record_id FROM dns_records WHERE subdomain_id = ?')
@@ -175,12 +218,33 @@ const createMine = async (c) => {
     throw e;
   }
 
+  // 扣除积分（管理员不扣）
+  let pointsAfter = UNLIMITED_POINTS;
+  if (!isAdmin && cost > 0) {
+    pointsAfter = await addPoints(
+      c.env.DB,
+      u.id,
+      -cost,
+      'apply',
+      `${fqdn}${short ? '（单字域名）' : ''}`
+    );
+  }
+
   const detail = [status];
   if (isAdmin) detail.push('管理员免审核');
+  else if (cost > 0) detail.push(`消耗 ${cost} 分${short ? '（单字域名）' : ''}`);
   if (isReserved) detail.push('保留域名');
   await audit(c, u.id, 'subdomain.create', fqdn, detail.join(' · '));
   // 注意：创建子域名时不会写入任何 DNS 记录，用户需要时再自行添加
-  return ok(c, { id: res.meta?.last_row_id, fqdn, status, reserved: isReserved });
+  return ok(c, {
+    id: res.meta?.last_row_id,
+    fqdn,
+    status,
+    reserved: isReserved,
+    cost: isAdmin ? 0 : cost,
+    short,
+    points: pointsAfter,
+  });
 };
 
 app.post('/', createMine);

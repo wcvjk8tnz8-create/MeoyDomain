@@ -382,8 +382,13 @@ export function safeJson(s) {
 export function validateLabel(label) {
   const l = String(label || '').trim().toLowerCase();
   if (!l) return { ok: false, error: '请输入子域名' };
-  if (l.length < 2) return { ok: false, error: '子域名至少 2 个字符' };
+  // 单字符（a、1）允许：属「单字域名」，需要更高积分兑换
+  if (l.length < 1) return { ok: false, error: '请输入子域名' };
   if (l.length > 63) return { ok: false, error: '子域名最多 63 个字符' };
+  if (!/^[a-z0-9]$/.test(l) && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(l))
+    return { ok: false, error: '只能使用小写字母、数字和连字符，且不能以连字符开头或结尾' };
+  // 单字符数字（如 "1"）允许，多字符纯数字不允许
+  if (l.length > 1 && /^\d+$/.test(l)) return { ok: false, error: '不支持纯数字子域名' };
   if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(l)) return { ok: false, error: '只能使用小写字母、数字和连字符，且不能以连字符开头或结尾' };
   if (/^\d+$/.test(l)) return { ok: false, error: '不支持纯数字子域名' };
   return { ok: true, label: l };

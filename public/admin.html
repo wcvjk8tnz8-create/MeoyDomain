@@ -44,7 +44,7 @@ let tab = 'pending';
 const HEADS = {
   pending: ['域名', '申请人', '用途', '时间', '操作'],
   subs: ['域名', '申请人', '状态', '记录', '时间', '操作'],
-  users: ['邮箱', '角色', '状态', '配额', '域名数', '操作'],
+  users: ['邮箱', '角色', '状态', '配额', '域名数', '积分', '操作'],
   locks: ['记录名', '类型', '发起人', '锁定时间', '操作'],
   settings: ['站点品牌', '值'],
   ips: ['IP', '账号数', '邮箱', '最近注册', '状态', '操作'],
@@ -94,13 +94,31 @@ async function load() {
         <td>${u.status === 'banned' ? `<span class="badge danger">已封禁</span><div class="hint">${esc(u.ban_reason || '')}</div>` : '<span class="badge ok">正常</span>'}</td>
         <td>${u.quotaUnlimited ? '<span class="badge inf">∞ 不限</span>' : u.quota}</td>
         <td>${u.sub_count}</td>
+        <td class="mono">${u.points === -1 ? '<span class="badge inf">∞</span>' : (u.points === null ? '<span style="color:var(--muted)">—</span>' : u.points)}</td>
         <td class="right nowrap">
+          <button class="btn sm" data-points="${u.id}" data-email="${esc(u.email)}" data-p="${u.points ?? ''}" data-role="${u.role}">积分</button>
           <button class="btn sm" data-quota="${u.id}" data-email="${esc(u.email)}" data-q="${u.quota}" data-role="${u.role}">配额/角色</button>
           ${u.status === 'banned'
             ? `<button class="btn sm ok" data-unban="${u.id}">解封</button>`
             : `<button class="btn sm danger" data-ban="${u.id}" data-email="${esc(u.email)}">封禁</button>`}
         </td>
       </tr>`).join('');
+    tb.querySelectorAll('[data-points]').forEach((b) => b.onclick = () => {
+      if (b.dataset.role === 'admin') return toast('管理员积分不限，无需调整', 'err');
+      openModal('调整积分 · ' + b.dataset.email, `
+        <div class="field"><label>设置为</label><input id="pset" type="number" value="${b.dataset.p || 0}"><div class="hint">直接指定最终余额</div></div>
+        <div class="field"><label>或增减</label><input id="pdelta" type="number" placeholder="如 +20 或 -5"><div class="hint">填了这项则忽略上面的「设置为」</div></div>
+        <div class="field"><label>备注</label><input id="preason" placeholder="选填"></div>
+        <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" id="pok">保存</button></div>`);
+      document.getElementById('pok').onclick = async () => {
+        const delta = document.getElementById('pdelta').value.trim();
+        const body = delta
+          ? { delta: Number(delta), reason: document.getElementById('preason').value.trim() }
+          : { set: Number(document.getElementById('pset').value), reason: document.getElementById('preason').value.trim() };
+        try { await api.post('/api/admin/users/' + b.dataset.points + '/points', body); toast('已保存'); closeModal(); load(); }
+        catch (e) { toast(e.message, 'err'); }
+      };
+    });
     tb.querySelectorAll('[data-quota]').forEach((b) => b.onclick = () => {
       openModal('调整 ' + b.dataset.email, `
         <div class="field"><label>子域名配额</label><input id="q" type="number" value="${b.dataset.q}"><div class="hint">填 -1 表示不限量</div></div>
@@ -231,6 +249,16 @@ async function load() {
             <div class="hint">超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响。</div>
           </div>
           <div class="field">
+            <label>积分规则</label>
+            <div class="grid2">
+              <div><span class="dim">每日签到奖励</span><input id="sCheckin" type="number" min="0" max="1000" value="${esc(s.checkin_points || '5')}"></div>
+              <div><span class="dim">新用户初始积分</span><input id="sInitial" type="number" min="0" max="10000" value="${esc(s.initial_points || '10')}"></div>
+              <div><span class="dim">申请子域名消耗</span><input id="sCost" type="number" min="0" max="10000" value="${esc(s.domain_cost || '5')}"></div>
+              <div><span class="dim">单字域名消耗</span><input id="sShortCost" type="number" min="0" max="100000" value="${esc(s.short_domain_cost || '35')}"></div>
+            </div>
+            <div class="hint">「单字域名长度上限」= ${esc(s.short_domain_len || '1')}（长度不超过该值即按单字计价）。管理员不消耗积分。老用户首次进入按已有域名数补偿，已有域名不受影响。</div>
+          </div>
+          <div class="field">
             <label>WHOIS 持有人邮箱</label>
             <select id="sWhois" style="max-width:260px">
               <option value="masked"${(s.whois_holder || 'masked') === 'masked' ? ' selected' : ''}>脱敏显示（ab***@gmail.com）</option>
@@ -266,6 +294,10 @@ async function load() {
           announcement: document.getElementById('sAnno').value,
           maxAccountsPerIp: document.getElementById('sIpLimit').value,
           whoisHolder: document.getElementById('sWhois').value,
+          checkinPoints: document.getElementById('sCheckin').value,
+          initialPoints: document.getElementById('sInitial').value,
+          domainCost: document.getElementById('sCost').value,
+          shortDomainCost: document.getElementById('sShortCost').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo

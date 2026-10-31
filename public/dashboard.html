@@ -19,6 +19,21 @@
     </div>
   </div>
 
+  <div class="card" id="pointsCard" style="display:none">
+    <h2>积分</h2>
+    <div class="row between" style="flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-family:var(--mono);font-size:28px;line-height:1.1;color:var(--c1)" id="ptVal">0</div>
+        <div class="sub" id="ptRules" style="margin:2px 0 0"></div>
+      </div>
+      <div class="row" style="gap:6px">
+        <button class="btn primary" id="btnCheckin">每日签到 +5</button>
+        <button class="btn sm ghost" id="btnLogs">明细</button>
+      </div>
+    </div>
+    <div class="hint" id="ptTip" style="margin-top:8px"></div>
+  </div>
+
   <div class="card">
     <h2>申请子域名</h2>
     <div class="row" style="align-items:flex-end">
@@ -126,11 +141,17 @@ async function runCheck(v) {
   if (!v) { tip.innerHTML = ''; return; }
   try {
     const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v));
-    tip.innerHTML = r.available
-      ? `<span style="color:var(--ok)">${esc(r.fqdn)} 可以注册</span>
-         <a href="/whois.html?name=${encodeURIComponent(v)}" target="_blank" style="font-size:11.5px;margin-left:6px">whois 详情</a>`
-      : `<span style="color:var(--danger)">${esc(r.message)}</span>
-         <a href="/whois.html?name=${encodeURIComponent(v)}" target="_blank" style="font-size:11.5px;margin-left:6px">whois 详情</a>`;
+    const link = `<a href="/whois.html?name=${encodeURIComponent(v)}" target="_blank" style="font-size:11.5px;margin-left:6px">whois 详情</a>`;
+    let costHtml = '';
+    if (r.available && r.cost > 0) {
+      const okPt = r.enough;
+      costHtml = `<div style="margin-top:3px;font-family:var(--mono);font-size:11.5px;color:${okPt ? 'var(--muted)' : 'var(--danger)'}">
+        ${r.short ? '<b style="color:var(--warn)">单字域名</b> ' : ''}消耗 ${r.cost} 分 · 余额 ${r.points} 分${okPt ? '' : '（不足，可每日签到积累）'}
+      </div>`;
+    }
+    tip.innerHTML = (r.available
+      ? `<span style="color:var(--ok)">${esc(r.fqdn)} 可以注册</span>`
+      : `<span style="color:var(--danger)">${esc(r.message)}</span>`) + link + costHtml;
   } catch (err) { tip.innerHTML = ''; }
 }
 
@@ -153,12 +174,83 @@ document.getElementById('btnApply').onclick = async () => {
     document.getElementById('note').value = '';
     document.getElementById('checkTip').innerHTML = '';
     load();
+    loadPoints();
   } catch (e) {
     toast(e.message, 'err');
     // 名称可能刚被他人抢注，刷新列表并重新检查
     load();
+    loadPoints();
     runCheck(label);
   }
+};
+
+/* ---------------- 积分 ---------------- */
+let ptData = null;
+
+async function loadPoints() {
+  try {
+    ptData = await api.get('/api/points/me');
+  } catch { return; }
+  const d = ptData;
+  const card = document.getElementById('pointsCard');
+  card.style.display = '';
+  document.getElementById('ptVal').innerHTML = d.unlimited
+    ? '<span style="font-size:26px">∞ 不限</span>'
+    : String(d.points);
+  document.getElementById('ptRules').textContent = d.unlimited
+    ? '管理员不限积分'
+    : `签到 +${d.rules.checkin} · 域名 -${d.rules.domainCost} · 单字域名 -${d.rules.shortCost}`;
+
+  const btn = document.getElementById('btnCheckin');
+  if (d.unlimited) {
+    btn.disabled = true;
+    btn.textContent = '管理员不限';
+  } else if (d.checkedIn) {
+    btn.disabled = true;
+    btn.textContent = `今日已签到（${d.today}）`;
+  } else {
+    btn.disabled = false;
+    btn.textContent = `每日签到 +${d.rules.checkin}`;
+  }
+  const tip = document.getElementById('ptTip');
+  tip.textContent = d.unlimited
+    ? '管理员申请子域名不消耗积分。'
+    : d.checkedIn
+      ? `明天可再领 ${d.rules.checkin} 分。单字域名（如 a、1）需 ${d.rules.shortCost} 分兑换。`
+      : `今天还没签到，可领 ${d.rules.checkin} 分。单字域名（如 a、1）需 ${d.rules.shortCost} 分兑换。`;
+}
+
+document.getElementById('btnCheckin').onclick = async () => {
+  const btn = document.getElementById('btnCheckin');
+  btn.disabled = true;
+  try {
+    const r = await api.post('/api/points/checkin', {});
+    toast(`签到成功 +${r.gained}，当前 ${r.points} 分`);
+    await loadPoints();
+  } catch (e) {
+    toast(e.message, 'err');
+    await loadPoints();
+  }
+};
+
+document.getElementById('btnLogs').onclick = () => {
+  const rows = (ptData && ptData.logs) || [];
+  const reasonText = {
+    checkin: '每日签到', apply: '申请子域名', grant: '开通额度',
+    admin_adjust: '管理员调整', admin_set: '管理员设置',
+  };
+  openModal('积分明细', rows.length ? `
+    <div class="tablewrap"><table>
+      <thead><tr><th>变动</th><th>余额</th><th>说明</th><th class="right">时间</th></tr></thead>
+      <tbody>${rows.map((l) => `
+        <tr>
+          <td class="mono" style="color:${l.delta >= 0 ? 'var(--ok)' : 'var(--danger)'}">${l.delta >= 0 ? '+' : ''}${l.delta}</td>
+          <td class="mono">${l.balance}</td>
+          <td>${esc(reasonText[l.reason] || l.reason)}${l.detail ? ` · ${esc(l.detail)}` : ''}</td>
+          <td class="right nowrap" style="color:var(--muted)">${fmtTime(l.created_at)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>` : '<div class="empty">暂无记录</div>');
 };
 
 // 支持从 WHOIS 页带名称跳转过来：/dashboard?apply=xxx
@@ -182,7 +274,11 @@ document.getElementById('btnPwd').onclick = () => {
   };
 };
 
-mountNav('dash').then(async () => { applyBranding(await loadBranding()); load(); }).catch(() => {});
+mountNav('dash').then(async () => {
+  applyBranding(await loadBranding());
+  load();
+  loadPoints();
+}).catch(() => {});
 </script>
 </body>
 </html>
