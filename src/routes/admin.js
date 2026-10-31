@@ -209,4 +209,49 @@ app.post('/reconcile/:id', async (c) => {
   return ok(c, { warnings: errs });
 });
 
+// 站点设置：站点名 / Logo / 公告
+app.get('/settings', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT key, value FROM settings').all();
+  return ok(c, { items: Object.fromEntries(results.map((r) => [r.key, r.value])) });
+});
+
+app.post('/settings', async (c) => {
+  const u = c.get('user');
+  const body = await c.req.json().catch(() => ({}));
+  const set = async (k, v) => {
+    if (v === undefined) return;
+    await c.env.DB.prepare(
+      'INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    )
+      .bind(k, String(v))
+      .run();
+  };
+  const name = String(body.siteName ?? '').trim().slice(0, 40);
+  const logo = String(body.logoUrl ?? '').trim().slice(0, 500);
+  const favicon = String(body.faviconUrl ?? '').trim().slice(0, 500);
+  const anno = String(body.announcement ?? '').trim().slice(0, 300);
+
+  if (name) await set('site_name', name);
+  await set('logo_url', logo || '/img/logo.jpg');
+  await set('favicon_url', favicon || '/img/favicon.png');
+  if (body.announcement !== undefined) await set('announcement', anno);
+
+  await audit(c, u.id, 'admin.settings', 'site', `name=${name} logo=${logo || '(默认)'}`);
+  return ok(c, {});
+});
+
+// 恢复默认 Logo（重新指向内置图片）
+app.post('/settings/reset-logo', async (c) => {
+  const u = c.get('user');
+  for (const [k, v] of [['logo_url', '/img/logo.jpg'], ['favicon_url', '/img/favicon.png']]) {
+    await c.env.DB.prepare(
+      'INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    )
+      .bind(k, v)
+      .run();
+  }
+  await audit(c, u.id, 'admin.settings', 'site', '恢复默认 Logo');
+  return ok(c, {});
+});
+
 export default app;

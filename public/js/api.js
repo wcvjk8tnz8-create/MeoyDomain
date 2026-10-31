@@ -58,6 +58,44 @@ document.addEventListener('click', (e) => {
   if (b) applyWallpaper(b.dataset.wp);
 });
 
+/* ---------- 站点品牌（站点名 / Logo，管理员可在后台改） ---------- */
+const DEFAULT_BRAND = { siteName: 'Meoy', logoUrl: '/img/logo.jpg', faviconUrl: '/img/favicon.png' };
+let brandPromise = null;
+
+function loadBranding() {
+  if (!brandPromise) {
+    brandPromise = api
+      .get('/api/config')
+      .then((d) => ({
+        siteName: d.siteName || DEFAULT_BRAND.siteName,
+        logoUrl: d.logoUrl || DEFAULT_BRAND.logoUrl,
+        faviconUrl: d.faviconUrl || DEFAULT_BRAND.faviconUrl,
+      }))
+      .catch(() => ({ ...DEFAULT_BRAND }));
+  }
+  return brandPromise;
+}
+
+/** 应用站点名与 favicon */
+function applyBranding(b) {
+  document.title = (document.title || '').replace(/^[^·]*·\s*/, b.siteName + ' · ');
+  let f = document.querySelector('link[rel="icon"]');
+  if (!f) {
+    f = document.createElement('link');
+    f.rel = 'icon';
+    document.head.appendChild(f);
+  }
+  f.href = b.faviconUrl;
+  document.querySelectorAll('[data-site-name]').forEach((el) => (el.textContent = b.siteName));
+  document.querySelectorAll('[data-logo-img]').forEach((el) => (el.src = b.logoUrl));
+}
+
+/** 生成 Logo 图片 HTML（size 为像素） */
+function logoHtml(b, size, cls = '') {
+  return `<img src="${esc(b.logoUrl)}" alt="${esc(b.siteName)}" class="${cls}"
+    style="width:${size}px;height:${size}px;object-fit:contain;border-radius:${Math.round(size * 0.22)}px">`;
+}
+
 /* ---------- 提示 ---------- */
 function toast(msg, type = 'ok', ms = 2600) {
   let box = document.getElementById('toast');
@@ -118,8 +156,12 @@ async function mountNav(active) {
     return null;
   }
   const isAdmin = user.role === 'admin';
+  const b = await loadBranding();
   nav.innerHTML = `
-    <div class="logo">Meoy<em>子域名分发</em></div>
+    <div class="logo">
+      <img src="${esc(b.logoUrl)}" alt="${esc(b.siteName)}" style="width:34px;height:34px;object-fit:contain;border-radius:8px">
+      <span class="logo-text">${esc(b.siteName)}<em>子域名分发</em></span>
+    </div>
     <div class="spacer"></div>
     <div class="links">
       <a class="navlink ${active === 'dash' ? 'active' : ''}" href="/dashboard">我的域名</a>

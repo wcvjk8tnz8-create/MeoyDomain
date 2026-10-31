@@ -11,9 +11,9 @@
 
 <div class="wrap narrow" style="padding-top:60px">
   <div class="brand-line">
-    <div class="brand-mark">M</div>
+    <img id="brandLogo" src="/img/logo.jpg" alt="Meoy" class="brand-logo">
     <div>
-      <div class="brand-name">Meoy</div>
+      <div class="brand-name" data-site-name>Meoy</div>
       <div class="brand-sub">二级域名分发 · DNS 管理</div>
     </div>
   </div>
@@ -95,6 +95,11 @@ document.getElementById('btnReg').onclick = async () => {
     setTimeout(() => location.href = '/dashboard', 400);
   } catch (e) { toast(e.message, 'err'); }
 };
+
+loadBranding().then((b) => {
+  applyBranding(b);
+  document.getElementById('brandLogo').src = b.logoUrl;
+});
 
 api.get('/api/auth/me').then(() => { location.href = '/dashboard'; }).catch(() => {});
 </script>

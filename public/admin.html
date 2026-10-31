@@ -11,7 +11,7 @@
 <nav class="nav" id="nav"></nav>
 
 <div class="wrap">
-  <h1>管理后台</h1>
+  <h1><span data-site-name>Meoy</span> · 管理后台</h1>
   <div class="sub" id="envTip"></div>
 
   <div class="stat-grid" id="stats" style="margin-bottom:16px"></div>
@@ -21,6 +21,7 @@
     <button class="tab" data-tab="subs">全部子域名</button>
     <button class="tab" data-tab="users">用户</button>
     <button class="tab" data-tab="locks">验证锁定</button>
+    <button class="tab" data-tab="settings">站点设置</button>
     <button class="tab" data-tab="audit">审计日志</button>
   </div>
 
@@ -44,6 +45,7 @@ const HEADS = {
   subs: ['域名', '申请人', '状态', '记录', '时间', '操作'],
   users: ['邮箱', '角色', '状态', '配额', '域名数', '操作'],
   locks: ['记录名', '类型', '发起人', '锁定时间', '操作'],
+  settings: ['站点品牌', '值'],
   audit: ['时间', '用户', '动作', '对象', '详情'],
 };
 
@@ -143,6 +145,64 @@ async function load() {
     });
   }
 
+  if (tab === 'settings') {
+    const d = await api.get('/api/admin/settings');
+    const s = d.items;
+    tb.innerHTML = `
+      <tr>
+        <td style="width:88px;vertical-align:top">
+          <img class="logo-preview" src="${esc(s.logo_url || '/img/logo.jpg')}" alt="logo">
+          <div class="hint" style="margin-top:6px">当前预览</div>
+        </td>
+        <td>
+          <div class="grid2" style="margin-bottom:10px">
+            <div class="field" style="margin:0"><label>站点名称</label><input id="sName" value="${esc(s.site_name || 'Meoy')}" placeholder="Meoy"></div>
+            <div class="field" style="margin:0"><label>Logo 地址</label><input id="sLogo" value="${esc(s.logo_url || '')}" placeholder="/img/logo.jpg"></div>
+          </div>
+          <div class="grid2" style="margin-bottom:12px">
+            <div class="field" style="margin:0"><label>图标地址（favicon）</label><input id="sFav" value="${esc(s.favicon_url || '')}" placeholder="/img/favicon.png"></div>
+            <div class="field" style="margin:0"><label>站点公告</label><input id="sAnno" value="${esc(s.announcement || '')}" placeholder="留空则不显示"></div>
+          </div>
+          <div class="alert info" style="margin-bottom:12px">
+            Logo 可以是站内路径（<span class="mono">/img/logo.jpg</span>）或外链图片地址（<span class="mono">https://…</span>）。
+            想换成本地图，把图片放进仓库的 <span class="mono">public/img/</span> 再推一次即可。
+          </div>
+          <div class="row">
+            <button class="btn primary" id="saveSet">保存</button>
+            <button class="btn" id="resetLogo">恢复默认 Logo</button>
+            <button class="btn ghost" id="reloadLogo">刷新预览</button>
+          </div>
+        </td>
+      </tr>`;
+    const preview = () => {
+      tb.querySelector('.logo-preview').src = document.getElementById('sLogo').value.trim() || '/img/logo.jpg';
+    };
+    document.getElementById('sLogo').addEventListener('input', preview);
+    document.getElementById('reloadLogo').onclick = preview;
+    document.getElementById('saveSet').onclick = async () => {
+      try {
+        await api.post('/api/admin/settings', {
+          siteName: document.getElementById('sName').value,
+          logoUrl: document.getElementById('sLogo').value,
+          faviconUrl: document.getElementById('sFav').value,
+          announcement: document.getElementById('sAnno').value,
+        });
+        toast('已保存，刷新页面后生效');
+        // 立即刷新导航 Logo
+        brandPromise = null;
+        const b = await loadBranding();
+        applyBranding(b);
+      } catch (e) { toast(e.message, 'err'); }
+    };
+    document.getElementById('resetLogo').onclick = async () => {
+      try {
+        await api.post('/api/admin/settings/reset-logo', {});
+        toast('已恢复默认 Logo'); load();
+      } catch (e) { toast(e.message, 'err'); }
+    };
+    return;
+  }
+
   if (tab === 'audit') {
     const d = await api.get('/api/admin/audit');
     tb.innerHTML = d.items.map((a) => `
@@ -182,7 +242,8 @@ document.querySelectorAll('.tab').forEach((t) => {
   };
 });
 
-mountNav('admin').then((u) => {
+mountNav('admin').then(async (u) => {
+  applyBranding(await loadBranding());
   if (u && u.role !== 'admin') {
     document.querySelector('.wrap').innerHTML =
       '<div class="card"><div class="alert danger">当前账号没有管理员权限。</div><a href="/dashboard">返回我的域名</a></div>';

@@ -85,11 +85,16 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 1px 0 rgba(255, 255, 255, .12) inset, 0 6px 24px rgba(6, 10, 26, .28);
   position: sticky; top: 0; z-index: 30;
 }
-.nav .logo {
+.nav .logo { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.nav .logo img {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, .4));
+  background: rgba(255, 255, 255, .14);
+  border: 1px solid var(--glass-line);
+}
+.nav .logo-text {
   font-weight: 700; font-size: 16px; letter-spacing: .5px;
   background: linear-gradient(92deg, var(--c1), var(--c2) 60%, var(--c3));
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  white-space: nowrap;
 }
 .nav .logo em { font-style: normal; opacity: .55; font-size: 11px; margin-left: 2px; }
 .nav .spacer { flex: 1; }
@@ -326,6 +331,19 @@ tr.locked:hover td { background: rgba(167, 139, 250, .24); }
 }
 .brand-name { font-size: 19px; font-weight: 800; letter-spacing: .3px; }
 .brand-sub { font-size: 11.5px; color: var(--muted); }
+.brand-logo {
+  width: 62px; height: 62px; object-fit: contain; border-radius: 16px;
+  background: rgba(255, 255, 255, .16);
+  border: 1px solid var(--glass-line-hi);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255, 255, 255, .34);
+}
+/* 后台 Logo 预览 */
+.logo-preview {
+  width: 76px; height: 76px; object-fit: contain; border-radius: 16px;
+  background: rgba(255, 255, 255, .14);
+  border: 1px solid var(--glass-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+}
 
 .divider { height: 1px; background: rgba(255, 255, 255, .14); margin: 15px 0; }
 

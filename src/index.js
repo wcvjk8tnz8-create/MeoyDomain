@@ -30,16 +30,24 @@ app.get('/api/health', (c) =>
 );
 
 // 前端初始化配置
-app.get('/api/config', (c) =>
-  ok(c, {
+// 公开配置（含站点品牌，登录页也要用）
+app.get('/api/config', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url')"
+  ).all();
+  const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
+  return ok(c, {
     rootDomain: c.env.ROOT_DOMAIN,
     allowSignup: c.env.ALLOW_SIGNUP !== '0',
     requireApproval: c.env.REQUIRE_APPROVAL === '1',
     recordTypes: TYPE_NAMES.map((k) => ({ key: k, ...RECORD_TYPES[k] })),
     ttlChoices: TTL_CHOICES,
     verifyPresets: VERIFY_PRESETS,
-  })
-);
+    siteName: s.site_name || 'Meoy',
+    logoUrl: s.logo_url || '/img/logo.jpg',
+    faviconUrl: s.favicon_url || '/img/favicon.png',
+  });
+});
 
 // 认证
 app.route('/api/auth', authRoutes);

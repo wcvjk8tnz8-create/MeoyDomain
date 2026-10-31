@@ -93,3 +93,7 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO settings(key, value) VALUES ('signup_open', '1');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('approval_required', '1');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('announcement', '欢迎使用二级域名分发系统');
+-- 站点品牌（后台「站点设置」可改）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('site_name', 'Meoy');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('logo_url', '/img/logo.jpg');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('favicon_url', '/img/favicon.png');

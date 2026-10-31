@@ -372,7 +372,7 @@ document.getElementById('btnSoa').onclick = async () => {
 
 document.getElementById('copyFqdn').onclick = () => copyText(sub.fqdn);
 
-mountNav('dash').then(loadAll).catch(() => {});
+mountNav('dash').then(async () => { applyBranding(await loadBranding()); loadAll(); }).catch(() => {});
 </script>
 </body>
 </html>
