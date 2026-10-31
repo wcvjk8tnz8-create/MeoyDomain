@@ -33,7 +33,7 @@
       </div>
       <button class="btn primary" id="btnApply">申请</button>
     </div>
-    <div class="alert info" style="margin:12px 0 0">
+    <div class="alert info" style="margin:12px 0 0" id="applyTip">
       创建子域名不会自动写入任何 DNS 记录，审核通过后到「DNS 记录」页按需添加。
     </div>
   </div>
@@ -63,8 +63,19 @@ async function load() {
   rootDomain = cfg.rootDomain;
   document.getElementById('rootDomain').textContent = rootDomain;
   const quotaHtml = d.quotaUnlimited ? '<span class="badge inf">∞ 不限</span>' : `${d.quota} 个`;
-  document.getElementById('quotaTip').innerHTML =
-    `已使用 ${d.used} / ${quotaHtml}` + (cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效');
+  const isAdmin = document.querySelector('.navlink[href="/admin"]') !== null;
+  const tip = isAdmin
+    ? ' · 管理员申请即时开通，可占用保留域名且不限数量'
+    : cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效';
+  document.getElementById('quotaTip').innerHTML = `已使用 ${d.used} / ${quotaHtml}` + tip;
+  if (isAdmin) {
+    document.getElementById('applyTip').innerHTML =
+      '创建子域名不会自动写入任何 DNS 记录。<b>管理员特权</b>：申请即时开通、不限数量、可使用 www / mail / admin 等保留域名。';
+  } else if (!cfg.requireApproval) {
+    document.getElementById('applyTip').innerHTML =
+      '创建子域名不会自动写入任何 DNS 记录，开通后到「DNS 记录」页按需添加。';
+  }
+
   const tb = document.getElementById('list');
   if (!d.items.length) {
     tb.innerHTML = `<tr><td colspan="5" class="empty">还没有子域名，先在上方申请一个</td></tr>`;

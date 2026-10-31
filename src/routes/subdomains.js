@@ -19,14 +19,22 @@ app.get('/check', async (c) => {
   const v = validateLabel(c.req.query('label'));
   if (!v.ok) return ok(c, { available: false, message: v.error });
   const fqdn = `${v.label}.${c.env.ROOT_DOMAIN}`;
+  const u = c.get('user');
+  const isAdmin = u && u.role === 'admin';
   const exists = await c.env.DB.prepare('SELECT id, status FROM subdomains WHERE label = ?').bind(v.label).first();
   const reserved = String(c.env.RESERVED_LABELS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   if (exists) return ok(c, { available: false, message: '该子域名已被占用', fqdn });
-  if (reserved.includes(v.label)) return ok(c, { available: false, message: '该名称为系统保留，不可申请', fqdn });
-  return ok(c, { available: true, message: '可以使用', fqdn });
+  // 管理员可申请保留域名
+  if (!isAdmin && reserved.includes(v.label))
+    return ok(c, { available: false, message: '该名称为系统保留，不可申请', fqdn });
+  return ok(c, {
+    available: true,
+    message: isAdmin && reserved.includes(v.label) ? '保留域名 · 管理员可用' : '可以使用',
+    fqdn,
+  });
 });
 
 // 我的子域名列表（同时兼容 /api/subdomains 与 /api/subdomains/）
@@ -55,11 +63,14 @@ const createMine = async (c) => {
   const v = validateLabel(label);
   if (!v.ok) return fail(c, v.error);
 
+  const isAdmin = u.role === 'admin';
   const reserved = String(c.env.RESERVED_LABELS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  if (reserved.includes(v.label)) return fail(c, '该名称为系统保留，不可申请');
+  const isReserved = reserved.includes(v.label);
+  // 管理员可申请保留域名，普通用户不行
+  if (!isAdmin && isReserved) return fail(c, '该名称为系统保留，不可申请');
 
   const dup = await c.env.DB.prepare('SELECT id FROM subdomains WHERE label = ?').bind(v.label).first();
   if (dup) return fail(c, '该子域名已被占用');
@@ -73,7 +84,8 @@ const createMine = async (c) => {
   if (u.quota >= 0 && (used?.n || 0) >= u.quota)
     return fail(c, `已达上限，每个账号最多持有 ${u.quota} 个子域名`);
 
-  const autoApprove = c.env.REQUIRE_APPROVAL !== '1';
+  // 免审核：全局关闭审核，或管理员申请（管理员自建即开通，含保留域名）
+  const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin;
   const status = autoApprove ? 'approved' : 'pending';
   const fqdn = `${v.label}.${c.env.ROOT_DOMAIN}`;
   const res = await c.env.DB.prepare(
@@ -83,9 +95,12 @@ const createMine = async (c) => {
     .bind(v.label, fqdn, u.id, status, String(note || '').slice(0, 300), now(), now(), autoApprove ? now() : null)
     .run();
 
-  await audit(c, u.id, 'subdomain.create', fqdn, status);
+  const detail = [status];
+  if (isAdmin) detail.push('管理员免审核');
+  if (isReserved) detail.push('保留域名');
+  await audit(c, u.id, 'subdomain.create', fqdn, detail.join(' · '));
   // 注意：创建子域名时不会写入任何 DNS 记录，用户需要时再自行添加
-  return ok(c, { id: res.meta?.last_row_id, fqdn, status });
+  return ok(c, { id: res.meta?.last_row_id, fqdn, status, reserved: isReserved });
 };
 
 app.post('/', createMine);
