@@ -88,6 +88,28 @@ subdomain-hub/
 
 记录下 **Zone ID**（域名概览页右下角）。
 
+### 1. 获取 Cloudflare 凭据
+
+| 需要什么 | 去哪里拿 | 直链 |
+|---|---|---|
+| **API Token** | 用户头像 → My Profile → API Tokens → Create Token | <https://dash.cloudflare.com/profile/api-tokens> |
+| **Account ID** | Workers & Pages 概览页右侧栏 | <https://dash.cloudflare.com/?to=/:account/workers-and-pages> |
+| **Zone ID** | 选中根域名 → Overview → 右下角 API 区块 | <https://dash.cloudflare.com/> → 你的域名 → Overview |
+
+API Token 用 **Create Custom Token**，按下面三行配：
+
+| 权限 | 资源 | 作用 |
+|---|---|---|
+| `Account` → `D1` → `Edit` | 你的账户 | CI 自动创建 D1 数据库 |
+| `Account` → `Workers Scripts` → `Edit` | 你的账户 | 部署 Worker |
+| `Zone` → `DNS` → `Edit` | 你的根域名 | 读写 DNS 记录 |
+
+> 图省事也可以用官方模板 **Edit Cloudflare Workers**（在 API Tokens 页面的模板列表里），它覆盖前两项，再单独补一条 Zone DNS 的编辑权限即可。
+>
+> 快捷入口：<https://dash.cloudflare.com/profile/api-tokens> → `Create Custom Token` → `Get started`
+
+三个值拿到后按下面填进 GitHub。
+
 ### 2. 填 4 个 Secrets，推一次就完事
 
 仓库 **Settings → Secrets and variables → Actions → Secrets**：

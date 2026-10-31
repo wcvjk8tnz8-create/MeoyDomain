@@ -30,7 +30,7 @@ function toast(msg, type = 'ok', ms = 2600) {
     document.body.appendChild(box);
   }
   const d = document.createElement('div');
-  d.className = 'toast ' + (type === 'err' ? 'err' : 'ok');
+  d.className = 'toast ' + (type === 'err' ? 'err' : '');
   d.textContent = msg;
   box.appendChild(d);
   setTimeout(() => d.remove(), ms);
@@ -76,12 +76,13 @@ async function mountNav(active) {
   }
   const isAdmin = user.role === 'admin';
   nav.innerHTML = `
-    <div class="logo">二级域名<span>分发</span></div>
+    <div class="logo">二级域名分发<span> · 控制台</span></div>
     <div class="spacer"></div>
     <div class="links">
       <a class="navlink ${active === 'dash' ? 'active' : ''}" href="/dashboard">我的域名</a>
       ${isAdmin ? `<a class="navlink ${active === 'admin' ? 'active' : ''}" href="/admin">管理后台</a>` : ''}
-      <span class="badge">${esc(user.email)}</span>
+      <span class="sep"></span>
+      <span class="badge" style="font-weight:400">${esc(user.email)}</span>
       <button class="btn sm ghost" id="btnLogout">退出</button>
     </div>`;
   document.getElementById('btnLogout').onclick = async () => {

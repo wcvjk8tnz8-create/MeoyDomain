@@ -51,9 +51,9 @@ async function load() {
   document.getElementById('stats').innerHTML = [
     ['用户', s.users], ['已开通域名', s.subdomains], ['待审核', s.pending], ['DNS 记录', s.records], ['验证锁定', s.locked],
   ].map(([l, v]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('')
-   + `<div class="stat"><div class="v" style="font-size:14px">${esc(s.rootDomain)}</div><div class="l">根域名${s.mock ? ' · MOCK 模式' : ''}</div></div>`;
+   + `<div class="stat"><div class="v" style="font-size:13px;font-family:var(--mono)">${esc(s.rootDomain)}</div><div class="l">根域名${s.mock ? ' · MOCK' : ''}</div></div>`;
   document.getElementById('envTip').textContent = s.mock
-    ? '当前运行在 MOCK 模式：DNS 记录只写入内存，不会真正调用 Cloudflare。'
+    ? '当前为 MOCK 模式：DNS 记录只写入内存，不会真正调用 Cloudflare。'
     : 'DNS 记录通过 Cloudflare API 实时同步。';
 
   document.getElementById('thead').innerHTML = '<tr>' + HEADS[tab].map((h) => `<th>${h}</th>`).join('') + '</tr>';
@@ -108,7 +108,7 @@ async function load() {
     });
     tb.querySelectorAll('[data-ban]').forEach((b) => b.onclick = () => {
       openModal('封禁 ' + b.dataset.email, `
-        <div class="alert danger">封禁后：该用户立即下线、无法登录，其全部子域名停用。</div>
+        <div class="alert danger">封禁后该用户立即下线、无法登录，其全部子域名停用。</div>
         <div class="field"><label>封禁原因</label><input id="rs" placeholder="违规使用"></div>
         <label class="check" style="margin-bottom:12px"><input type="checkbox" id="pg"> 同时清空其在 Cloudflare 上的全部 DNS 记录</label>
         <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" id="ok">确认封禁</button></div>`);
@@ -184,7 +184,7 @@ document.querySelectorAll('.tab').forEach((t) => {
 mountNav('admin').then((u) => {
   if (u && u.role !== 'admin') {
     document.querySelector('.wrap').innerHTML =
-      '<div class="card"><div class="alert danger">当前账号没有管理员权限。</div><a href="/dashboard">← 返回我的域名</a></div>';
+      '<div class="card"><div class="alert danger">当前账号没有管理员权限。</div><a href="/dashboard">返回我的域名</a></div>';
     return;
   }
   load();

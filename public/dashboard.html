@@ -16,29 +16,29 @@
   </div>
 
   <div class="card">
-    <h2>申请新的子域名</h2>
+    <h2>申请子域名</h2>
     <div class="row" style="align-items:flex-end">
-      <div style="flex:1;min-width:200px">
+      <div style="flex:1;min-width:190px">
         <label>子域名</label>
         <div class="row" style="gap:0;flex-wrap:nowrap">
-          <input id="label" placeholder="mail" style="border-radius:10px 0 0 10px" autocomplete="off">
-          <span class="mono" style="padding:0 12px;background:var(--card-2);border:1px solid var(--line);border-left:none;border-radius:0 10px 10px 0;display:flex;align-items:center;white-space:nowrap">.<span id="rootDomain"></span></span>
+          <input id="label" placeholder="mail" style="border-radius:5px 0 0 5px;border-right:none" autocomplete="off">
+          <span class="mono" style="padding:0 11px;background:var(--surface-3);border:1px solid var(--border-2);border-radius:0 5px 5px 0;display:flex;align-items:center;white-space:nowrap;color:var(--text-2)">.<span id="rootDomain"></span></span>
         </div>
         <div class="hint" id="checkTip"></div>
       </div>
       <div style="flex:2;min-width:220px">
-        <label>用途说明（选填，管理员审核参考）</label>
+        <label>用途说明（选填，供管理员审核参考）</label>
         <input id="note" placeholder="例如：个人博客 / 邮件服务">
       </div>
       <button class="btn primary" id="btnApply">申请</button>
     </div>
-    <div class="alert info" style="margin-top:12px">
-      创建子域名时<strong>不会</strong>自动写入任何 DNS 记录；审核通过后再到「DNS 记录」页按需添加。
+    <div class="alert info" style="margin:12px 0 0">
+      创建子域名不会自动写入任何 DNS 记录，审核通过后到「DNS 记录」页按需添加。
     </div>
   </div>
 
   <div class="card">
-    <h2>子域名列表</h2>
+    <h2>列表</h2>
     <div class="tablewrap">
       <table>
         <thead><tr><th>域名</th><th>状态</th><th>记录数</th><th>申请时间</th><th class="right">操作</th></tr></thead>
@@ -61,10 +61,11 @@ async function load() {
   const cfg = await api.get('/api/config');
   rootDomain = cfg.rootDomain;
   document.getElementById('rootDomain').textContent = rootDomain;
-  document.getElementById('quotaTip').textContent = `已使用 ${d.used} / ${d.quota} 个` + (cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效');
+  document.getElementById('quotaTip').textContent =
+    `已使用 ${d.used} / ${d.quota} 个` + (cfg.requireApproval ? ' · 新申请需管理员审核' : ' · 即时生效');
   const tb = document.getElementById('list');
   if (!d.items.length) {
-    tb.innerHTML = `<tr><td colspan="5" class="empty">还没有子域名，先在上方申请一个吧</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="5" class="empty">还没有子域名，先在上方申请一个</td></tr>`;
     return;
   }
   tb.innerHTML = d.items.map((s) => `
@@ -74,13 +75,13 @@ async function load() {
       <td>${s.record_count}</td>
       <td class="nowrap" style="color:var(--muted)">${fmtTime(s.created_at)}</td>
       <td class="right nowrap">
-        <button class="btn sm" onclick="location.href='/domain?id=${s.id}'">管理 DNS</button>
+        <button class="btn sm" onclick="location.href='/domain?id=${s.id}'">DNS 记录</button>
         <button class="btn sm danger" data-del="${s.id}">释放</button>
       </td>
     </tr>`).join('');
   tb.querySelectorAll('[data-del]').forEach((b) => {
     b.onclick = async () => {
-      if (!confirm('确定释放该子域名？它在 Cloudflare 上的所有 DNS 记录会一并删除。')) return;
+      if (!confirm('确定释放该子域名？其在 Cloudflare 上的所有 DNS 记录会一并删除。')) return;
       try { await api.del('/api/subdomains/' + b.dataset.del); toast('已释放'); load(); }
       catch (e) { toast(e.message, 'err'); }
     };
@@ -96,8 +97,8 @@ document.getElementById('label').addEventListener('input', (e) => {
     try {
       const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v));
       tip.innerHTML = r.available
-        ? `<span style="color:var(--ok)">✓ ${esc(r.fqdn)} 可用</span>`
-        : `<span style="color:var(--danger)">✗ ${esc(r.message)}</span>`;
+        ? `<span style="color:var(--ok)">${esc(r.fqdn)} 可用</span>`
+        : `<span style="color:var(--danger)">${esc(r.message)}</span>`;
     } catch (err) { tip.textContent = ''; }
   }, 350);
 });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DNS 记录管理 · 二级域名分发系统</title>
+<title>DNS 记录 · 二级域名分发系统</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
 
 <div class="wrap">
   <div style="margin-bottom:14px">
-    <a href="/dashboard" style="font-size:13px">← 返回我的域名</a>
+    <a href="/dashboard" style="font-size:12.5px">返回我的域名</a>
     <div class="row between" style="margin-top:6px">
       <div>
         <span class="fqdn" id="fqdn"></span> <span class="copy" id="copyFqdn">复制</span>
@@ -23,19 +23,18 @@
 
   <div id="statusAlert"></div>
 
-  <!-- 根域名验证 -->
   <div class="card">
     <h2>根域名验证</h2>
     <div class="sub" style="margin-bottom:12px">
-      粘贴平台给你的验证记录（主机名 + 值），系统会写入一条 TXT 并<strong>锁定</strong>。
-      锁定期间任何人都无法修改或删除它，只有你在下方点击「确认认证完成」后才会释放 —— 这样别人无法抢注或破坏你的验证。
+      粘贴平台给出的验证记录（主机名 + 值），系统会写入一条 TXT 并锁定。锁定期间任何人都不能修改或删除，
+      只有发起者点击「确认认证完成」后才会释放，避免被抢注或破坏。
     </div>
     <div class="preset-grid" id="presets"></div>
     <div class="grid2">
       <div class="field">
-        <label>主机名（不用带根域名）</label>
+        <label>主机名（无需带根域名）</label>
         <input id="vHost" placeholder="_vercel" autocomplete="off">
-        <div class="hint">将生成：<span class="mono" id="vPreview"></span></div>
+        <div class="hint">将生成 <span class="mono" id="vPreview"></span></div>
       </div>
       <div class="field">
         <label>验证值（TXT）</label>
@@ -43,21 +42,19 @@
       </div>
     </div>
     <div class="row end">
-      <button class="btn primary" id="btnVerify">写入并锁定验证记录</button>
+      <button class="btn primary" id="btnVerify">写入并锁定</button>
     </div>
   </div>
 
-  <!-- 常用模板 -->
   <div class="card flat">
-    <h3>快捷解析模板</h3>
-    <div class="row" id="tpls" style="gap:8px"></div>
+    <h3>常用模板</h3>
+    <div class="row" id="tpls" style="gap:6px"></div>
   </div>
 
-  <!-- DNS 记录 -->
   <div class="card">
     <div class="row between" style="margin-bottom:10px">
       <h2 style="margin:0">DNS 记录</h2>
-      <button class="btn primary sm" id="btnAdd">+ 添加记录</button>
+      <button class="btn primary sm" id="btnAdd">添加记录</button>
     </div>
     <div class="tablewrap">
       <table>
@@ -78,10 +75,10 @@ const subId = params.get('id');
 let cfg = null, sub = null, records = [], presets = [];
 
 const TEMPLATES = [
-  { n: 'Vercel (CNAME)', type: 'CNAME', host: '', content: 'cname.vercel-dns.com', proxied: false },
-  { n: 'Netlify (CNAME)', type: 'CNAME', host: '', content: 'your-site.netlify.app', proxied: false },
+  { n: 'Vercel CNAME', type: 'CNAME', host: '', content: 'cname.vercel-dns.com', proxied: false },
+  { n: 'Netlify CNAME', type: 'CNAME', host: '', content: 'your-site.netlify.app', proxied: false },
   { n: 'Cloudflare Pages', type: 'CNAME', host: '', content: 'your-project.pages.dev', proxied: false },
-  { n: 'GitHub Pages (A)', type: 'A', host: '', content: '185.199.108.153', proxied: false },
+  { n: 'GitHub Pages A', type: 'A', host: '', content: '185.199.108.153', proxied: false },
   { n: 'www 别名', type: 'CNAME', host: 'www', content: '@target', proxied: false },
   { n: 'SPF 拒绝全部', type: 'TXT', host: '', content: 'v=spf1 -all', proxied: false },
   { n: 'DMARC 拒绝', type: 'TXT', host: '_dmarc', content: 'v=DMARC1; p=reject; adkim=s; aspf=s', proxied: false },
@@ -147,7 +144,7 @@ function renderTpl() {
 function renderRecords() {
   const tb = document.getElementById('recList');
   if (!records.length) {
-    tb.innerHTML = `<tr><td colspan="6" class="empty">暂无 DNS 记录。创建子域名时不会自动添加任何记录，点右上角手动添加。</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="6" class="empty">暂无 DNS 记录。创建子域名不会自动添加记录，点右上角手动添加。</td></tr>`;
     return;
   }
   tb.innerHTML = records.map((r) => {
@@ -161,8 +158,8 @@ function renderRecords() {
       <td class="mono" title="${esc(val)}">${esc(short)}</td>
       <td class="nowrap" style="color:var(--muted)">${r.ttl === 1 ? '自动' : r.ttl}</td>
       <td class="nowrap">
-        ${r.proxied ? '<span class="badge proxy">已代理</span> ' : ''}
-        ${lock ? `<span class="badge lock">🔒 验证锁定</span>` : '<span class="badge ok">正常</span>'}
+        ${r.proxied ? '<span class="badge proxy">代理</span> ' : ''}
+        ${lock ? `<span class="badge lock">验证锁定</span>` : '<span class="badge ok">正常</span>'}
         ${lock && r.verify_preset ? `<div class="hint">${esc(presetLabel(r.verify_preset))} · ${fmtTime(r.locked_at)}</div>` : ''}
       </td>
       <td class="right nowrap">
@@ -186,8 +183,8 @@ function renderRecords() {
     const r = records.find((x) => x.id === Number(b.dataset.confirm));
     openModal('确认认证完成', `
       <div class="alert ok">验证记录 <span class="mono">${esc(r.name)}</span> 即将解锁。</div>
-      <p style="color:var(--muted);font-size:13px">大多数平台的验证记录在验证完成后就不再需要，建议删除以释放该主机名；如果平台要求长期保留（例如 Google 站点验证），请勾选保留。</p>
-      <label class="check" style="margin:12px 0"><input type="checkbox" id="keepRec"> 保留这条 TXT 记录（仅解除锁定）</label>
+      <p style="color:var(--text-2);font-size:12.5px;margin:0 0 12px">多数平台的验证记录在验证完成后不再需要，建议删除以释放该主机名；若平台要求长期保留（如 Google 站点验证），请勾选保留。</p>
+      <label class="check" style="margin:0 0 14px"><input type="checkbox" id="keepRec"> 保留这条 TXT 记录（仅解除锁定）</label>
       <div class="row end">
         <button class="btn" onclick="closeModal()">取消</button>
         <button class="btn primary" id="okConfirm">确认认证完成</button>
@@ -206,7 +203,6 @@ function presetLabel(key) {
   return p ? p.label : key;
 }
 
-// ---------- 添加 / 编辑记录 ----------
 function openRecordForm(rec, presetBody) {
   const types = cfg.recordTypes;
   const cur = rec ? rec.type : (presetBody ? presetBody.type : 'A');
@@ -227,7 +223,7 @@ function openRecordForm(rec, presetBody) {
       <div class="field">
         <label>主机名</label>
         <input id="fHost" placeholder="留空或 @ 表示 ${esc(sub.fqdn)}">
-        <div class="hint">填写后生成 <span class="mono" id="fPreview"></span></div>
+        <div class="hint">生成 <span class="mono" id="fPreview"></span></div>
       </div>
       <div class="field">
         <label>TTL</label>
@@ -242,7 +238,7 @@ function openRecordForm(rec, presetBody) {
         : `<input id="fContent" placeholder="${esc(spec.placeholder || '')}">`}
     </div>
     <div id="fProxyWrap" class="field ${spec.canProxy ? '' : 'hidden'}">
-      <label class="check"><input type="checkbox" id="fProxied"> 开启 Cloudflare 代理（橙色云，仅 TTL 自动时可用）</label>
+      <label class="check"><input type="checkbox" id="fProxied"> 开启 Cloudflare 代理（仅 TTL 为自动时可用）</label>
     </div>
     <div class="field">
       <label>备注（选填）</label>
@@ -261,6 +257,10 @@ function openRecordForm(rec, presetBody) {
     const c = document.getElementById('fContent'); if (c) c.value = saved.content;
   };
 
+  function updatePreview2() {
+    const h = document.getElementById('fHost').value.trim();
+    document.getElementById('fPreview').textContent = (h && h !== '@' ? h + '.' : '') + sub.fqdn;
+  }
   const fillExtra = () => {
     const sp = types.find((t) => t.key === typeSel.value);
     document.getElementById('fExtra').innerHTML = (sp.fields || []).map((f) => {
@@ -274,15 +274,9 @@ function openRecordForm(rec, presetBody) {
     }).join('');
     updatePreview2();
   };
-
-  function updatePreview2() {
-    const h = document.getElementById('fHost').value.trim();
-    document.getElementById('fPreview').textContent = (h && h !== '@' ? h + '.' : '') + sub.fqdn;
-  }
   document.getElementById('fHost').addEventListener('input', updatePreview2);
   fillExtra();
 
-  // 预填
   const init = rec || presetBody || {};
   document.getElementById('fHost').value = init.host ?? '';
   document.getElementById('fContent').value = init.content ?? '';
