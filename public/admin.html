@@ -249,6 +249,29 @@ async function load() {
             <div class="hint">超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响。</div>
           </div>
           <div class="field">
+            <label>域名有效期</label>
+            <div class="grid2">
+              <div><span class="dim">新域名有效期（天）</span><input id="sValidDays" type="number" min="1" max="3650" value="365"></div>
+              <div><span class="dim">到期前可续期天数</span><input id="sRenewWindow" type="number" min="0" max="3650" value="180"></div>
+            </div>
+            <div class="hint">迁移前已注册的域名已设为<b>永久有效</b>，不追溯有效期。</div>
+          </div>
+          <div class="field">
+            <label>DNS 提供商 API（可选 · 突破 200 条记录限制）</label>
+            <div class="field" style="margin:0 0 8px">
+              <span class="dim">API URL</span>
+              <input id="sDnsUrl" type="text" autocomplete="off" placeholder="https://api.example.com/v1">
+              <div class="hint">留空则使用 Cloudflare（免费版单区域上限约 200 条记录）。
+                填写后所有 DNS 读写走该接口；支持 <span class="mono">{zone}</span> 占位符，例如
+                <span class="mono">https://api.example.com/zones/{zone}/dns_records</span>。</div>
+            </div>
+            <div class="grid2">
+              <div><span class="dim">API Key</span><input id="sDnsKey" type="text" autocomplete="off" placeholder="留空则不修改"></div>
+              <div><span class="dim">API Secret</span><input id="sDnsSecret" type="password" autocomplete="new-password" placeholder="留空则不修改"></div>
+            </div>
+            <div class="hint" id="dnsProvHint"></div>
+          </div>
+          <div class="field">
             <label>DNSHE API 凭证（查询 DNSHE 系域名）</label>
             <div class="grid2">
               <div><span class="dim">API Key</span><input id="sDnsheKey" type="text" autocomplete="off" placeholder="cfsd_..."></div>
@@ -306,6 +329,11 @@ async function load() {
           initialPoints: document.getElementById('sInitial').value,
           domainCost: document.getElementById('sCost').value,
           shortDomainCost: document.getElementById('sShortCost').value,
+          dnsApiUrl: document.getElementById('sDnsUrl').value,
+          dnsApiKey: document.getElementById('sDnsKey').value,
+          dnsApiSecret: document.getElementById('sDnsSecret').value,
+          domainValidDays: document.getElementById('sValidDays').value,
+          renewWindowDays: document.getElementById('sRenewWindow').value,
           dnsheApiKey: document.getElementById('sDnsheKey').value,
           dnsheApiSecret: document.getElementById('sDnsheSecret').value,
         });
@@ -322,6 +350,35 @@ async function load() {
         toast('已恢复默认 Logo'); load();
       } catch (e) { toast(e.message, 'err'); }
     };
+
+    // 有效期规则
+    {
+      const ex = d.expiry || {};
+      const vd = document.getElementById('sValidDays');
+      const rw = document.getElementById('sRenewWindow');
+      if (vd && ex.validDays) vd.value = ex.validDays;
+      if (rw && ex.renewWindowDays) rw.value = ex.renewWindowDays;
+    }
+
+    // 自定义 DNS 提供商：URL 可回显，Key/Secret 只显示掩码；留空表示不修改
+    {
+      const p = d.dnsProvider || {};
+      const urlEl = document.getElementById('sDnsUrl');
+      const kEl = document.getElementById('sDnsKey');
+      const sEl = document.getElementById('sDnsSecret');
+      const hint = document.getElementById('dnsProvHint');
+      if (urlEl) urlEl.value = p.url || '';
+      if (p.fromEnv) {
+        urlEl.disabled = true; kEl.disabled = true; sEl.disabled = true;
+        hint.innerHTML = '<span class="badge ok">已由环境变量配置</span> 后台不可修改。当前：<span class="mono">' + esc(p.url) + '</span>';
+      } else if (p.custom) {
+        if (kEl) kEl.placeholder = p.keyMasked || '已配置，留空不修改';
+        if (sEl) sEl.placeholder = '已配置，留空不修改';
+        hint.innerHTML = '<span class="badge ok">已启用自定义接口</span> DNS 读写走 <span class="mono">' + esc(p.url) + '</span>。清空 URL 即恢复 Cloudflare。';
+      } else {
+        hint.innerHTML = '当前使用 <b>Cloudflare</b>（免费版单区域约 200 条记录上限）。';
+      }
+    }
 
     // DNSHE 凭证：后端只回传掩码，不回传明文；留空表示不修改
     {

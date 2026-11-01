@@ -4,6 +4,7 @@ import { validateLabel } from '../lib/records.js';
 import { cfDelete, cfErrorMessage } from '../lib/cf.js';
 import { UNLIMITED_POINTS, ensurePoints, addPoints, domainCost } from '../lib/points.js';
 import { pointRules } from './points.js';
+import { expiryRules, computeExpiry, expiryState, renewExpiry, migrateLegacyPerpetual, ensureExpiryColumns } from '../lib/expiry.js';
 
 const app = new Hono();
 
@@ -122,12 +123,30 @@ const listMine = async (c) => {
   // 被驳回的不计入已用额度
   const used = results.filter((s) => s.status !== 'rejected').length;
   const rejected = results.length - used;
+
+  // 一次性迁移：迁移前已注册的域名设为永久（不追溯 1 年有效期）
+  await ensureExpiryColumns(c.env);
+  await migrateLegacyPerpetual(c.env);
+  const rules = await expiryRules(c.env);
+  const pending = await c.env.DB
+    .prepare("SELECT id, fqdn FROM subdomains WHERE user_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1")
+    .bind(u.id)
+    .first();
+
   return ok(c, {
-    items: results.map((s) => ({ ...s, countsTowardQuota: s.status !== 'rejected' })),
+    items: results.map((s) => ({
+      ...s,
+      countsTowardQuota: s.status !== 'rejected',
+      expiry: expiryState(s, { renewWindowDays: rules.renewWindowDays }),
+    })),
     quota: u.quota,
     quotaUnlimited: !!u.quotaUnlimited,
     used,
     rejected,
+    // 单域名队列：前端据此禁用申请入口
+    pendingApplication: pending ? { id: pending.id, fqdn: pending.fqdn } : null,
+    validDays: rules.validDays,
+    renewWindowDays: rules.renewWindowDays,
   });
 };
 
@@ -136,6 +155,7 @@ app.get('/', listMine);
 // 申请子域名
 const createMine = async (c) => {
   const u = c.get('user');
+  await ensureExpiryColumns(c.env);
   const { label, note } = await c.req.json().catch(() => ({}));
   const v = validateLabel(label);
   if (!v.ok) return fail(c, v.error);
@@ -154,6 +174,24 @@ const createMine = async (c) => {
 
   // 需要清理的旧记录：仅「本人/管理员重新申请此前被驳回的名称」
   const dup = lk.reclaimable && lk.row ? lk.row : null;
+
+  /* 单域名队列：同一时间只能有一个待审核申请。
+     管理员申请是即时开通（不产生 pending），因此不受此限制。 */
+  if (!isAdmin) {
+    const pending = await c.env.DB.prepare(
+      "SELECT id, fqdn, created_at FROM subdomains WHERE user_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1"
+    )
+      .bind(u.id)
+      .first();
+    if (pending) {
+      return fail(
+        c,
+        `你已有一个待审核的申请（${pending.fqdn}），同一时间只能申请一个域名。请等待审核完成，或被驳回后再申请。`,
+        409,
+        { pendingId: pending.id, pendingFqdn: pending.fqdn }
+      );
+    }
+  }
 
   // 配额检查（被驳回的不计入），必须在清理旧记录之前，避免校验失败却已删数据
   const used = await c.env.DB.prepare(
@@ -202,13 +240,21 @@ const createMine = async (c) => {
   const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin;
   const status = autoApprove ? 'approved' : 'pending';
   const fqdn = `${v.label}.${c.env.ROOT_DOMAIN}`;
+
+  // 有效期：即时开通的（管理员 / 免审核）现在就起算，待审核的等批准时再起算
+  const expRules = await expiryRules(c.env);
+  const expiresAt = autoApprove ? computeExpiry({ validDays: expRules.validDays }) : null;
+
   let res;
   try {
     res = await c.env.DB.prepare(
-      `INSERT INTO subdomains (label, fqdn, user_id, status, note, created_at, updated_at, reviewed_at)
-       VALUES (?,?,?,?,?,?,?,?)`
+      `INSERT INTO subdomains (label, fqdn, user_id, status, note, expires_at, created_at, updated_at, reviewed_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`
     )
-      .bind(v.label, fqdn, u.id, status, String(note || '').slice(0, 300), now(), now(), autoApprove ? now() : null)
+      .bind(
+        v.label, fqdn, u.id, status, String(note || '').slice(0, 300),
+        expiresAt, now(), now(), autoApprove ? now() : null
+      )
       .run();
   } catch (e) {
     // 并发：同一瞬间被别人抢先注册（label / fqdn 唯一约束兜底）
@@ -272,6 +318,46 @@ app.patch('/:id', async (c) => {
     .bind(String(note || '').slice(0, 300), now(), id)
     .run();
   return ok(c, {});
+});
+
+/* ---------- 续期 ----------
+   仅在到期前 renewWindowDays 天内可续；每次续一个周期（默认 1 年）。
+   永久域名无需续期。 */
+app.post('/:id/renew', async (c) => {
+  const u = c.get('user');
+  const id = Number(c.req.param('id'));
+  const sub = await c.env.DB.prepare('SELECT * FROM subdomains WHERE id = ?').bind(id).first();
+  if (!sub) return fail(c, '子域名不存在', 404);
+  if (sub.user_id !== u.id && u.role !== 'admin') return fail(c, '无权操作', 403);
+
+  if (sub.status !== 'approved') return fail(c, '只有已注册的域名可以续期');
+
+  const rules = await expiryRules(c.env);
+  const st = expiryState(sub, { renewWindowDays: rules.renewWindowDays });
+  if (st.perpetual) return fail(c, '该域名为永久有效，无需续期');
+  if (st.expired) return fail(c, '域名已过期，无法续期。请重新申请。', 410);
+  if (!st.canRenew) {
+    return fail(
+      c,
+      `当前不在续期窗口内：仅在到期前 ${rules.renewWindowDays} 天内可续期（还剩 ${st.daysLeft} 天）`
+    );
+  }
+
+  const r = renewExpiry(sub, { validDays: rules.validDays });
+  if (!r.ok) return fail(c, r.message);
+
+  await c.env.DB.prepare('UPDATE subdomains SET expires_at = ?, renewed_at = ?, updated_at = ? WHERE id = ?')
+    .bind(r.expiresAt, now(), now(), id)
+    .run();
+  await audit(c, u.id, 'subdomain.renew', sub.fqdn, `续期 ${rules.validDays} 天，新到期 ${new Date(r.expiresAt).toISOString().slice(0, 10)}`);
+
+  const fresh = await c.env.DB.prepare('SELECT * FROM subdomains WHERE id = ?').bind(id).first();
+  return ok(c, {
+    id,
+    fqdn: sub.fqdn,
+    expiresAt: r.expiresAt,
+    expiry: expiryState(fresh, { renewWindowDays: rules.renewWindowDays }),
+  });
 });
 
 // 释放子域名（同时把其在 Cloudflare 上的记录全部删除）

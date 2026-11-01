@@ -103,16 +103,31 @@ CREATE TABLE IF NOT EXISTS subdomains (
   label         TEXT    NOT NULL UNIQUE,      -- 二级部分，如 mail
   fqdn          TEXT    NOT NULL UNIQUE,      -- 完整域名，如 mail.meoy.top
   user_id       INTEGER NOT NULL,
-  status        TEXT    NOT NULL DEFAULT 'pending',  -- pending | approved | rejected | suspended
+  status        TEXT    NOT NULL DEFAULT 'pending',  -- pending | approved | rejected | suspended | expired
   reason        TEXT,                          -- 驳回 / 停用原因
   note          TEXT,                          -- 用户申请时填写的用途说明
+  -- 有效期：NULL = 永久（迁移前已注册的域名）；有值 = 到期时间戳
+  expires_at    INTEGER,
+  renewed_at    INTEGER,                       -- 最近一次续期时间
+  perpetual     INTEGER NOT NULL DEFAULT 0,    -- 1 = 永久有效（老域名 / 管理员设置）
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL,
   reviewed_at   INTEGER,
   reviewed_by   INTEGER
 );
-CREATE INDEX IF NOT EXISTS idx_subdomains_user   ON subdomains(user_id);
-CREATE INDEX IF NOT EXISTS idx_subdomains_status ON subdomains(status);
+CREATE INDEX IF NOT EXISTS idx_subdomains_user    ON subdomains(user_id);
+CREATE INDEX IF NOT EXISTS idx_subdomains_status  ON subdomains(status);
+-- 注意：旧库没有 expires_at 列，CREATE TABLE IF NOT EXISTS 不会补列，
+-- 因此 expires_at 相关索引放到「列补齐」步骤之后再建（见文件末尾）。
+-- 这里先尝试建，失败会被忽略，末尾会重试。
+
+-- 一次性迁移：迁移前已注册（approved）的域名设为永久，不追溯 1 年有效期。
+-- 用 INSERT OR IGNORE 记录迁移标记，重复执行不会覆盖管理员后来的改动。
+CREATE TABLE IF NOT EXISTS migrations (
+  name       TEXT PRIMARY KEY,
+  applied_at INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO migrations (name, applied_at) VALUES ('legacy_perpetual', 0);
 
 -- DNS 记录表
 CREATE TABLE IF NOT EXISTS dns_records (
@@ -180,3 +195,15 @@ INSERT OR IGNORE INTO settings(key, value) VALUES ('favicon_url', '/favicon.ico'
 
 -- 迁移：早期默认 favicon 为 png，现统一为根目录的 .ico（仅改仍是旧默认值的库）
 UPDATE settings SET value = '/favicon.ico' WHERE key = 'favicon_url' AND value = '/img/favicon.png';
+
+-- ══════════════════════════════════════════════════════════
+--  列补齐：CREATE TABLE IF NOT EXISTS 不会给已存在的表加列，
+--  因此对旧库逐列检测后再 ALTER TABLE ADD COLUMN（SQLite 不支持 IF NOT EXISTS）。
+--  wrangler d1 execute 执行整份文件时，每条语句独立提交，
+--  失败会中断后续语句 —— 所以这些 ALTER 必须由应用层的幂等迁移承担。
+--  这里保留注释说明，实际补齐逻辑见 src/lib/expiry.js 的 ensureExpiryColumns()。
+-- ══════════════════════════════════════════════════════════
+
+-- 有效期规则（管理员可在后台「站点设置」调整）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('domain_valid_days', '365');   -- 新申请域名有效期（天）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('renew_window_days', '180');   -- 到期前多少天内可续期

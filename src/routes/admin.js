@@ -4,6 +4,8 @@ import { cfDelete, cfErrorMessage } from '../lib/cf.js';
 import { UNLIMITED } from '../middleware/auth.js';
 import { ensurePoints, addPoints } from '../lib/points.js';
 import { pointRules } from './points.js';
+import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColumns, migrateLegacyPerpetual } from '../lib/expiry.js';
+import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 
 const app = new Hono();
 
@@ -43,16 +45,54 @@ app.get('/subdomains', async (c) => {
 
 // 审核：通过 / 驳回 / 停用 / 恢复
 async function review(c, id, status, reason) {
+  await ensureExpiryColumns(c.env);
   const sub = await c.env.DB.prepare('SELECT * FROM subdomains WHERE id = ?').bind(id).first();
   if (!sub) return fail(c, '子域名不存在', 404);
   const u = c.get('user');
-  await c.env.DB.prepare(
-    'UPDATE subdomains SET status = ?, reason = ?, reviewed_at = ?, reviewed_by = ?, updated_at = ? WHERE id = ?'
-  )
-    .bind(status, reason || null, now(), u.id, now(), id)
-    .run();
-  await audit(c, u.id, `subdomain.${status}`, sub.fqdn, reason || '');
-  return ok(c, { status });
+  let extra = '';
+
+  // 批准 → 设置 1 年有效期（永久域名除外）
+  if (status === 'approved') {
+    const rules = await expiryRules(c.env);
+    const exp = Number(sub.perpetual) === 1
+      ? null
+      : computeExpiry({ perpetual: false, validDays: rules.validDays });
+    await c.env.DB.prepare(
+      'UPDATE subdomains SET status = ?, reason = ?, expires_at = ?, reviewed_at = ?, reviewed_by = ?, updated_at = ? WHERE id = ?'
+    )
+      .bind(status, reason || null, exp, now(), u.id, now(), id)
+      .run();
+    if (exp) extra = `有效期 ${rules.validDays} 天`;
+
+    /* 单域名队列：同一用户短时间内提交多个申请时，只批准这一个，
+       其余 pending 自动驳回（防止并发/绕过导致一人占多个待审名额）。 */
+    const others = await c.env.DB
+      .prepare("SELECT id, fqdn FROM subdomains WHERE user_id = ? AND status = 'pending' AND id <> ?")
+      .bind(sub.user_id, id)
+      .all();
+    const list = others.results || [];
+    if (list.length) {
+      const msg = '同一时间只能有一个待审核申请，其余已自动驳回';
+      for (const o of list) {
+        await c.env.DB.prepare(
+          "UPDATE subdomains SET status = 'rejected', reason = ?, reviewed_at = ?, reviewed_by = ?, updated_at = ? WHERE id = ?"
+        )
+          .bind(msg, now(), u.id, now(), o.id)
+          .run();
+        await audit(c, u.id, 'subdomain.rejected', o.fqdn, msg);
+      }
+      extra += (extra ? ' · ' : '') + `自动驳回同批 ${list.length} 个申请`;
+    }
+  } else {
+    await c.env.DB.prepare(
+      'UPDATE subdomains SET status = ?, reason = ?, reviewed_at = ?, reviewed_by = ?, updated_at = ? WHERE id = ?'
+    )
+      .bind(status, reason || null, now(), u.id, now(), id)
+      .run();
+  }
+
+  await audit(c, u.id, `subdomain.${status}`, sub.fqdn, [reason, extra].filter(Boolean).join(' · '));
+  return ok(c, { status, extra });
 }
 
 app.post('/subdomains/:id/approve', async (c) => review(c, Number(c.req.param('id')), 'approved', ''));
@@ -82,6 +122,8 @@ app.delete('/subdomains/:id', async (c) => {
 
 // 用户列表
 app.get('/users', async (c) => {
+  await ensureExpiryColumns(c.env);
+  await migrateLegacyPerpetual(c.env);
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.role, u.status, u.quota, u.ban_reason, u.created_at, u.last_login_at,
             (SELECT COUNT(*) FROM subdomains s WHERE s.user_id = u.id AND s.status <> 'rejected') AS sub_count,
@@ -348,7 +390,7 @@ app.get('/settings', async (c) => {
   const raw = Object.fromEntries(results.map((r) => [r.key, r.value]));
 
   // 敏感项：不回传明文，只回传「是否已配置 + 尾号」，前端显示为占位符
-  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret'];
+  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret', 'dns_api_key', 'dns_api_secret'];
   const items = { ...raw };
   for (const k of SENSITIVE) delete items[k];
 
@@ -357,16 +399,32 @@ app.get('/settings', async (c) => {
     if (!s) return '';
     return '••••••••' + s.slice(-4);
   };
+
+  // 自定义 DNS 提供商状态（URL 可回显，Key/Secret 只给掩码）
+  const prov = await dnsProvider(c.env);
+  const envDnsUrl = String(c.env.DNS_API_URL || '').trim();
+  const envDnsKey = String(c.env.DNS_API_KEY || '').trim();
+  const envDnsSecret = String(c.env.DNS_API_SECRET || '').trim();
   const envKey = String(c.env.DNSHE_API_KEY || '').trim();
   const envSecret = String(c.env.DNSHE_API_SECRET || '').trim();
   return ok(c, {
     items,
+    dnsProvider: {
+      custom: prov.custom,
+      url: prov.custom ? prov.base : '',
+      fromEnv: !!envDnsUrl,
+      keySet: !!(raw.dns_api_key || envDnsKey),
+      secretSet: !!(raw.dns_api_secret || envDnsSecret),
+      keyMasked: mask(raw.dns_api_key || envDnsKey),
+      secretMasked: mask(raw.dns_api_secret || envDnsSecret),
+    },
     secrets: {
       dnsheApiKeySet: !!(raw.dnshe_api_key || envKey),
       dnsheApiSecretSet: !!(raw.dnshe_api_secret || envSecret),
       dnsheApiKeyMasked: mask(raw.dnshe_api_key || envKey),
       dnsheApiSecretMasked: mask(raw.dnshe_api_secret || envSecret),
       fromEnv: !!(envKey && envSecret),   // 来自环境变量时后台不可改
+      expiry: await expiryRules(c.env),
     },
   });
 });
@@ -398,6 +456,18 @@ app.post('/settings', async (c) => {
     if (!Number.isFinite(n) || n < 1 || n > 50) return fail(c, '单 IP 账号数需在 1-50 之间');
     await set('max_accounts_per_ip', String(Math.floor(n)));
   }
+
+  // 域名有效期规则
+  if (body.domainValidDays !== undefined) await set('domain_valid_days', String(body.domainValidDays || '').trim());
+  if (body.renewWindowDays !== undefined) await set('renew_window_days', String(body.renewWindowDays || '').trim());
+
+  // 自定义 DNS 提供商（填了 URL 就走它，可突破 Cloudflare 200 条记录限制；留空用 Cloudflare）
+  if (body.dnsApiUrl !== undefined) {
+    await set('dns_api_url', String(body.dnsApiUrl || '').trim());
+    clearDnsProviderCache();   // 清缓存，立即生效
+  }
+  if (body.dnsApiKey !== undefined) await set('dns_api_key', String(body.dnsApiKey || '').trim());
+  if (body.dnsApiSecret !== undefined) await set('dns_api_secret', String(body.dnsApiSecret || '').trim());
 
   // DNSHE API 凭证（用于查询 DNSHE 系域名；留空则退回公开模式）
   if (body.dnsheApiKey !== undefined) await set('dnshe_api_key', String(body.dnsheApiKey || '').trim());

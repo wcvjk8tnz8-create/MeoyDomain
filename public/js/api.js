@@ -125,6 +125,14 @@ function fmtTime(ts) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+/** 只显示日期：2026-11-01 */
+function fmtDate(ts) {
+  if (!ts) return '-';
+  const d = new Date(Number(ts));
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 function copyText(t) {
   navigator.clipboard?.writeText(t).then(() => toast('已复制'), () => toast('复制失败', 'err'));
 }
