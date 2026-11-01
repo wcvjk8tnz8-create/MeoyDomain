@@ -96,6 +96,23 @@ function clearUserCache() {
   try { sessionStorage.removeItem(USER_KEY); } catch {}
 }
 
+/** 点猫爪 → 冒几个小爱心（纯装饰，走 transform 动画） */
+function pawBurst(anchor) {
+  for (let i = 0; i < 5; i++) {
+    const h = document.createElement('i');
+    h.className = 'heart';
+    h.textContent = '♥';
+    h.style.setProperty('--hx', ((Math.random() * 40) - 20).toFixed(0) + 'px');
+    h.style.setProperty('--hy', (-24 - Math.random() * 26).toFixed(0) + 'px');
+    h.style.animationDelay = (i * 0.055).toFixed(3) + 's';
+    anchor.appendChild(h);
+    setTimeout(() => h.remove(), 950);
+  }
+  anchor.classList.remove('tapped');
+  void anchor.offsetWidth;
+  anchor.classList.add('tapped');
+}
+
 /** 生成侧边栏一项 */
 function shellItem(it, active, isAdmin) {
   if (it.key === 'admin' && !isAdmin) return '';
@@ -143,24 +160,57 @@ async function mountShell(active, opt = {}) {
 
   const isAdmin = me && me.role === 'admin';
 
+  // 头像用邮箱首字符（圆形色块），比堆一长串邮箱更好看
+  const initial = me ? (me.email || '?').trim().charAt(0).toUpperCase() : '';
+  // 去掉 @ 域名部分，只显示用户名，避免手机上顶栏被撑爆
+  const shortName = me ? String(me.email || '').split('@')[0] : '';
+
   host.innerHTML = `
     <div class="topbar-in">
       <button class="side-toggle" id="sideToggle" aria-label="菜单">
         <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z"/></svg>
       </button>
+
       <a class="top-brand" href="/dashboard.html">
         <img id="topLogo" src="${esc(brand.logoUrl)}" alt="">
-        <span data-brand-name>${esc(brand.siteName)}</span>
-        <span class="paw" title="喵">${PAW_SVG}</span>
+        <span class="brand-txt">
+          <span class="brand-name" data-brand-name>${esc(brand.siteName)}</span>
+          <span class="brand-sub">二级域名分发</span>
+        </span>
       </a>
+
       <div class="top-right">
-        ${me
-          ? `<span class="top-user" title="${esc(me.email)}">
-               ${esc(me.email)}
-               ${isAdmin ? '<span class="badge inf">管理员</span>' : ''}
-             </span>
-             <button class="btn sm ghost" id="btnLogout">退出</button>`
-          : `<a class="btn sm primary" href="/">登录</a>`}
+        ${me ? `
+          <button class="theme-paw" id="pawBtn" title="喵一个" aria-label="猫爪">
+            ${PAW_SVG}
+          </button>
+          <div class="user-chip" id="userChip" title="${esc(me.email)}">
+            <span class="avatar">${esc(initial)}</span>
+            <span class="u-meta">
+              <span class="u-name">${esc(shortName)}</span>
+              <span class="u-role">${isAdmin ? '管理员' : '用户'}</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+          </div>
+          <div class="user-menu" id="userMenu">
+            <div class="um-head">
+              <span class="avatar">${esc(initial)}</span>
+              <div>
+                <div class="um-name">${esc(shortName)}</div>
+                <div class="um-mail">${esc(me.email)}</div>
+              </div>
+            </div>
+            <div class="um-body">
+              <a href="/dashboard.html">我的域名</a>
+              <a href="/rewards.html">奖励中心</a>
+              ${isAdmin ? '<a href="/admin.html">管理后台</a>' : ''}
+              <a href="/terms.html">服务条款</a>
+            </div>
+            <div class="um-foot">
+              <button class="btn sm ghost" id="btnLogout">退出登录</button>
+            </div>
+          </div>
+        ` : `<a class="btn sm primary" href="/">登录</a>`}
       </div>
     </div>`;
 
@@ -178,6 +228,28 @@ async function mountShell(active, opt = {}) {
 
   const tg = document.getElementById('sideToggle');
   if (tg) tg.onclick = () => document.body.classList.toggle('side-open');
+
+  /* 用户菜单：点 chip 展开，点外部或按 Esc 关闭 */
+  const chip = document.getElementById('userChip');
+  const menu = document.getElementById('userMenu');
+  const setMenu = (open) => {
+    if (!chip || !menu) return;
+    chip.classList.toggle('on', open);
+    menu.classList.toggle('on', open);
+  };
+  if (chip && menu) {
+    chip.onclick = (e) => {
+      e.stopPropagation();
+      setMenu(!menu.classList.contains('on'));
+    };
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => setMenu(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+  }
+
+  /* 顶栏猫爪：点一下放个小爱心 */
+  const pawBtn = document.getElementById('pawBtn');
+  if (pawBtn) pawBtn.onclick = () => pawBurst(pawBtn);
 
   const out = async () => {
     clearUserCache();
