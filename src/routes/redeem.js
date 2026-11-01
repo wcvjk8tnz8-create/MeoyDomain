@@ -10,6 +10,13 @@ const app = new Hono();
 
 const TYPE_TEXT = { permanent: '域名永久化', quota: '配额' };
 
+/* 券（coupon）规则：
+   一张券 = 一个码，面向所有人发放；
+   每个账号限用 1 次（redeem_logs 里按 code + user_id 查重）；
+   券本身有总使用量上限，默认 10000 次。 */
+const COUPON_MAX_USES = 10000;
+const COUPON_MAX_USES_LIMIT = 1000000;
+
 /** 随机码：去掉易混淆的 0/O/1/I/L */
 function rand(n) {
   const set = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -141,7 +148,11 @@ app.post('/admin/generate', async (c) => {
   if (!['permanent', 'quota'].includes(type)) return fail(c, '类型必须是 permanent 或 quota');
   const count = Math.min(Math.max(Number(b.count) || 1, 1), 200);
   const value = type === 'quota' ? Math.min(Math.max(Number(b.value) || 1, 1), 999) : 1;
-  const maxUses = Math.min(Math.max(Number(b.maxUses) || 1, 1), 9999);
+  // 券的总使用量：留空/0 即用默认 10000
+  const maxUses = Math.min(
+    Math.max(Number(b.maxUses) || COUPON_MAX_USES, 1),
+    COUPON_MAX_USES_LIMIT
+  );
   const note = String(b.note || '').slice(0, 200);
   const days = Number(b.days) || 0;
   const expiresAt = days > 0 ? Date.now() + days * 86400000 : null;
@@ -195,6 +206,34 @@ app.post('/admin/:id/toggle', async (c) => {
   await c.env.DB.prepare('UPDATE redeem_codes SET status = ? WHERE id = ?').bind(next, id).run();
   await audit(c, c.get('user').id, 'redeem.toggle', row.code, next === 'active' ? '启用' : '停用');
   return ok(c, { status: next });
+});
+
+/** 清空全部券（可选连同兑换记录一起清） */
+app.delete('/admin/all', async (c) => {
+  const bad = requireAdmin(c);
+  if (bad) return bad;
+  const u = c.get('user');
+
+  // 安全闸门：必须显式确认，防止误触
+  const body = await c.req.json().catch(() => ({}));
+  const confirm = String(c.req.query('confirm') || body.confirm || '');
+  if (confirm !== '1' && confirm !== 'true') {
+    const cnt = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM redeem_codes').first();
+    return fail(c, `此操作会删除全部 ${cnt?.n || 0} 张券，且不可恢复。请带上确认参数重试。`);
+  }
+
+  const keepLogs = body.keepLogs !== false;   // 默认保留兑换记录（便于追溯谁用过）
+  const before = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM redeem_codes').first();
+  await c.env.DB.prepare('DELETE FROM redeem_codes').run();
+  let logCleared = 0;
+  if (!keepLogs) {
+    const lb = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM redeem_logs').first();
+    logCleared = lb?.n || 0;
+    await c.env.DB.prepare('DELETE FROM redeem_logs').run();
+  }
+
+  await audit(c, u.id, 'redeem.purge', '全部券', `删除 ${before?.n || 0} 张${keepLogs ? '（保留兑换记录）' : `，并清空 ${logCleared} 条记录`}`);
+  return ok(c, { deleted: before?.n || 0, logCleared });
 });
 
 /** 删除 */
