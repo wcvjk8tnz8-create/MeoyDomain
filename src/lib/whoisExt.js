@@ -43,28 +43,70 @@ async function fetchJson(url, { headers = {}, timeout = 12000 } = {}) {
   }
 }
 
-/* ---------------- DNSHE 公开 WHOIS ---------------- */
-export async function dnsheWhois(domain) {
+/* ---------------- DNSHE WHOIS ----------------
+   凭证来源优先级：
+   1) env.DNSHE_API_KEY / DNSHE_API_SECRET（wrangler secret，推荐）
+   2) D1 settings 表（管理后台 → 站点设置里填）
+   都没有则退回公开模式（免认证，官方限制 2 次/分钟/IP） */
+export async function dnsheCredentials(env) {
+  let key = String(env?.DNSHE_API_KEY || '').trim();
+  let secret = String(env?.DNSHE_API_SECRET || '').trim();
+  if (!key || !secret) {
+    try {
+      const rows = await env.DB
+        .prepare("SELECT key, value FROM settings WHERE key IN ('dnshe_api_key','dnshe_api_secret')")
+        .all();
+      for (const r of rows?.results || []) {
+        if (r.key === 'dnshe_api_key' && !key) key = String(r.value || '').trim();
+        if (r.key === 'dnshe_api_secret' && !secret) secret = String(r.value || '').trim();
+      }
+    } catch { /* 忽略 */ }
+  }
+  return { key, secret, authed: !!(key && secret) };
+}
+
+export async function dnsheWhois(domain, env) {
   const url =
     'https://api005.dnshe.com/index.php?m=domain_hub&endpoint=whois&domain=' +
     encodeURIComponent(domain);
+
+  const cred = env ? await dnsheCredentials(env) : { key: '', secret: '', authed: false };
+  const headers = { Accept: 'application/json' };
+  // 凭证只能通过 HTTP Header 传递（官方已禁止 URL 参数 / Body）
+  if (cred.authed) {
+    headers['X-API-Key'] = cred.key;
+    headers['X-API-Secret'] = cred.secret;
+  }
+
   let res;
   try {
-    res = await fetchJson(url, { headers: { Accept: 'application/json' } });
+    res = await fetchJson(url, { headers });
   } catch (e) {
-    return { source: 'dnshe', ok: false, error: 'DNSHE 请求失败：' + String(e.message || e).slice(0, 120) };
+    return { source: 'dnshe', ok: false, authed: cred.authed, error: 'DNSHE 请求失败：' + String(e.message || e).slice(0, 120) };
+  }
+  if (cred.authed && (res.status === 401 || res.status === 403)) {
+    return {
+      source: 'dnshe', ok: false, authed: true, authError: true,
+      error: 'DNSHE 凭证无效或已被吊销（HTTP ' + res.status + '）。请在管理后台 → 站点设置更新 API Key / Secret。',
+    };
   }
   if (res.status === 429 || (res.data && res.data.error_code === 'rate_limit_exceeded')) {
-    return { source: 'dnshe', ok: false, rateLimited: true, error: 'DNSHE 限流（2 次/分钟），请稍后再试' };
+    return {
+      source: 'dnshe', ok: false, authed: cred.authed, rateLimited: true,
+      error: cred.authed
+        ? 'DNSHE 限流，请稍后再试'
+        : 'DNSHE 公开模式限流（2 次/分钟/IP）。在管理后台填写 API Key / Secret 可提高额度。',
+    };
   }
   const d = res.data;
   if (!d || d.success !== true) {
-    return { source: 'dnshe', ok: false, error: (d && d.message) || `DNSHE 返回 HTTP ${res.status}` };
+    return { source: 'dnshe', ok: false, authed: cred.authed, error: (d && d.message) || `DNSHE 返回 HTTP ${res.status}` };
   }
   const registered = d.registered !== false && d.status !== 'unregistered';
   return {
     source: 'dnshe',
     ok: true,
+    authed: cred.authed,
     domain: d.domain || domain,
     registered,
     status: d.status ? [String(d.status)] : [],
@@ -151,9 +193,9 @@ export async function rdapWhois(domain) {
 }
 
 /** 自动选择数据源：DNSHE 系走 DNSHE，其余走 RDAP */
-export async function lookupExternal(domain) {
+export async function lookupExternal(domain, env) {
   if (isDnsheDomain(domain)) {
-    const r = await dnsheWhois(domain);
+    const r = await dnsheWhois(domain, env);
     // DNSHE 查不到（比如不是它管的名）时再兜一次 RDAP
     if (r.ok) return r;
     const fb = await rdapWhois(domain);

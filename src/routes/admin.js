@@ -345,7 +345,30 @@ app.post('/ips/unban', async (c) => {
 // 站点设置：站点名 / Logo / 公告
 app.get('/settings', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT key, value FROM settings').all();
-  return ok(c, { items: Object.fromEntries(results.map((r) => [r.key, r.value])) });
+  const raw = Object.fromEntries(results.map((r) => [r.key, r.value]));
+
+  // 敏感项：不回传明文，只回传「是否已配置 + 尾号」，前端显示为占位符
+  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret'];
+  const items = { ...raw };
+  for (const k of SENSITIVE) delete items[k];
+
+  const mask = (v) => {
+    const s = String(v || '');
+    if (!s) return '';
+    return '••••••••' + s.slice(-4);
+  };
+  const envKey = String(c.env.DNSHE_API_KEY || '').trim();
+  const envSecret = String(c.env.DNSHE_API_SECRET || '').trim();
+  return ok(c, {
+    items,
+    secrets: {
+      dnsheApiKeySet: !!(raw.dnshe_api_key || envKey),
+      dnsheApiSecretSet: !!(raw.dnshe_api_secret || envSecret),
+      dnsheApiKeyMasked: mask(raw.dnshe_api_key || envKey),
+      dnsheApiSecretMasked: mask(raw.dnshe_api_secret || envSecret),
+      fromEnv: !!(envKey && envSecret),   // 来自环境变量时后台不可改
+    },
+  });
 });
 
 app.post('/settings', async (c) => {
@@ -375,6 +398,10 @@ app.post('/settings', async (c) => {
     if (!Number.isFinite(n) || n < 1 || n > 50) return fail(c, '单 IP 账号数需在 1-50 之间');
     await set('max_accounts_per_ip', String(Math.floor(n)));
   }
+
+  // DNSHE API 凭证（用于查询 DNSHE 系域名；留空则退回公开模式）
+  if (body.dnsheApiKey !== undefined) await set('dnshe_api_key', String(body.dnsheApiKey || '').trim());
+  if (body.dnsheApiSecret !== undefined) await set('dnshe_api_secret', String(body.dnsheApiSecret || '').trim());
 
   // 积分规则
   const numRule = async (key, val, min, max, label) => {

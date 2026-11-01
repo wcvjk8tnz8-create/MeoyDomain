@@ -133,7 +133,18 @@
 
 - **DNSHE 系后缀**（`de5.net` `us.ci` `cc.cd` `ccwu.cc` `bot.cd` `dnshe.com`）
   → `https://api005.dnshe.com/index.php?m=domain_hub&endpoint=whois&domain=xxx`
-  官方公开接口，**免认证**，限制 2 次/分钟/IP
+
+**DNSHE 凭证（推荐配置，额度更高更稳）**，两种填法任选：
+
+| 方式 | 操作 | 优先级 |
+|---|---|---|
+| Worker Secret | 仓库 **Settings → Secrets → Actions** 加 `DNSHE_API_KEY` / `DNSHE_API_SECRET`，CI 自动 `wrangler secret put` | **高** |
+| 后台填写 | 管理后台 → 站点设置 → DNSHE API 凭证 | 低 |
+
+凭证只通过 **HTTP Header**（`X-API-Key` / `X-API-Secret`）发送 —— 官方已禁止 URL 参数与 Body 传递。
+两者都没填时退回**公开模式**（免认证，官方限制 2 次/分钟/IP）。
+
+**安全**：后台 `GET /api/admin/settings` **不回传明文**，只给「是否已配置 + 末 4 位」（如 `••••••••9853`）；Secret 输入框为 `password` 类型，留空表示不修改。由环境变量配置时后台输入框会锁定。
 - **其它后缀** → `https://rdap.org/domain/xxx`（自动 302 到对应注册局），免 key，返回结构化 JSON
   - HTTP 404 = 注册局无记录，判为未注册
   - 解析出：注册商 + IANA ID、注册/到期/更新时间、EPP 状态、NS

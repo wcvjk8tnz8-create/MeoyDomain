@@ -126,7 +126,7 @@ async function externalWhois(c, domain, root) {
     });
   }
 
-  const r = await lookupExternal(domain);
+  const r = await lookupExternal(domain, c.env);
   if (!r.ok) {
     // 上游失败时，若有过期缓存也先用着
     const stale = await getCachedAny(c.env.DB, cacheKey);

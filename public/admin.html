@@ -249,6 +249,14 @@ async function load() {
             <div class="hint">超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响。</div>
           </div>
           <div class="field">
+            <label>DNSHE API 凭证（查询 DNSHE 系域名）</label>
+            <div class="grid2">
+              <div><span class="dim">API Key</span><input id="sDnsheKey" type="text" autocomplete="off" placeholder="cfsd_..."></div>
+              <div><span class="dim">API Secret</span><input id="sDnsheSecret" type="password" autocomplete="new-password" placeholder="留空则不修改"></div>
+            </div>
+            <div class="hint" id="dnsheHint"></div>
+          </div>
+          <div class="field">
             <label>积分规则</label>
             <div class="grid2">
               <div><span class="dim">每日签到奖励</span><input id="sCheckin" type="number" min="0" max="1000" value="${esc(s.checkin_points || '5')}"></div>
@@ -298,6 +306,8 @@ async function load() {
           initialPoints: document.getElementById('sInitial').value,
           domainCost: document.getElementById('sCost').value,
           shortDomainCost: document.getElementById('sShortCost').value,
+          dnsheApiKey: document.getElementById('sDnsheKey').value,
+          dnsheApiSecret: document.getElementById('sDnsheSecret').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo
@@ -312,6 +322,26 @@ async function load() {
         toast('已恢复默认 Logo'); load();
       } catch (e) { toast(e.message, 'err'); }
     };
+
+    // DNSHE 凭证：后端只回传掩码，不回传明文；留空表示不修改
+    {
+      const sec = d.secrets || {};
+      const keyEl = document.getElementById('sDnsheKey');
+      const secEl = document.getElementById('sDnsheSecret');
+      const hint = document.getElementById('dnsheHint');
+      if (sec.fromEnv) {
+        keyEl.disabled = true; secEl.disabled = true;
+        keyEl.value = sec.dnsheApiKeyMasked || '';
+        secEl.value = '••••••••';
+        hint.innerHTML = '<span class="badge ok">已由环境变量配置</span> 后台不可修改（优先级更高）。';
+      } else if (sec.dnsheApiKeySet) {
+        keyEl.placeholder = sec.dnsheApiKeyMasked || '已配置，留空不修改';
+        secEl.placeholder = '已配置，留空不修改';
+        hint.innerHTML = '<span class="badge ok">已配置</span> 需修改时填入新值，留空则保持原值。';
+      } else {
+        hint.innerHTML = '留空则使用公开模式（免认证，官方限制 <b>2 次/分钟/IP</b>）。填写后额度更高、查询更稳定。';
+      }
+    }
     return;
   }
 
