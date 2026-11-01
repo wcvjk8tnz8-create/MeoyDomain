@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 320" width="420" height="320" role="img" aria-label="猫耳少女与黑猫">
+  <defs>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8d8ff"/><stop offset="60%" stop-color="#84c2f2"/><stop offset="100%" stop-color="#6aa9e0"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#eaf3fb"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".45" r=".6">
+      <stop offset="0%" stop-color="#cfe6ff" stop-opacity=".85"/><stop offset="100%" stop-color="#cfe6ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 背景光晕 -->
+  <ellipse cx="215" cy="150" rx="180" ry="140" fill="url(#glow)"/>
+  <!-- 装饰圆点 -->
+  <g fill="#9cc7f0" opacity=".38">
+    <circle cx="46" cy="58" r="4"/><circle cx="378" cy="96" r="5"/><circle cx="70" cy="250" r="3.5"/>
+    <circle cx="356" cy="238" r="3"/><circle cx="150" cy="42" r="3"/>
+  </g>
+
+  <!-- 少女：坐姿半身 -->
+  <g>
+    <!-- 身体 -->
+    <path d="M132 300c0-46 18-80 62-92 44 12 62 46 62 92Z" fill="url(#cloth)"/>
+    <path d="M150 300c0-34 14-60 44-72 30 12 44 38 44 72Z" fill="#f3f8fd"/>
+    <!-- 领巾 -->
+    <path d="M176 214l20 16 20-16-20-10Z" fill="#7fb8ea"/>
+    <!-- 脖子 -->
+    <path d="M186 200h24v16h-24Z" fill="#ffe0cc"/>
+    <!-- 脸 -->
+    <ellipse cx="198" cy="170" rx="42" ry="46" fill="#ffe8d6"/>
+    <!-- 后发 -->
+    <path d="M156 172c0-30 18-52 42-52s42 22 42 52c0 10-2 18-5 26l-6-16c-6 12-19 20-31 20s-25-8-31-20l-6 16c-3-8-5-16-5-26Z" fill="url(#hair)"/>
+    <!-- 猫耳 -->
+    <path d="M162 132l6-30 30 18Z" fill="url(#hair)"/>
+    <path d="M234 132l-6-30-30 18Z" fill="url(#hair)"/>
+    <path d="M168 130l4-17 16 10Z" fill="#ffd6e6"/>
+    <path d="M228 130l-4-17-16 10Z" fill="#ffd6e6"/>
+    <!-- 刘海 -->
+    <path d="M156 158c4-26 20-40 42-40s38 14 42 40c-6-14-14-20-22-22-10 8-30 9-40 2-8 2-16 8-22 20Z" fill="url(#hair)"/>
+    <!-- 眼睛 -->
+    <ellipse cx="182" cy="172" rx="6.5" ry="8" fill="#3f6f9e"/>
+    <ellipse cx="214" cy="172" rx="6.5" ry="8" fill="#3f6f9e"/>
+    <circle cx="184.5" cy="169" r="2.4" fill="#fff"/>
+    <circle cx="216.5" cy="169" r="2.4" fill="#fff"/>
+    <!-- 腮红 -->
+    <ellipse cx="168" cy="186" rx="8" ry="4.6" fill="#ff9ec4" opacity=".55"/>
+    <ellipse cx="228" cy="186" rx="8" ry="4.6" fill="#ff9ec4" opacity=".55"/>
+    <!-- 嘴 -->
+    <path d="M193 190q5 5 10 0" stroke="#d98aa0" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 黑猫：趴在右下 -->
+  <g transform="translate(268 214)">
+    <ellipse cx="52" cy="52" rx="46" ry="34" fill="#2f3440"/>
+    <!-- 头 -->
+    <circle cx="24" cy="26" r="26" fill="#2f3440"/>
+    <!-- 耳 -->
+    <path d="M6 8l2-16 15 10Z" fill="#2f3440"/>
+    <path d="M42 8l-2-16-15 10Z" fill="#2f3440"/>
+    <path d="M9 8l1-9 8 6Z" fill="#6b7488"/>
+    <path d="M39 8l-1-9-8 6Z" fill="#6b7488"/>
+    <!-- 眼（眯）-->
+    <path d="M14 26q4-4 8 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <path d="M28 26q4-4 8 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <!-- 鼻 -->
+    <path d="M23 31h4l-2 3Z" fill="#ffb3c6"/>
+    <!-- 尾巴 -->
+    <path d="M92 66c14-6 22-18 18-30" stroke="#2f3440" stroke-width="11" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

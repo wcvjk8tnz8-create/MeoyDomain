@@ -28,6 +28,8 @@ const api = {
 
 /* ---------- 樱花飘落（合成器动画，不触发重排） ---------- */
 function mountSakura() {
+  // 落地页用 DnsNeko 那种清透线条风，不铺樱花
+  if (document.body.classList.contains('page-home')) return;
   if (document.getElementById('sakura')) return;
   // 减少动态效果偏好时不开；小屏减少数量省性能
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
