@@ -450,3 +450,26 @@ npm run dev
 - **PTR**：只有在 Cloudflare 托管反向区域（in-addr.arpa）时才真正生效，正向域中创建仅作占位
 - **NS**：Cloudflare 区域的根域 NS 不可修改，但子域委派（如 `sub.xxx.meoy.top` 的 NS）可以正常添加
 - TXT 单条最长 2048 字符（Cloudflare 限制），超出需分段
+
+
+---
+
+## 开发语言：渐进式 TypeScript
+
+项目支持 TypeScript，采用**渐进式迁移**，不破坏现有代码：
+
+- Wrangler 原生支持 `.ts`（内置 esbuild 转译），**无需额外构建步骤**，`wrangler deploy` 直接可用
+- `tsconfig.json` 里 `allowJs: true` + `checkJs: false` —— 存量 `.js` 正常参与打包，但暂不做类型检查
+- 全局类型在 `src/types.d.ts`：`Env`（D1/R2/ASSETS/Secrets/Vars 全部绑定）、
+  数据行类型（与 `schema.sql` 一一对应）、`SessionUser` 等
+- 已迁移：~~`src/lib/util.js`~~ → `src/lib/util.ts`（统一响应 / audit / clientIp）
+
+```bash
+npm run typecheck   # tsc --noEmit，只检查 .ts
+```
+
+**为什么存量 `import ... from './util.js'` 不用改**：esbuild（Wrangler 内置）会把
+`./util.js` 自动解析到同名的 `util.ts`，因此删除 `.js` 后所有引用无需修改。
+
+**新代码约定**：新增模块请用 `.ts`，并 `import type { Env, UserRow } from '../types'`；
+存量 `.js` 保持不动，除非要顺手重写。

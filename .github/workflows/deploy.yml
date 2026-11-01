@@ -56,6 +56,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
 
+      # 类型检查：存量 .js 不参与检查（tsconfig checkJs=false），
+      # 只对 .ts 生效。当前为非阻断，纯提示；稳定后可去掉 continue-on-error。
+      - name: 类型检查（TypeScript）
+        continue-on-error: true
+        run: npm run typecheck
+
       # D1 数据库：存在就复用，不存在自动创建，并把 uuid 传给下一步
       - name: 准备 D1 数据库
         run: node scripts/ensure-d1.mjs
