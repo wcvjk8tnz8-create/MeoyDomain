@@ -22,6 +22,7 @@ const api = {
   get: (p) => api.req('GET', p),
   post: (p, b) => api.req('POST', p, b),
   patch: (p, b) => api.req('PATCH', p, b),
+  put: (p, b) => api.req('PUT', p, b),
   del: (p) => api.req('DELETE', p),
 };
 
@@ -110,7 +111,7 @@ function loadBranding() {
         siteName: d.siteName || DEFAULT_BRAND.siteName,
         logoUrl: d.logoUrl || DEFAULT_BRAND.logoUrl,
         faviconUrl: d.faviconUrl || DEFAULT_BRAND.faviconUrl,
-        fontBody: d.fontBody || 'system',
+        fontBody: d.fontBody || 'zcool',
         fontDisplay: d.fontDisplay || 'zcool',
       }))
       .catch(() => ({ ...DEFAULT_BRAND }));
@@ -123,7 +124,7 @@ function loadBranding() {
    key: system | noto | lxgw | zcool
    拉丁与数字始终由 Redaction 35 接管，这里只决定中文字符用哪个字体。 */
 const CN_FONTS = {
-  system: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
+  system: "'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
   noto: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
   lxgw: "'LXGW WenKai TC', 'LXGW WenKai', 'PingFang SC', 'Microsoft YaHei', sans-serif",
   zcool: "'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', sans-serif",

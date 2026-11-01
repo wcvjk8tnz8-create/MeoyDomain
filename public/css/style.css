@@ -90,7 +90,7 @@
        （此前 Zen Maru Gothic / M PLUS Rounded 1c 是日文字体，
         简体特有字会掉回 Noto Sans SC，同一行里圆体黑体混排 → 显得杂）
      · 标题中文：站酷快乐体（简体圆体，圆润活泼），缺字回落系统字体 */
-  --cn-body: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --cn-body: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   --cn-display: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   --sans: 'Redaction 35', var(--cn-body);
   --cn: var(--cn-body);
@@ -1371,4 +1371,121 @@ input:focus, select:focus, textarea:focus {
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   color: hsl(var(--popover-foreground));
+}
+
+/* ══════════════════════════════════════════════════════════
+   个人资料（参考 DnsNeko 用户卡片）
+   ══════════════════════════════════════════════════════════ */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 980px) { .profile-grid { grid-template-columns: 1fr; } }
+
+.profile-card { padding: 0; overflow: hidden; }
+.pc-banner {
+  position: relative;
+  height: 104px;
+  overflow: hidden;
+  background: hsl(var(--muted));
+}
+.pc-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pc-banner-mask {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, hsl(var(--background) / .1), hsl(var(--background) / .82));
+}
+.pc-body { padding: 0 18px 18px; }
+
+.pc-av-wrap { position: relative; margin-top: -38px; margin-bottom: 8px; width: fit-content; }
+.pc-av {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  border: 3px solid hsl(var(--background));
+  background: hsl(var(--card));
+  object-fit: cover;
+  box-shadow: var(--shadow-md);
+  display: block;
+}
+.pc-av-btn {
+  position: absolute;
+  right: -2px; bottom: -2px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.pc-av-btn:hover { background: hsl(var(--accent)); }
+
+.pc-name {
+  font-family: var(--display);
+  font-size: 17px; font-weight: 700;
+  color: hsl(var(--foreground));
+  word-break: break-all;
+}
+.pc-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 9px; }
+.pc-bio {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.6;
+  margin-bottom: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.pc-meta { font-size: 12px; }
+
+/* 安全设置行 */
+.sec-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.sec-row:last-child { border-bottom: none; }
+.sec-t { font-family: var(--display); font-size: 13px; color: hsl(var(--foreground)); }
+.sec-d { font-size: 11.5px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+
+/* 头像选择弹窗 */
+.av-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.av-item {
+  position: relative;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  aspect-ratio: 1;
+  transition: border-color .15s, transform .15s;
+}
+.av-item img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  box-shadow: var(--shadow);
+}
+.av-item:hover { transform: scale(1.06); }
+.av-item.on { border-color: hsl(var(--primary)); }
+.av-item.on::after {
+  content: '✓';
+  position: absolute;
+  right: -2px; bottom: -2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
 }

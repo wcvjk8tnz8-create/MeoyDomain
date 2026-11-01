@@ -12,6 +12,7 @@ import recordRoutes from './routes/records.js';
 import adminRoutes from './routes/admin.js';
 import redeemRoutes from './routes/redeem.js';
 import chatRoutes from './routes/chat.js';
+import profileRoutes from './routes/profile.js';
 
 const app = new Hono();
 
@@ -88,7 +89,7 @@ app.get('/api/config', async (c) => {
     siteName: s.site_name || 'Meoy',
     logoUrl: s.logo_url || '/img/logo.jpg',
     faviconUrl: s.favicon_url || '/favicon.ico',
-    fontBody: s.font_body || 'system',
+    fontBody: s.font_body || 'zcool',
     fontDisplay: s.font_display || 'zcool',
   });
 });
@@ -108,8 +109,10 @@ app.use('/api/soa', requireAuth);
 app.use('/api/admin/*', requireAuth, requireAdmin);
 app.use('/api/redeem/*', requireAuth);
 app.use('/api/chat/*', requireAuth);
+app.use('/api/profile/*', requireAuth);
 
 app.route('/api', recordRoutes);
+app.route('/api/profile', profileRoutes);
 app.route('/api/points', pointRoutes);
 app.route('/api/subdomains', subdomainRoutes);
 // NS 委派：/api/delegation/providers 与 /api/subdomains/:id/delegation

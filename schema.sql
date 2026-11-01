@@ -264,3 +264,17 @@ CREATE TABLE IF NOT EXISTS chat_replies (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_chat_replies_post ON chat_replies(post_id);
+
+-- 全局中文字体（正文 / 标题）：system | noto | lxgw | zcool
+INSERT OR IGNORE INTO settings(key, value) VALUES('font_body', 'zcool');
+INSERT OR IGNORE INTO settings(key, value) VALUES('font_display', 'zcool');
+
+-- 用户资料（独立表：不动 users 结构，避免已存在表补列失败）
+CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id     INTEGER PRIMARY KEY,
+  uid         TEXT,                       -- 对外展示的 UID（不含敏感信息）
+  avatar      TEXT,                       -- 头像地址（站内 /img/avatar/xx.svg 或外链）
+  nickname    TEXT,                       -- 昵称
+  bio         TEXT,                       -- 个人简介 / 签名
+  updated_at  INTEGER
+);
