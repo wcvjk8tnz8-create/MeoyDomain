@@ -6,55 +6,59 @@
 
 :root {
   /* 樱花猫主题：粉调墨色（不是冷灰，带一点紫粉） */
-  --ink: #3d2b3d;        /* 深藕色 */
-  --ink-2: #6b5468;
-  --ink-3: #9b8798;
+  /* 清爽浅蓝白为底（参考 DnsNeko），樱花粉只作强调点缀 */
+  --ink: #243044;        /* 蓝灰墨 */
+  --ink-2: #4c5d74;
+  --ink-3: #8496ab;
 
-  /* 强调色：樱花主色（纯色，不用渐变） */
-  --c1: #f2789f;         /* 樱花主粉 */
-  --c2: #ff9ec0;         /* 浅樱粉（与 c1 同系） */
-  --c3: #ffb7c5;         /* 樱花瓣 */
-  --c1-dim: #d9628a;     /* 深樱粉 */
+  /* 主强调：樱花粉；辅助：晴空蓝 */
+  --c1: #ef7da6;         /* 樱花粉 */
+  --c2: #f7a8c4;         /* 浅樱 */
+  --c3: #ffd0dd;         /* 花瓣 */
+  --c1-dim: #d65f8c;     /* 深樱 */
+  --sky: #5aa9e6;        /* 晴空蓝（辅助强调） */
 
-  /* 面板：奶白（樱花季的柔和感） */
-  --panel: rgba(255, 253, 254, .93);
-  --panel-2: rgba(255, 250, 252, .82);
+  /* 面板：纯白卡片 + 极淡蓝底 */
+  --panel: #ffffff;
+  --panel-2: rgba(240, 246, 253, .8);
   --panel-hi: #ffffff;
 
-  /* 描边：粉调细线 */
-  --line: rgba(242, 120, 159, .2);
-  --line-hi: rgba(242, 120, 159, .48);
-  --line-warm: rgba(242, 120, 159, .48);
+  /* 描边：冷调细线，比粉调更干净 */
+  --line: rgba(36, 48, 68, .1);
+  --line-hi: rgba(36, 48, 68, .22);
+  --line-warm: rgba(239, 125, 166, .45);
 
   /* 文字 */
-  --text: #3d2b3d;
-  --text-2: #6b5468;
-  --muted: #9b8798;
+  --text: #243044;
+  --text-2: #4c5d74;
+  --muted: #8496ab;
 
-  /* 状态色：柔和糖果 */
-  --ok: #34c78a;
-  --warn: #efa63f;
-  --danger: #f4687a;
-  --lock: #b58ae0;
+  /* 状态色 */
+  --ok: #2fb37a;
+  --warn: #e5a13a;
+  --danger: #e8606f;
+  --lock: #8f7bd8;
 
-  /* 圆润活泼：大圆角 + 粉调柔和阴影 */
-  /* 猫爪遮罩（空状态装饰用） */
   --paw-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Ccircle%20cx%3D%227%22%20cy%3D%229%22%20r%3D%222.2%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%227.2%22%20r%3D%222.2%22%2F%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%229%22%20r%3D%222.2%22%2F%3E%3Cpath%20d%3D%22M12%2012.5c3.2%200%205.8%202%205.8%204.4%200%202-1.7%203.3-3.9%203.3h-3.8C8%2020.2%206.2%2018.9%206.2%2016.9c0-2.4%202.6-4.4%205.8-4.4Z%22%2F%3E%3C%2Fsvg%3E");
+  --radius: 16px;        /* 收敛：22px 太笨 */
+  --radius-s: 10px;
+  --shadow: 0 1px 2px rgba(36, 48, 68, .05), 0 4px 14px rgba(36, 48, 68, .06);
+  --glow: 0 4px 12px rgba(239, 125, 166, .32);
 
-  --radius: 22px;
-  --radius-s: 14px;
-  --shadow: 0 4px 14px rgba(242, 120, 159, .13), 0 10px 30px rgba(242, 120, 159, .1);
-  --glow: 0 6px 18px rgba(242, 120, 159, .38);
-
-  /* 字体：Redaction 35（拉丁/数字） + 圆体（中文）
-     圆体优先用 Google Fonts 的 Zen Maru Gothic / M PLUS Rounded 1c（含汉字），
-     日文中没有的简体特有字回落 Noto Sans SC。 */
-  --rounded: 'Zen Maru Gothic', 'M PLUS Rounded 1c', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  --sans: 'Redaction 35', var(--rounded);
-  --cn: var(--rounded);
+  /* 字体
+     · Redaction 35：拉丁与数字（像素/位图感，保留）
+     · 正文中文：统一用系统级简体中文字体，不再混日文圆体
+       （此前 Zen Maru Gothic / M PLUS Rounded 1c 是日文字体，
+        简体特有字会掉回 Noto Sans SC，同一行里圆体黑体混排 → 显得杂）
+     · 标题中文：站酷快乐体（简体圆体，圆润活泼），缺字回落系统字体 */
+  --cn-body: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --cn-display: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --sans: 'Redaction 35', var(--cn-body);
+  --cn: var(--cn-body);
+  --display: 'Redaction 35', var(--cn-display);
   /* 等宽栈也改为 Redaction 35 优先 —— 用户要求全局统一字体。
      域名/记录值改用 tabular-nums 保持数字对齐，不再使用系统等宽字体。 */
-  --mono: 'Redaction 35', var(--rounded);
+  --mono: 'Redaction 35', var(--cn-body);
 }
 
 * { box-sizing: border-box; }
@@ -68,7 +72,7 @@ html, body {
   font-size: 13px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  background: linear-gradient(170deg, #fff5f8 0%, #ffeef4 50%, #fff7fb 100%);
+  background: linear-gradient(170deg, #f2f7fd 0%, #f8fbff 45%, #fdf6fa 100%);
 }
 
 /* ---------- 背景：角色壁纸 + 网格 ---------- */
@@ -105,7 +109,7 @@ html, body {
   background:
     radial-gradient(90% 70% at 12% 4%, rgba(150, 190, 255, .38), transparent 60%),
     radial-gradient(80% 80% at 92% 96%, rgba(255, 170, 210, .4), transparent 62%),
-    rgba(255, 250, 252, .74);   /* 奶白遮罩：壁纸可见但文字清晰 */
+    rgba(250, 252, 255, .8);   /* 浅蓝白遮罩：壁纸淡入背景，文字保持清晰 */
 }
 
 /* 无扫描线：糖果风不需要 CRT 质感 */
@@ -1041,3 +1045,124 @@ input, select, textarea { border-radius: var(--radius-s); }
   -webkit-mask: var(--paw-mask) center/contain no-repeat;
   mask: var(--paw-mask) center/contain no-repeat;
 }
+
+/* ══════════════════════════════════════════════════════════
+   字体分工：Redaction 35（拉丁/数字）+ 系统简中（正文）+ 站酷快乐体（标题）
+   ══════════════════════════════════════════════════════════ */
+h1, h2, h3,
+.page-title, .brand-name, .stat-v,
+.op-btn, .tab, .side-txt {
+  font-family: var(--display);
+}
+/* 数字与域名：保持 Redaction 35 的位图质感 + 等宽数字 */
+.stat-v.mono, .fqdn, .mono, code { font-variant-numeric: tabular-nums; }
+
+/* ══════════════════════════════════════════════════════════
+   DnsNeko 风格控制台：统计卡 + 快捷入口
+   ══════════════════════════════════════════════════════════ */
+
+/* ---------- 欢迎条 ---------- */
+.welcome {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 13px;
+  border-radius: var(--radius);
+  background: linear-gradient(100deg, rgba(90,169,230,.1), rgba(239,125,166,.1));
+  border: 1px solid rgba(90, 169, 230, .18);
+}
+.welcome .w-av {
+  width: 40px; height: 40px; flex: 0 0 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #f7a8c4, #ef7da6);
+  color: #fff; font-size: 16px; font-weight: 700;
+  font-family: var(--display);
+}
+.welcome .w-txt { min-width: 0; }
+.welcome .w-hi { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink); }
+.welcome .w-sub { font-size: 11.5px; color: var(--muted); }
+
+/* ---------- 统计卡片 ---------- */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 11px;
+  margin-bottom: 13px;
+}
+@media (max-width: 860px) { .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.stat-card {
+  display: flex; align-items: center; gap: 11px;
+  padding: 13px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: transform .18s cubic-bezier(.4,0,.2,1), box-shadow .18s;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(36,48,68,.1); }
+.stat-card .sc-ico {
+  width: 38px; height: 38px; flex: 0 0 38px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  font-size: 17px;
+}
+.stat-card .sc-ico svg { width: 19px; height: 19px; fill: currentColor; }
+.sc-pink  .sc-ico { background: rgba(239,125,166,.13); color: var(--c1); }
+.sc-blue  .sc-ico { background: rgba(90,169,230,.14);  color: var(--sky); }
+.sc-green .sc-ico { background: rgba(47,179,122,.13);  color: var(--ok); }
+.sc-amber .sc-ico { background: rgba(229,161,58,.15);  color: var(--warn); }
+.stat-card .sc-num {
+  font-family: var(--display);
+  font-size: 21px; font-weight: 700; line-height: 1.15; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .sc-lbl { font-size: 11.5px; color: var(--muted); }
+
+/* ---------- 快捷入口 ---------- */
+.quick-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 13px;
+}
+@media (max-width: 860px) { .quick-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.quick {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 13px 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: transform .18s cubic-bezier(.4,0,.2,1), box-shadow .18s, color .18s, border-color .18s;
+}
+.quick:hover {
+  transform: translateY(-2px);
+  color: var(--c1-dim);
+  border-color: rgba(239,125,166,.35);
+  box-shadow: 0 6px 16px rgba(239,125,166,.16);
+}
+.quick .q-ico {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 11px;
+  background: rgba(239,125,166,.1);
+  color: var(--c1);
+}
+.quick .q-ico svg { width: 18px; height: 18px; fill: currentColor; }
+.quick .q-txt { font-family: var(--display); font-size: 11.5px; text-align: center; }
+
+/* ---------- 表格：DnsNeko 式清晰行 ---------- */
+.tablewrap table { border-collapse: separate; border-spacing: 0; }
+.tablewrap thead th {
+  background: rgba(240, 246, 253, .7);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  white-space: nowrap;
+}
+.tablewrap tbody td { border-bottom: 1px solid var(--line); }
+.tablewrap tbody tr:last-child td { border-bottom: none; }
