@@ -4,6 +4,7 @@ import { lookupLabel } from './subdomains.js';
 import { UNLIMITED_POINTS, ensurePoints, domainCost } from '../lib/points.js';
 import { pointRules } from './points.js';
 import { lookupExternal, isValidDomain, isDnsheDomain, getCached, getCachedAny, setCached } from '../lib/whoisExt.js';
+import { detectHosting, customPanel } from '../lib/hosting.js';
 
 const app = new Hono();
 
@@ -144,23 +145,58 @@ async function externalWhois(c, domain, root) {
     });
   }
 
-  await setCached(c.env.DB, cacheKey, r);
+  // 托管服务商识别：查 CNAME 指向，命中已知平台或自定义面板则展示
+  let panel = null;
+  try { panel = await customPanel(c.env); } catch { /* 忽略 */ }
+  let host = { hosting: null, cname: null, source: 'none' };
+  try { host = await detectHosting(domain, panel); } catch { /* 探测失败不阻断查询 */ }
+
+  // 托管说明 + 滥用举报渠道（仿 DNSHE 公共域名说明页）
+  const abuse = await abuseInfo(c.env);
+  const enriched = {
+    ...r,
+    hosting: host.hosting,
+    cname: host.cname,
+    hostingSource: host.source,
+    abuse: host.hosting ? { ...abuse, hosting: host.hosting } : abuse,
+  };
+  await setCached(c.env.DB, cacheKey, enriched);
   return ok(c, {
     external: true,
     source: r.source,
     query: domain,
     domain,
     rootDomain: root,
-    ...r,
+    ...enriched,
     externalLinks: externalLinks(domain),
   });
 }
 
-/** 第三方查询站直达链接 */
+/** 滥用举报渠道：后台「站点设置」可配置 */
+async function abuseInfo(env) {
+  let email = String(env.ABUSE_EMAIL || '').trim();
+  let url = String(env.ABUSE_REPORT_URL || '').trim();
+  if (!email) {
+    try {
+      const rows = await env.DB
+        .prepare("SELECT key, value FROM settings WHERE key IN ('abuse_email','abuse_report_url')")
+        .all();
+      const m = Object.fromEntries((rows?.results || []).map((x) => [x.key, String(x.value || '').trim()]));
+      email = m.abuse_email || '';
+      url = m.abuse_report_url || '';
+    } catch { /* 忽略 */ }
+  }
+  return { email: email || '', url: url || '' };
+}
+
+/**
+ * 第三方查询站直达链接
+ * 注意：已移除 whois.com —— DNSHE 的公开 WHOIS 本身就能查外部域名，
+ * 保留 whois.dnshe.com 与 ICANN Lookup 即可覆盖。
+ */
 function externalLinks(domain) {
   const d = encodeURIComponent(domain);
   return [
-    { name: 'whois.com', url: `https://www.whois.com/whois/${d}` },
     { name: 'whois.dnshe.com', url: `https://whois.dnshe.com/?domain=${d}` },
     { name: 'ICANN Lookup', url: `https://lookup.icann.org/en/lookup?name=${d}` },
   ];

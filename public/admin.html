@@ -272,6 +272,24 @@ async function load() {
             <div class="hint" id="dnsProvHint"></div>
           </div>
           <div class="field">
+            <label>滥用举报渠道（外部域名 WHOIS 展示）</label>
+            <div class="grid2">
+              <div><span class="dim">投诉邮箱</span><input id="sAbuseEmail" placeholder="abuse@meoy.top"></div>
+              <div><span class="dim">在线举报入口 URL</span><input id="sAbuseUrl" placeholder="https://..."></div>
+            </div>
+            <div class="hint">查询外部域名并识别到托管平台时，结果下方会展示「滥用与违规举报通道」区块。</div>
+          </div>
+          <div class="field">
+            <label>托管面板域名（CNAME 识别）</label>
+            <div class="grid2">
+              <div><span class="dim">面板域名</span><input id="sPanelDomain" placeholder="dash.domain.meoy.top"></div>
+              <div><span class="dim">显示名称</span><input id="sPanelName" placeholder="Meoy 面板"></div>
+            </div>
+            <div class="hint">外部域名 WHOIS 会探测 CNAME 指向；指向该域名时显示你设定的名称（如
+              <span class="mono">meoy.top CNAME dash.domain.meoy.top</span> → 显示「Meoy 面板」）。
+              Vercel / Netlify / GitHub Pages 等常见平台自动识别，无需配置。</div>
+          </div>
+          <div class="field">
             <label>DNSHE API 凭证（查询 DNSHE 系域名）</label>
             <div class="grid2">
               <div><span class="dim">API Key</span><input id="sDnsheKey" type="text" autocomplete="off" placeholder="cfsd_..."></div>
@@ -334,6 +352,10 @@ async function load() {
           dnsApiSecret: document.getElementById('sDnsSecret').value,
           domainValidDays: document.getElementById('sValidDays').value,
           renewWindowDays: document.getElementById('sRenewWindow').value,
+          abuseEmail: document.getElementById('sAbuseEmail').value,
+          abuseReportUrl: document.getElementById('sAbuseUrl').value,
+          hostingPanelDomain: document.getElementById('sPanelDomain').value,
+          hostingPanelName: document.getElementById('sPanelName').value,
           dnsheApiKey: document.getElementById('sDnsheKey').value,
           dnsheApiSecret: document.getElementById('sDnsheSecret').value,
         });
@@ -358,6 +380,11 @@ async function load() {
       const rw = document.getElementById('sRenewWindow');
       if (vd && ex.validDays) vd.value = ex.validDays;
       if (rw && ex.renewWindowDays) rw.value = ex.renewWindowDays;
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      set('sAbuseEmail', (d.items || {}).abuse_email);
+      set('sAbuseUrl', (d.items || {}).abuse_report_url);
+      set('sPanelDomain', (d.items || {}).hosting_panel_domain);
+      set('sPanelName', (d.items || {}).hosting_panel_name);
     }
 
     // 自定义 DNS 提供商：URL 可回显，Key/Secret 只显示掩码；留空表示不修改

@@ -137,7 +137,52 @@ function renderExternal(r, box) {
     return;
   }
 
-  box.innerHTML = extBody(r, d, srcName) + linkRow(r);
+  box.innerHTML = extBody(r, d, srcName) + hostingCard(r) + linkRow(r);
+}
+
+/* ---------------- 托管服务说明卡（仿 DNSHE 公共域名说明页） ---------------- */
+function hostingCard(r) {
+  const host = r.hosting;
+  const cname = r.cname;
+  const ab = r.abuse || {};
+  // 只有识别出托管平台，或有 CNAME 指向时才展示
+  if (!host && !cname) return '';
+
+  const who = host || '第三方服务';
+  const report = [];
+  if (ab.email) report.push(`投诉邮箱：<a href="mailto:${esc(ab.email)}" class="mono">${esc(ab.email)}</a>`);
+  if (ab.url) report.push(`<a href="${esc(ab.url)}" target="_blank" rel="noopener">在线举报入口</a>`);
+
+  return `
+  <div class="card flat" style="margin-top:13px;border-color:rgba(242,84,91,.35)">
+    <div class="row between" style="align-items:flex-start;margin-bottom:10px">
+      <div>
+        <h3 style="margin:0 0 3px">托管服务说明</h3>
+        <div class="hint" style="margin:0">当前域名 <span class="mono">${esc(r.domain || r.query)}</span>
+          由 <b style="color:var(--ink)">${esc(who)}</b> 托管</div>
+      </div>
+      ${host ? '<span class="badge inf">已识别</span>' : '<span class="badge warn">未识别平台</span>'}
+    </div>
+
+    <div style="color:var(--text-2);font-size:12.5px;line-height:1.85">
+      该域名由 <b>${esc(who)}</b> 提供托管，本站仅提供二级域名分发与 DNS 解析服务，
+      不参与、亦不对该域名所承载的内容与服务承担任何责任。
+    </div>
+
+    ${cname ? `<div class="kv" style="margin-top:10px">
+      <div class="k">CNAME 指向</div><div class="mono" style="font-size:11.5px">${esc(cname)}</div>
+    </div>` : ''}
+
+    <div class="alert danger" style="margin:12px 0 0">
+      <b>滥用与违规举报通道</b><br>
+      ${report.length ? report.join(' · ') : '如发现该域名存在钓鱼、恶意程序、垃圾邮件等滥用行为，请联系站点管理员。'}
+    </div>
+
+    <div class="row" style="margin-top:12px;gap:7px;flex-wrap:wrap">
+      <a class="btn sm ok" href="/terms.html" target="_blank">服务条款 (TOS)</a>
+      ${ab.url ? `<a class="btn sm ghost" href="${esc(ab.url)}" target="_blank" rel="noopener">在线举报</a>` : ''}
+    </div>
+  </div>`;
 }
 
 function extBody(r, d, srcName) {
@@ -160,6 +205,13 @@ function extBody(r, d, srcName) {
   const mailHtml = (r.registrant && r.registrant.email)
     ? `<div class="k">注册人邮箱</div><div class="mono">${esc(r.registrant.email)}</div>`
     : '';
+  // 托管服务商（CNAME 探测）
+  const hostHtml = r.hosting
+    ? `<div class="k">托管服务商</div><div><span class="badge inf">${esc(r.hosting)}</span></div>`
+    : '';
+  const cnameHtml = r.cname
+    ? `<div class="k">CNAME 指向</div><div class="mono" style="font-size:11.5px">${esc(r.cname)}</div>`
+    : '';
 
   return `
     <div class="row between" style="margin-bottom:12px">
@@ -173,6 +225,8 @@ function extBody(r, d, srcName) {
       ${r.createdAt ? `<div class="k">注册时间</div><div>${esc(r.createdAt)}</div>` : ''}
       ${r.expiresAt ? `<div class="k">到期时间</div><div>${esc(r.expiresAt)}</div>` : ''}
       ${r.updatedAt ? `<div class="k">更新时间</div><div>${esc(r.updatedAt)}</div>` : ''}
+      ${hostHtml}
+      ${cnameHtml}
       ${statusHtml}
       ${nsHtml}
       ${mailHtml}

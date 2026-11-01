@@ -152,7 +152,33 @@
 
 **缓存**：结果写入 `whois_cache` 表，TTL 6 小时。上游失败时若有旧缓存仍展示，并标注时间。
 
-**第三方直达链接**（结果卡片底部）：whois.com / whois.dnshe.com / ICANN Lookup。
+**第三方直达链接**（结果卡片底部）：whois.dnshe.com / ICANN Lookup。
+（原 whois.com 已移除 —— DNSHE 公开 WHOIS 本身就能查外部域名，无需再外跳。）
+
+**托管服务说明卡**（仿 DNSHE 公共域名说明页）
+
+查询外部域名时会探测其 CNAME 指向，命中后在结果下方展示说明卡：
+
+| CNAME 指向 | 显示为 |
+|---|---|
+| `dash.domain.meoy.top`（后台配置） | 你设定的名称，如「Meoy 面板」 |
+| `cname.vercel-dns.com` | Vercel |
+| `*.pages.dev` | Cloudflare Pages |
+| `*.github.io` | GitHub Pages |
+| 其它已知平台（17 种指纹） | Netlify / Firebase / Render / Fly.io / Deno / Heroku … |
+| 认不出但有 CNAME | 标记「未识别平台」，原样展示 CNAME |
+| 无 CNAME | 不展示 |
+
+说明卡含：托管方名称、CNAME 指向、**滥用与违规举报通道**（投诉邮箱 + 在线举报入口）、服务条款按钮。
+
+**后台配置项**（站点设置）：
+
+| 项 | 说明 |
+|---|---|
+| 托管面板域名 / 显示名称 | CNAME 指向该域名时显示你的名称 |
+| 投诉邮箱 / 在线举报入口 URL | 举报通道区块内容 |
+
+CNAME 探测走 DoH（cloudflare-dns.com → dns.google 双端点降级），5 秒超时，失败不影响主查询。
 
 新增数据源：编辑 `src/lib/whoisExt.js`。
 

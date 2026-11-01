@@ -461,6 +461,14 @@ app.post('/settings', async (c) => {
   if (body.domainValidDays !== undefined) await set('domain_valid_days', String(body.domainValidDays || '').trim());
   if (body.renewWindowDays !== undefined) await set('renew_window_days', String(body.renewWindowDays || '').trim());
 
+  // 滥用举报渠道（外部域名 WHOIS 的「举报通道」区块展示）
+  if (body.abuseEmail !== undefined) await set('abuse_email', String(body.abuseEmail || '').trim());
+  if (body.abuseReportUrl !== undefined) await set('abuse_report_url', String(body.abuseReportUrl || '').trim());
+
+  // 托管面板域名（CNAME 识别用：域名 CNAME 到它时显示自定义名称）
+  if (body.hostingPanelDomain !== undefined) await set('hosting_panel_domain', String(body.hostingPanelDomain || '').trim().toLowerCase());
+  if (body.hostingPanelName !== undefined) await set('hosting_panel_name', String(body.hostingPanelName || '').trim());
+
   // 自定义 DNS 提供商（填了 URL 就走它，可突破 Cloudflare 200 条记录限制；留空用 Cloudflare）
   if (body.dnsApiUrl !== undefined) {
     await set('dns_api_url', String(body.dnsApiUrl || '').trim());
