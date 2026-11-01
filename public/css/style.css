@@ -834,6 +834,7 @@ tr.rejected td { background: rgba(255, 92, 114, .09); }
   .u-meta { display: none; }        /* 小屏只留头像 */
   .user-chip { padding: 0 4px; }
   .user-chip .chev { display: none; }
+  .theme-paw { display: none; }     /* 窄屏先让位给品牌与头像 */
   .sidebar {
     transform: translateX(-100%);
     transition: transform .28s cubic-bezier(.4,0,.2,1);
@@ -1091,6 +1092,20 @@ h1, h2, h3,
 }
 @media (max-width: 860px) { .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+/* 顶栏：任何宽度都不换行、不溢出（此前窄屏会被挤到第二行） */
+.topbar-in { flex-wrap: nowrap; }
+.top-brand { flex: 0 1 auto; min-width: 0; }
+.top-right { flex: 0 0 auto; }
+@media (max-width: 720px) {
+  .brand-txt { display: none; }            /* 只留 Logo */
+  .top-brand { padding: 4px; gap: 0; }
+  .topbar-in { gap: 8px; }
+}
+@media (max-width: 400px) {
+  .topbar-in { padding: 0 8px; gap: 6px; }
+  .user-chip .avatar { width: 26px; height: 26px; flex: 0 0 26px; }
+}
+
 .stat-card {
   display: flex; align-items: center; gap: 11px;
   padding: 13px 14px;
@@ -1166,3 +1181,28 @@ h1, h2, h3,
 }
 .tablewrap tbody td { border-bottom: 1px solid var(--line); }
 .tablewrap tbody tr:last-child td { border-bottom: none; }
+
+
+/* ══════════════════════════════════════════════════════════
+   中文字体全局兜底
+   --cn-body / --cn-display 由后台「站点设置 · 全局字体」控制，
+   前端 api.js 通过 CSS 变量覆盖，全站（含管理后台）立即生效。
+   这里再兜一层：确保任何组件里的中文都不会掉回浏览器默认字体。
+   ══════════════════════════════════════════════════════════ */
+body, .card, .card *:not(.mono):not(.fqdn):not(code):not(.badge),
+table, thead th, tbody td,
+.btn, input, select, textarea, label, .hint, .sub, .dim,
+.side-item, .top-brand, .user-chip, .user-menu, .um-body a,
+.stat-card, .quick, .welcome, .alert, .tab, .op-btn, .field {
+  font-family: var(--sans);
+}
+/* 标题与强调数字走 display 栈（中文标题字体 + Redaction 35） */
+h1, h2, h3, .stat-v, .sc-num, .brand-name, .w-hi, .q-txt, .page-title {
+  font-family: var(--display);
+}
+/* 域名/记录值等：Redaction 35 优先，中文回落到正文字体 */
+.mono, .fqdn, code { font-family: var(--mono); }
+
+/* 顶栏：任何宽度都不换行 */
+.topbar-in > * { flex-shrink: 0; }
+.top-brand { overflow: hidden; }

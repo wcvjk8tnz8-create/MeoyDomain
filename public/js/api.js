@@ -110,6 +110,8 @@ function loadBranding() {
         siteName: d.siteName || DEFAULT_BRAND.siteName,
         logoUrl: d.logoUrl || DEFAULT_BRAND.logoUrl,
         faviconUrl: d.faviconUrl || DEFAULT_BRAND.faviconUrl,
+        fontBody: d.fontBody || 'system',
+        fontDisplay: d.fontDisplay || 'zcool',
       }))
       .catch(() => ({ ...DEFAULT_BRAND }));
   }
@@ -117,7 +119,27 @@ function loadBranding() {
 }
 
 /** 应用站点名与 favicon */
+/* ---------- 全局中文字体（后台可配，全站生效） ----------
+   key: system | noto | lxgw | zcool
+   拉丁与数字始终由 Redaction 35 接管，这里只决定中文字符用哪个字体。 */
+const CN_FONTS = {
+  system: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
+  noto: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+  lxgw: "'LXGW WenKai TC', 'LXGW WenKai', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+  zcool: "'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+};
+
+function applyFonts(fontBody, fontDisplay) {
+  const root = document.documentElement;
+  const body = CN_FONTS[fontBody] || CN_FONTS.system;
+  const disp = CN_FONTS[fontDisplay] || CN_FONTS.zcool;
+  // 覆盖 CSS 变量 → 所有页面（前台 / WHOIS / 后台 / 条款）立即全局生效
+  root.style.setProperty('--cn-body', body);
+  root.style.setProperty('--cn-display', disp);
+}
+
 function applyBranding(b) {
+  if (b.fontBody || b.fontDisplay) applyFonts(b.fontBody, b.fontDisplay);
   document.title = (document.title || '').replace(/^[^·]*·\s*/, b.siteName + ' · ');
   let f = document.querySelector('link[rel="icon"]');
   if (!f) {

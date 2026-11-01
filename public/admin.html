@@ -6,9 +6,9 @@
 <title>管理后台 · Meoy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&display=swap"></noscript>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/css/style.css">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
@@ -333,6 +333,30 @@ async function load() {
             <div class="hint">「单字域名长度上限」= ${esc(s.short_domain_len || '1')}（长度不超过该值即按单字计价）。管理员不消耗积分。老用户首次进入按已有域名数补偿，已有域名不受影响。</div>
           </div>
           <div class="field">
+            <label>全局字体（中文字体）</label>
+            <div class="grid2">
+              <div>
+                <span class="dim">正文字体</span>
+                <select id="sFontBody">
+                  <option value="system"${(s.font_body || 'system') === 'system' ? ' selected' : ''}>系统默认（苹方 / 微软雅黑）</option>
+                  <option value="noto"${s.font_body === 'noto' ? ' selected' : ''}>思源黑体 Noto Sans SC</option>
+                  <option value="lxgw"${s.font_body === 'lxgw' ? ' selected' : ''}>霞鹜文楷 LXGW WenKai</option>
+                  <option value="zcool"${s.font_body === 'zcool' ? ' selected' : ''}>站酷快乐体（圆润，偏标题）</option>
+                </select>
+              </div>
+              <div>
+                <span class="dim">标题字体</span>
+                <select id="sFontDisplay">
+                  <option value="zcool"${(s.font_display || 'zcool') === 'zcool' ? ' selected' : ''}>站酷快乐体（圆润活泼）</option>
+                  <option value="system"${s.font_display === 'system' ? ' selected' : ''}>系统默认（苹方 / 微软雅黑）</option>
+                  <option value="noto"${s.font_display === 'noto' ? ' selected' : ''}>思源黑体 Noto Sans SC</option>
+                  <option value="lxgw"${s.font_display === 'lxgw' ? ' selected' : ''}>霞鹜文楷 LXGW WenKai</option>
+                </select>
+              </div>
+            </div>
+            <div class="hint">全局生效：前台、WHOIS、管理后台、条款页全部应用。拉丁字母与数字始终使用 Redaction 35（像素感），中文字体只接管中文字符。切换后刷新页面即可看到。</div>
+          </div>
+          <div class="field">
             <label>WHOIS 持有人邮箱</label>
             <select id="sWhois" style="max-width:260px">
               <option value="masked"${(s.whois_holder || 'masked') === 'masked' ? ' selected' : ''}>脱敏显示（ab***@gmail.com）</option>
@@ -383,6 +407,8 @@ async function load() {
           hostingPanelName: document.getElementById('sPanelName').value,
           dnsheApiKey: document.getElementById('sDnsheKey').value,
           dnsheApiSecret: document.getElementById('sDnsheSecret').value,
+          fontBody: document.getElementById('sFontBody').value,
+          fontDisplay: document.getElementById('sFontDisplay').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo

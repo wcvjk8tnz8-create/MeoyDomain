@@ -75,7 +75,7 @@ app.get('/api/health', (c) =>
 // 公开配置（含站点品牌，登录页也要用）
 app.get('/api/config', async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url')"
+    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display')"
   ).all();
   const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
   return ok(c, {
@@ -88,6 +88,8 @@ app.get('/api/config', async (c) => {
     siteName: s.site_name || 'Meoy',
     logoUrl: s.logo_url || '/img/logo.jpg',
     faviconUrl: s.favicon_url || '/favicon.ico',
+    fontBody: s.font_body || 'system',
+    fontDisplay: s.font_display || 'zcool',
   });
 });
 

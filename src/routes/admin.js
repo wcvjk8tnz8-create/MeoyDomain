@@ -498,6 +498,19 @@ app.post('/settings', async (c) => {
   if (!(await numRule('short_domain_len', body.shortDomainLen, 1, 10, '单字域名长度上限'))) return fail(c, c.__ruleErr);
   if (!(await numRule('initial_points', body.initialPoints, 0, 10000, '新用户初始积分'))) return fail(c, c.__ruleErr);
 
+  // 全局中文字体（正文 / 标题）：拉丁与数字始终用 Redaction 35，这里只决定中文用哪个字体
+  const FONTS = ['system', 'noto', 'lxgw', 'zcool'];
+  if (body.fontBody !== undefined) {
+    const f = String(body.fontBody).toLowerCase();
+    if (!FONTS.includes(f)) return fail(c, '正文字体取值不合法');
+    await set('font_body', f);
+  }
+  if (body.fontDisplay !== undefined) {
+    const f = String(body.fontDisplay).toLowerCase();
+    if (!FONTS.includes(f)) return fail(c, '标题字体取值不合法');
+    await set('font_display', f);
+  }
+
   // WHOIS 持有人显示策略
   if (body.whoisHolder !== undefined) {
     const m = String(body.whoisHolder).toLowerCase();
