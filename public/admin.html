@@ -5,12 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>管理后台 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="bg"></div>
-<nav class="nav" id="nav"></nav>
+<header class="topbar" id="topbar"></header>
+<aside class="sidebar" id="sidebar"></aside>
 
-<div class="wrap">
+<main class="main"><div class="main-in"><div class="wrap">
   <h1><span data-site-name>Meoy</span> · 管理后台</h1>
   <div class="sub" id="envTip"></div>
 
@@ -32,12 +36,13 @@
       <tbody id="tbody"><tr><td class="empty">加载中…</td></tr></tbody>
     </table></div>
   </div>
-</div>
+</div></main>
 
 <div class="modal" id="modal"><div class="box"></div></div>
 <div id="toast"></div>
 
 <script src="/js/api.js"></script>
+<script src="/js/shell.js"></script>
 <script>
 let tab = 'pending';
 
@@ -468,7 +473,7 @@ document.querySelectorAll('.tab').forEach((t) => {
   };
 });
 
-mountNav('admin').then(async (u) => {
+mountShell('admin').then(async (u) => {
   applyBranding(await loadBranding());
   if (u && u.role !== 'admin') {
     document.querySelector('.wrap').innerHTML =

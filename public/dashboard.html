@@ -5,12 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>我的子域名 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="bg"></div>
-<nav class="nav" id="nav"></nav>
+<header class="topbar" id="topbar"></header>
+<aside class="sidebar" id="sidebar"></aside>
 
-<div class="wrap">
+<main class="main"><div class="main-in"><div class="wrap">
   <div class="row between" style="margin-bottom:14px">
     <div><h1><span data-site-name>Meoy</span> · 我的子域名</h1><div class="sub" id="quotaTip" style="margin:0"></div></div>
     <div class="row" style="gap:6px">
@@ -62,19 +66,32 @@
 
   <div class="card">
     <h2>列表</h2>
+    <div class="row" style="align-items:flex-end;gap:9px;margin-bottom:11px">
+      <div style="flex:1;min-width:170px">
+        <label>搜索</label>
+        <input id="kw" placeholder="域名关键字" autocomplete="off">
+      </div>
+      <button class="btn" id="btnSearch">搜索</button>
+    </div>
     <div class="tablewrap">
       <table>
         <thead><tr><th>域名</th><th>状态</th><th>有效期</th><th>记录数</th><th>申请时间</th><th class="right">操作</th></tr></thead>
         <tbody id="list"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
       </table>
     </div>
+    <div class="row between" style="margin-top:12px">
+      <button class="btn sm" id="btnPrev">上一页</button>
+      <span class="dim" id="pageTip" style="font-size:12px"></span>
+      <button class="btn sm" id="btnNext">下一页</button>
+    </div>
   </div>
-</div>
+</div></main>
 
 <div class="modal" id="modal"><div class="box"></div></div>
 <div id="toast"></div>
 
 <script src="/js/api.js"></script>
+<script src="/js/shell.js"></script>
 <script>
 let rootDomain = '';
 let checkTimer = null;
@@ -118,12 +135,37 @@ async function load() {
       '创建子域名不会自动写入任何 DNS 记录，开通后到「DNS 记录」页按需添加。';
   }
 
+  allItems = d.items || [];
+  renderPage();
+}
+
+const PAGE_SIZE = 10;
+let allItems = [];
+let curPage = 1;
+
+function filtered() {
+  const kw = (document.getElementById('kw')?.value || '').trim().toLowerCase();
+  if (!kw) return allItems;
+  return allItems.filter((s) =>
+    String(s.fqdn || '').toLowerCase().includes(kw) ||
+    String(s.note || '').toLowerCase().includes(kw));
+}
+
+function renderPage() {
   const tb = document.getElementById('list');
-  if (!d.items.length) {
-    tb.innerHTML = `<tr><td colspan="6" class="empty">还没有子域名，先在上方申请一个</td></tr>`;
+  const items = filtered();
+  const totalPage = Math.max(Math.ceil(items.length / PAGE_SIZE), 1);
+  if (curPage > totalPage) curPage = totalPage;
+  const start = (curPage - 1) * PAGE_SIZE;
+  const slice = items.slice(start, start + PAGE_SIZE);
+
+  if (!items.length) {
+    tb.innerHTML = `<tr><td colspan="6" class="empty">${allItems.length ? '没有匹配的域名' : '还没有子域名，先在上方申请一个'}</td></tr>`;
+    document.getElementById('pageTip').textContent = '';
     return;
   }
-  tb.innerHTML = d.items.map((s) => {
+  tb.innerHTML = slice.map((s) => {
+
     const rejected = s.status === 'rejected';
     const note = rejected
       ? `<div class="alert danger" style="margin:6px 0 0;padding:6px 9px;font-size:12px">
@@ -155,7 +197,14 @@ async function load() {
         <button class="btn sm ${rejected ? '' : 'danger'}" data-del="${s.id}">${rejected ? '移除' : '释放'}</button>
       </td>
     </tr>`;
+
   }).join('');
+
+  document.getElementById('pageTip').textContent = `第 ${curPage} / ${totalPage} 页 · 共 ${items.length} 个`;
+  document.getElementById('btnPrev').disabled = curPage <= 1;
+  document.getElementById('btnNext').disabled = curPage >= totalPage;
+
+  // 续期 / 释放按钮（分页后重新绑定）
   tb.querySelectorAll('[data-renew]').forEach((b) => {
     b.onclick = async () => {
       b.disabled = true;
@@ -167,7 +216,7 @@ async function load() {
     };
   });
   tb.querySelectorAll('[data-del]').forEach((b) => {
-    const s = d.items.find((x) => String(x.id) === String(b.dataset.del));
+    const s = allItems.find((x) => String(x.id) === String(b.dataset.del));
     const rejected = s && s.status === 'rejected';
     b.onclick = async () => {
       const msg = rejected
@@ -214,6 +263,11 @@ document.getElementById('label').addEventListener('input', (e) => {
   clearTimeout(checkTimer);
   checkTimer = setTimeout(() => runCheck(v), 350);
 });
+
+document.getElementById('btnSearch').onclick = () => { curPage = 1; renderPage(); };
+document.getElementById('kw').addEventListener('input', () => { curPage = 1; renderPage(); });
+document.getElementById('btnPrev').onclick = () => { if (curPage > 1) { curPage--; renderPage(); } };
+document.getElementById('btnNext').onclick = () => { curPage++; renderPage(); };
 
 document.getElementById('btnApply').onclick = async () => {
   const label = document.getElementById('label').value.trim();
@@ -332,7 +386,7 @@ document.getElementById('btnPwd').onclick = () => {
   };
 };
 
-mountNav('dash').then(async () => {
+mountShell('domains').then(async () => {
   applyBranding(await loadBranding());
   load();
   loadPoints();

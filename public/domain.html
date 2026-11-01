@@ -5,25 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DNS 记录 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="bg"></div>
-<nav class="nav" id="nav"></nav>
+<header class="topbar" id="topbar"></header>
+<aside class="sidebar" id="sidebar"></aside>
 
-<div class="wrap">
-  <div style="margin-bottom:14px">
-    <a href="/dashboard" style="font-size:12.5px">返回我的域名</a>
-    <div class="row between" style="margin-top:6px">
+<main class="main"><div class="main-in"><div class="wrap">
+    <div style="margin-bottom:14px">
+    <a href="/dashboard" style="font-size:12.5px">← 返回域名管理</a>
+    <div class="row between" style="margin-top:6px;align-items:center">
       <div>
         <span class="fqdn" id="fqdn"></span> <span class="copy" id="copyFqdn">复制</span>
         <span id="statusBadge" style="margin-left:8px"></span>
       </div>
-      <button class="btn sm" id="btnSoa">查看 SOA</button>
     </div>
   </div>
 
   <div id="statusAlert"></div>
 
+  <div class="detail-layout">
+    <div class="detail-main">
+
+      <div class="tabs" id="tabs">
+        <button class="tab on" data-tab="overview">概览</button>
+        <button class="tab" data-tab="dns">DNS 解析</button>
+        <button class="tab" data-tab="ns">DNS 服务器</button>
+      </div>
+
+      <!-- 概览 -->
+      <div class="tabpane on" data-pane="overview">
+        <div class="card">
+          <h2>概览</h2>
+          <div id="overviewBox"><div class="empty">加载中…</div></div>
+        </div>
+      </div>
+
+      <!-- DNS 解析 -->
+      <div class="tabpane" data-pane="dns">
   <div class="card">
     <h2>根域名验证</h2>
     <div class="sub" style="margin-bottom:12px">
@@ -56,20 +78,6 @@
   </div>
 
   <div class="card">
-    <h2>域名托管（NS 委派）</h2>
-    <div class="sub" style="margin-bottom:12px">
-      把该子域名的解析权整体交给第三方 DNS（anyns.io / DNSHE / Cloudflare 等）。
-      系统会在父区域写入 NS 记录，之后该域名下的全部记录由目标服务商负责，本站不再接管解析。
-    </div>
-    <div id="delegationBox"><div class="empty">加载中…</div></div>
-  </div>
-
-  <div class="card flat">
-    <h3>常用模板</h3>
-    <div class="row" id="tpls" style="gap:6px"></div>
-  </div>
-
-  <div class="card">
     <div class="row between" style="margin-bottom:10px">
       <h2 style="margin:0">DNS 记录</h2>
       <button class="btn primary sm" id="btnAdd">添加记录</button>
@@ -81,12 +89,61 @@
       </table>
     </div>
   </div>
-</div>
+
+  <div class="card flat">
+    <h3>常用模板</h3>
+    <div class="row" id="tpls" style="gap:6px"></div>
+  </div>
+      </div>
+
+      <!-- DNS 服务器 -->
+      <div class="tabpane" data-pane="ns">
+  <div class="card">
+    <h2>域名托管（NS 委派）</h2>
+    <div class="sub" style="margin-bottom:12px">
+      把该子域名的解析权整体交给第三方 DNS（anyns.io / DNSHE / Cloudflare 等）。
+      系统会在父区域写入 NS 记录，之后该域名下的全部记录由目标服务商负责，本站不再接管解析。
+    </div>
+    <div id="delegationBox"><div class="empty">加载中…</div></div>
+  </div>
+
+  <div class="card flat">
+    <div class="row between">
+      <h3 style="margin:0">SOA 记录</h3>
+      <button class="btn sm" id="btnSoa">查看 SOA</button>
+    </div>
+    <div class="hint" style="margin-top:8px">SOA 由 Cloudflare 自动生成，只读，无法通过 API 修改。</div>
+  </div>
+      </div>
+
+    </div>
+
+    <aside class="detail-side">
+      <div class="card">
+        <h2>快捷操作</h2>
+        <div class="ops">
+          <button class="op-btn" data-act="add"><span>＋</span>添加解析</button>
+          <button class="op-btn" data-act="ns"><span>◎</span>DNS 服务器</button>
+          <button class="op-btn" data-act="whois"><span>⌕</span>WHOIS 查询</button>
+          <button class="op-btn" data-act="renew"><span>↻</span>续期</button>
+          <button class="op-btn" data-act="ssl"><span>🔒</span>SSL 证书</button>
+        </div>
+      </div>
+      <div class="card flat">
+        <h3>小提示</h3>
+        <div style="color:var(--text-2);font-size:12px;line-height:1.8">
+          创建子域名默认不写入任何 DNS 记录，需要时在「DNS 解析」里添加。
+        </div>
+      </div>
+    </aside>
+  </div>
+</div></main>
 
 <div class="modal" id="modal"><div class="box"></div></div>
 <div id="toast"></div>
 
 <script src="/js/api.js"></script>
+<script src="/js/shell.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const subId = params.get('id');
@@ -117,6 +174,7 @@ async function loadAll() {
   renderTpl();
   renderRecords();
   renderStatusAlert();
+  renderOverview();
   updatePreview();
   await loadDelegation();
 }
@@ -522,7 +580,70 @@ document.getElementById('btnSoa').onclick = async () => {
 
 document.getElementById('copyFqdn').onclick = () => copyText(sub.fqdn);
 
-mountNav('dash').then(async () => { applyBranding(await loadBranding()); loadAll(); }).catch(() => {});
+/* ---------- 概览 ---------- */
+function renderOverview() {
+  const box = document.getElementById('overviewBox');
+  if (!sub) return;
+  const rc = (records || []).length;
+  const perpetual = Number(sub.perpetual) === 1 || !sub.expires_at;
+  let expText = '永久有效', expCls = 'var(--ok)';
+  if (!perpetual) {
+    const left = Math.ceil((Number(sub.expires_at) - Date.now()) / 86400000);
+    expText = left > 0 ? left + ' 天后到期' : '已过期';
+    expCls = left > 180 ? 'var(--ok)' : left > 0 ? 'var(--warn)' : 'var(--danger)';
+  }
+  const st = sub.status === 'approved' ? '<span style="color:var(--ok)">正常</span>'
+           : sub.status === 'pending' ? '<span style="color:var(--warn)">审核中</span>'
+           : sub.status === 'suspended' ? '<span style="color:var(--danger)">已停用</span>'
+           : esc(sub.status);
+  box.innerHTML = `<div class="stat-grid">
+    <div class="stat"><div class="stat-k">域名状态</div><div class="stat-v">${st}</div></div>
+    <div class="stat"><div class="stat-k">DNS</div><div class="stat-v">${rc > 0 ? '<span style="color:var(--ok)">已解析</span>' : '<span style="color:var(--muted)">未添加记录</span>'}</div></div>
+    <div class="stat"><div class="stat-k">DNS 记录</div><div class="stat-v mono">${rc} 条</div></div>
+    <div class="stat"><div class="stat-k">有效期</div><div class="stat-v" style="color:${expCls}">${expText}</div></div>
+  </div>`;
+}
+
+/* ---------- 标签页切换 ---------- */
+function switchTab(name) {
+  document.querySelectorAll('#tabs .tab').forEach((x) => x.classList.toggle('on', x.dataset.tab === name));
+  document.querySelectorAll('.tabpane').forEach((pp) => pp.classList.toggle('on', pp.dataset.pane === name));
+}
+document.querySelectorAll('#tabs .tab').forEach((t) => {
+  t.onclick = () => switchTab(t.dataset.tab);
+});
+
+/* ---------- 右侧快捷操作 ---------- */
+async function doRenew() {
+  try {
+    const r = await api.post('/api/subdomains/' + subId + '/renew', {});
+    toast('已续期，新到期 ' + fmtDate(r.expiresAt));
+    loadAll();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+document.querySelectorAll('.op-btn').forEach((b) => {
+  b.onclick = () => {
+    const a = b.dataset.act;
+    if (a === 'add') {
+      switchTab('dns');
+      const btn = document.getElementById('btnAdd');
+      if (btn) btn.click();
+    } else if (a === 'ns') {
+      switchTab('ns');
+    } else if (a === 'whois') {
+      location.href = '/whois.html?name=' + encodeURIComponent(sub ? sub.label : '');
+    } else if (a === 'renew') {
+      if (Number(sub.perpetual) === 1 || !sub.expires_at) return toast('该域名永久有效，无需续期');
+      doRenew();
+    } else if (a === 'ssl') {
+      switchTab('dns');
+      toast('本站不签发证书：可在 DNS 解析里添加 ACME 验证记录，并用 CAA 记录限制签发机构', 'info');
+    }
+  };
+});
+
+mountShell('domains').then(async () => { applyBranding(await loadBranding()); loadAll(); }).catch(() => {});
 </script>
 </body>
 </html>

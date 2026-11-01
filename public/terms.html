@@ -9,12 +9,16 @@
   // 公开页：免登录，接口返回 401 时不跳转登录页
   window.MEOY_PUBLIC_PAGE = true;
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="bg"></div>
-<nav class="nav" id="nav"></nav>
+<header class="topbar" id="topbar"></header>
+<aside class="sidebar" id="sidebar"></aside>
 
-<div class="wrap" style="max-width:820px">
+<main class="main"><div class="main-in"><div class="wrap" style="max-width:820px">
   <div style="margin-bottom:14px">
     <a href="/dashboard" id="backLink" style="font-size:12.5px">返回</a>
   </div>
@@ -22,10 +26,11 @@
   <div class="sub" id="meta"></div>
 
   <div class="card" id="body">加载中…</div>
-</div>
+</div></main>
 
 <div id="toast"></div>
 <script src="/js/api.js"></script>
+<script src="/js/shell.js"></script>
 <script>
 (async () => {
   try {
@@ -53,7 +58,7 @@
 })();
 
 // 公开页面：未登录也可查看，导航显示登录入口
-mountNav('terms', { optional: true }).then(async () => {
+mountShell('terms', { optional: true }).then(async () => {
   applyBranding(await loadBranding());
 }).catch(() => {});
 </script>

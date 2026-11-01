@@ -10,6 +10,8 @@ import pointRoutes from './routes/points.js';
 import subdomainRoutes from './routes/subdomains.js';
 import recordRoutes from './routes/records.js';
 import adminRoutes from './routes/admin.js';
+import redeemRoutes from './routes/redeem.js';
+import chatRoutes from './routes/chat.js';
 
 const app = new Hono();
 
@@ -102,6 +104,8 @@ app.use('/api/delegation/*', requireAuth);
 app.use('/api/records/*', requireAuth);
 app.use('/api/soa', requireAuth);
 app.use('/api/admin/*', requireAuth, requireAdmin);
+app.use('/api/redeem/*', requireAuth);
+app.use('/api/chat/*', requireAuth);
 
 app.route('/api', recordRoutes);
 app.route('/api/points', pointRoutes);
@@ -110,6 +114,8 @@ app.route('/api/subdomains', subdomainRoutes);
 app.route('/api/delegation', delegationRoutes);
 app.route('/api/subdomains', delegationRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/api/redeem', redeemRoutes);
+app.route('/api/chat', chatRoutes);
 
 // API 兜底
 app.all('/api/*', (c) => fail(c, '接口不存在', 404));

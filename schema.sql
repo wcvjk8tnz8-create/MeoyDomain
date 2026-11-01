@@ -207,3 +207,60 @@ UPDATE settings SET value = '/favicon.ico' WHERE key = 'favicon_url' AND value =
 -- 有效期规则（管理员可在后台「站点设置」调整）
 INSERT OR IGNORE INTO settings(key, value) VALUES ('domain_valid_days', '365');   -- 新申请域名有效期（天）
 INSERT OR IGNORE INTO settings(key, value) VALUES ('renew_window_days', '180');   -- 到期前多少天内可续期
+
+-- ══════════════════════════════════════════════════════════
+--  兑换码：V-XXX 域名永久化 / PE-XXXXX 配额
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS redeem_codes (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  code         TEXT    NOT NULL UNIQUE,   -- 形如 V-A1B2C3 / PE-XXXXXXX
+  type         TEXT    NOT NULL,          -- permanent | quota
+  value        INTEGER NOT NULL DEFAULT 1,-- quota 类型表示增加的配额数量
+  max_uses     INTEGER NOT NULL DEFAULT 1,
+  used_count   INTEGER NOT NULL DEFAULT 0,
+  status       TEXT    NOT NULL DEFAULT 'active',  -- active | disabled
+  note         TEXT,                       -- 备注（派发给谁）
+  expires_at   INTEGER,                    -- 为空表示长期有效
+  created_by   INTEGER,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_redeem_status ON redeem_codes(status);
+CREATE INDEX IF NOT EXISTS idx_redeem_type   ON redeem_codes(type);
+
+-- 兑换记录（含 V 码兑换时绑定的域名）
+CREATE TABLE IF NOT EXISTS redeem_logs (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  code         TEXT    NOT NULL,
+  user_id      INTEGER NOT NULL,
+  type         TEXT    NOT NULL,
+  subdomain_id INTEGER,                    -- permanent 类型：被永久化的域名
+  value        INTEGER NOT NULL DEFAULT 0,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_redeem_logs_user ON redeem_logs(user_id);
+
+-- ══════════════════════════════════════════════════════════
+--  聊天地（讨论区 / 博客）
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS chat_posts (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL,
+  title      TEXT    NOT NULL,
+  content    TEXT    NOT NULL,
+  pinned     INTEGER NOT NULL DEFAULT 0,
+  locked     INTEGER NOT NULL DEFAULT 0,
+  views      INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_posts_user ON chat_posts(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_posts_time ON chat_posts(created_at);
+
+CREATE TABLE IF NOT EXISTS chat_replies (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id    INTEGER NOT NULL,
+  user_id    INTEGER NOT NULL,
+  content    TEXT    NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_replies_post ON chat_replies(post_id);

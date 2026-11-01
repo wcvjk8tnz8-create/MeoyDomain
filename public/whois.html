@@ -18,12 +18,16 @@
     } catch (e) {}
   })();
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="bg"></div>
-<nav class="nav" id="nav"></nav>
+<header class="topbar" id="topbar"></header>
+<aside class="sidebar" id="sidebar"></aside>
 
-<div class="wrap" style="max-width:760px">
+<main class="main"><div class="main-in"><div class="wrap" style="max-width:760px">
   <h1>WHOIS 查询</h1>
   <div class="sub" id="rootTip">查询某个二级子域名的注册状态</div>
   <div class="hint" id="hostTip" style="margin:0 0 12px"></div>
@@ -61,10 +65,11 @@
       · 外部查询结果缓存 6 小时，避免触发上游限流。
     </div>
   </div>
-</div>
+</div></main>
 
 <div id="toast"></div>
 <script src="/js/api.js"></script>
+<script src="/js/shell.js"></script>
 <script>
 let rootDomain = '';
 
@@ -279,7 +284,7 @@ document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 
 })();
 
 // 免登录页面：未登录也正常渲染（若这里要求登录，会与 whois 子域的自动跳转形成死循环）
-mountNav('whois', { optional: true }).then(async (u) => {
+mountShell('whois', { optional: true }).then(async (u) => {
   applyBranding(await loadBranding());
   isLoggedIn = !!u;
   // 登录态变化后再刷一次结果，让「申请」按钮状态正确

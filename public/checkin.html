@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>签到地 · Meoy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<div id="bg"></div>
+<header class="topbar" id="topbar"></header>
+<aside class="sidebar" id="sidebar"></aside>
+<main class="main"><div class="main-in">
+
+  <div class="page-head">
+    <h1 class="page-title">签到地</h1>
+    <p class="page-sub">每天来一次，领取积分</p>
+  </div>
+
+  <div class="card" style="text-align:center;padding:30px 20px">
+    <div id="coin" class="coin">
+      <span class="coin-num" id="ptsNum">—</span>
+      <span class="coin-unit">积分</span>
+    </div>
+    <div class="hint" id="ptsTip" style="margin:8px 0 16px">加载中…</div>
+    <button class="btn primary" id="btnCheck" style="padding:10px 30px;font-size:14px">今日签到</button>
+    <div class="hint" id="checkTip" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>积分明细</h2>
+    <div id="logBox" class="tablewrap"><div class="empty">加载中…</div></div>
+  </div>
+
+  <div class="card flat">
+    <h3>积分怎么用</h3>
+    <div style="color:var(--text-2);font-size:12.5px;line-height:1.9">
+      · 每天签到领 <b id="ruleCheckin">5</b> 分，一天只能领一次。<br>
+      · 申请一个普通子域名消耗 <b id="ruleCost">5</b> 分。<br>
+      · 单字域名（如 <span class="mono">a</span>、<span class="mono">1</span>）需要 <b id="ruleShort">35</b> 分。<br>
+      · 管理员不限积分。<br>
+      · 想要域名永久化或更多配额？去「<a href="/rewards.html" style="color:var(--c1-dim)">奖励中心</a>」用兑换码。
+    </div>
+  </div>
+
+</div></main>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script src="/js/shell.js"></script>
+<script>
+async function load() {
+  try {
+    const d = await api.get('/api/points/me');
+    const unlimited = d.unlimited;
+    document.getElementById('ptsNum').textContent = unlimited ? '∞' : d.points;
+    document.getElementById('ptsTip').textContent = unlimited
+      ? '管理员不限积分'
+      : (d.canCheckIn ? '今天还没有签到' : '今天已签到，明天再来');
+
+    const btn = document.getElementById('btnCheck');
+    const tip = document.getElementById('checkTip');
+    if (unlimited) {
+      btn.disabled = true;
+      btn.textContent = '管理员无需签到';
+      tip.textContent = '';
+    } else if (d.checkedIn) {
+      btn.disabled = true;
+      btn.textContent = '今日已签到';
+      tip.innerHTML = `<span style="color:var(--ok)">明天可再领 ${d.rules.checkin} 分</span>`;
+    } else {
+      btn.disabled = false;
+      btn.textContent = `签到领 ${d.rules.checkin} 分`;
+      tip.textContent = '';
+    }
+
+    const r = d.rules || {};
+    if (r.checkin !== undefined) document.getElementById('ruleCheckin').textContent = r.checkin;
+    if (r.domainCost !== undefined) document.getElementById('ruleCost').textContent = r.domainCost;
+    if (r.shortCost !== undefined) document.getElementById('ruleShort').textContent = r.shortCost;
+
+    const box = document.getElementById('logBox');
+    if (!d.logs || !d.logs.length) { box.innerHTML = '<div class="empty">还没有积分变动</div>'; return; }
+    box.innerHTML = `<table>
+      <thead><tr><th>变动</th><th>余额</th><th>说明</th><th>时间</th></tr></thead>
+      <tbody>${d.logs.map((l) => `<tr>
+        <td class="mono" style="color:${l.delta > 0 ? 'var(--ok)' : 'var(--danger)'}">${l.delta > 0 ? '+' : ''}${l.delta}</td>
+        <td class="mono">${l.balance}</td>
+        <td>${esc(l.reason || '')}${l.detail ? ' <span style="color:var(--muted)">' + esc(l.detail) + '</span>' : ''}</td>
+        <td class="nowrap" style="color:var(--muted)">${fmtTime(l.created_at)}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+document.getElementById('btnCheck').onclick = async () => {
+  const btn = document.getElementById('btnCheck');
+  const coin = document.getElementById('coin');
+  btn.disabled = true;
+  try {
+    const r = await api.post('/api/points/checkin', {});
+    // 弹一下的动画
+    coin.classList.remove('pop');
+    void coin.offsetWidth;
+    coin.classList.add('pop');
+    toast(`签到成功，+${r.gained} 分`);
+    setTimeout(load, 380);
+  } catch (e) { toast(e.message, 'err'); load(); }
+};
+
+(async () => {
+  await mountShell('checkin');
+  load();
+})();
+</script>
+<style>
+.coin { display:inline-flex; align-items:baseline; gap:7px; justify-content:center; }
+.coin-num {
+  font-family: var(--mono);
+  font-size: 44px; font-weight: 700;
+  background: linear-gradient(100deg, var(--c1), var(--c2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  line-height: 1.1;
+}
+.coin-unit { font-size: 13px; color: var(--muted); }
+.coin.pop { animation: coinPop .5s cubic-bezier(.34,1.56,.64,1); }
+@keyframes coinPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+</style>
+</body>
+</html>
