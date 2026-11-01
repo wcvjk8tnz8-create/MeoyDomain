@@ -67,7 +67,10 @@ jobs:
       # R2 存储桶：存在就复用，不存在自动创建（用于自定义头像上传）
       # 头像默认走 Worker 的 /api/avatar/<key> 代理，本身即公网可访问，不需要 R2 公开访问
       # 如需外链直连，可在 Variables 里填 R2_CUSTOM_DOMAIN（如 img.meoy.top）
+      # 注意：用 always() 放行 —— R2 准备失败时脚本会自动移除绑定并降级，
+      # 站点功能不受影响（仅上传自定义头像不可用），不应阻断部署。
       - name: 准备 R2 存储桶
+        continue-on-error: true
         run: node scripts/ensure-r2.mjs
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
