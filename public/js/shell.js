@@ -23,6 +23,59 @@ const SHELL_ICON = {
   logout: '<path d="M5 3h9a1 1 0 0 1 1 1v4h-2V5H6v14h7v-3h2v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm9.6 4.6 1.4 1.4L18 11H9v2h9l-2 2-1.4 1.4L19.2 11l-4.6-4.6Z"/>',
 };
 
+/* ---------- 品牌信息缓存（避免每次切页都等一个网络往返） ---------- */
+const BRAND_KEY = 'meoy_brand';
+const BRAND_TTL = 5 * 60 * 1000;   // 5 分钟
+
+function readBrandCache() {
+  try {
+    const raw = sessionStorage.getItem(BRAND_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || Date.now() - o.t > BRAND_TTL) return null;
+    return o.v;
+  } catch { return null; }
+}
+
+function writeBrandCache(v) {
+  try { sessionStorage.setItem(BRAND_KEY, JSON.stringify({ t: Date.now(), v })); } catch {}
+}
+
+/** 就地更新品牌（顶栏 logo / 站点名 / 标题） */
+function applyBrand(b) {
+  document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = b.siteName));
+  const li = document.getElementById('topLogo');
+  if (li && li.src !== b.logoUrl) li.src = b.logoUrl;
+  const t = document.title;
+  const i = t.lastIndexOf(' · ');
+  if (i > 0) document.title = t.slice(0, i) + ' · ' + b.siteName;
+}
+
+/* ---------- 链接预取：hover / 空闲时把目标页 HTML 拉进缓存 ---------- */
+const prefetched = new Set();
+function prefetch(url) {
+  if (!url || prefetched.has(url)) return;
+  prefetched.add(url);
+  try {
+    const l = document.createElement('link');
+    l.rel = 'prefetch';
+    l.as = 'document';
+    l.href = url;
+    document.head.appendChild(l);
+  } catch {}
+}
+
+/** 侧栏链接 hover 即预取，点击时几乎瞬时 */
+function bindPrefetch(root) {
+  (root || document).querySelectorAll('#sidebar a[href], .top-brand[href]').forEach((a) => {
+    const h = a.getAttribute('href') || '';
+    if (!h || h.charAt(0) !== '/' || h.indexOf('.html') < 0) return;
+    const go = () => prefetch(h);
+    a.addEventListener('mouseenter', go, { once: true, passive: true });
+    a.addEventListener('touchstart', go, { once: true, passive: true });
+  });
+}
+
 /** 生成侧边栏一项 */
 function shellItem(it, active, isAdmin) {
   if (it.key === 'admin' && !isAdmin) return '';
@@ -43,6 +96,9 @@ async function mountShell(active, opt = {}) {
   const side = document.getElementById('sidebar');
   if (!host || !side) return;
 
+  // 品牌信息走 sessionStorage 缓存，命中时不等待网络 —— 切页零阻塞
+  let brand = readBrandCache() || { siteName: 'Meoy', logoUrl: '/img/logo.jpg' };
+
   let me = null;
   try {
     const r = await api.get('/api/auth/me');
@@ -50,14 +106,13 @@ async function mountShell(active, opt = {}) {
   } catch { me = null; }
   if (!me && !opt.optional) { location.href = '/'; return; }
 
-  let brand = { siteName: 'Meoy', logoUrl: '/img/logo.jpg' };
-  try {
-    const cfg = await api.get('/api/config');
-    brand = { siteName: cfg.siteName || cfg.site_name || 'Meoy', logoUrl: cfg.logoUrl || cfg.logo_url || '/img/logo.jpg' };
-  } catch {}
   document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = brand.siteName));
-  const li = document.getElementById('topLogo');
-  if (li) li.src = brand.logoUrl;
+  // 后台刷新品牌（不阻塞渲染），拿到后再就地更新
+  api.get('/api/config').then((cfg) => {
+    const b = { siteName: cfg.siteName || cfg.site_name || 'Meoy', logoUrl: cfg.logoUrl || cfg.logo_url || '/img/logo.jpg' };
+    writeBrandCache(b);
+    if (b.siteName !== brand.siteName || b.logoUrl !== brand.logoUrl) applyBrand(b);
+  }).catch(() => {});
 
   const isAdmin = me && me.role === 'admin';
 
@@ -105,7 +160,17 @@ async function mountShell(active, opt = {}) {
   const sl = document.getElementById('sideLogout');
   if (sl) sl.onclick = (e) => { e.preventDefault(); out(); };
 
+  bindPrefetch(side);
+  // 空闲时预取其余常用页（不抢占当前页资源）
+  idle(() => ['/dashboard.html', '/whois.html', '/checkin.html', '/rewards.html', '/chat.html'].forEach(prefetch));
+
   // 入场动画
   document.body.classList.add('shell-ready');
   return me;
+}
+
+/** requestIdleCallback 兜底 */
+function idle(fn) {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout: 2500 });
+  else setTimeout(fn, 1200);
 }
