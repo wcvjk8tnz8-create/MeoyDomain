@@ -9,6 +9,13 @@ binding = "ASSETS"
 # 由 Worker 先处理（whois 子域的服务端重定向需要），处理完再回落到静态资源
 run_worker_first = true
 
+# R2 对象存储：用于用户上传自定义头像（可选）
+# 创建：npx wrangler r2 bucket create meoy-avatars
+# 若不使用自定义头像上传，可整段删除（上传接口会自动禁用）
+[[r2_buckets]]
+binding = "AVATARS"
+bucket_name = "meoy-avatars"
+
 # D1 数据库
 [[d1_databases]]
 binding = "DB"
@@ -30,6 +37,11 @@ REQUIRE_APPROVAL = "1"
 RESERVED_LABELS = "www,ns1,ns2,ns3,ns4,mail,admin,api,cdn,ftp,smtp,pop,imap,mx,test,blog,shop,app,dns,dns1,dns2,root,support,help,docs,status,panel,cloud,dev,git,ssh,mysql,db,web,forum,bbs,home,search,whois,dnshe,anyns,ns,cdn1,cname,static,assets,img,image,img1,cdn2,img2"
 # 调试用：置为 "1" 时不真实调用 Cloudflare API，改为内存模拟（方便本地跑通流程）
 CF_MOCK = "0"
+# R2 公开访问域名（留空则用默认 /api/avatar/<key> 代理读取）
+# 建议在 R2 桶设置里绑定自定义域（如 img.meoy.top），填到这里可直接外链，省 Worker 流量
+R2_PUBLIC_URL = ""
+# 头像上传大小上限（KB）
+AVATAR_MAX_KB = "2048"
 
 # 以下敏感值用 secret 写入，不要写在这里：
 #   npx wrangler secret put CF_API_TOKEN

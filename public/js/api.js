@@ -281,7 +281,11 @@ async function mountNav(active, opts = {}) {
 
 function openModal(title, html) {
   const m = document.getElementById('modal');
-  m.querySelector('.box').innerHTML = `<h2>${esc(title)}</h2>${html}`;
+  if (!m) return;
+  // 兼容两种结构：旧页 <div class="box">，新页 <div class="modal-card" id="modalCard">
+  const box = m.querySelector('.modal-card') || m.querySelector('.box');
+  if (!box) return;
+  box.innerHTML = `<h2>${esc(title)}</h2>${html}`;
   m.classList.add('show');
 }
 function closeModal() {

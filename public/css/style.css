@@ -1489,3 +1489,77 @@ input:focus, select:focus, textarea:focus {
   font-size: 11px;
   display: flex; align-items: center; justify-content: center;
 }
+
+/* ══════════════════════════════════════════════════════════
+   工单系统 / 域名转移
+   ══════════════════════════════════════════════════════════ */
+
+/* ---------- 四步进度条 ---------- */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 700px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.step {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  transition: background .18s, border-color .18s, color .18s;
+}
+.s-num {
+  width: 22px; height: 22px; flex: 0 0 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-family: var(--display);
+  font-size: 11.5px; font-weight: 700;
+}
+.s-txt { font-family: var(--display); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step.done { border-color: hsl(var(--primary) / .4); color: hsl(var(--foreground)); }
+.step.done .s-num { background: hsl(var(--primary) / .15); color: hsl(var(--primary)); }
+.step.on {
+  background: hsl(var(--primary) / .08);
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+.step.on .s-num { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+
+/* 须知列表 */
+.notice-list ol { margin: 0; padding-left: 20px; }
+.notice-list li { font-size: 12.5px; color: hsl(var(--text-2)); margin-bottom: 6px; line-height: 1.7; }
+
+/* ---------- 工单回复 ---- */
+.reply-box {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 2px;
+}
+.reply {
+  padding: 10px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--background));
+}
+.reply.admin { background: hsl(var(--primary) / .05); border-color: hsl(var(--primary) / .28); }
+.r-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.r-who {
+  font-family: var(--display);
+  font-size: 12px; font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.reply.admin .r-who { color: hsl(var(--primary)); }
+.r-time { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.r-body { font-size: 12.5px; color: hsl(var(--text-2)); line-height: 1.7; word-break: break-word; }
+
+/* 警告条（转移不可逆） */
+.alert.warn {
+  background: hsl(var(--warning) / .1);
+  border-color: hsl(var(--warning) / .3);
+  color: hsl(38 92% 38%);
+}

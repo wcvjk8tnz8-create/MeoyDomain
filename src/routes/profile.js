@@ -27,6 +27,8 @@ function safeAvatar(v) {
   const s = String(v || '').trim();
   if (!s) return DEFAULT_AVATAR;
   if (AVATARS.some((a) => a.url === s)) return s;
+  // 本站 R2 上传的头像：/api/avatar/<key>（key 限制为安全字符）
+  if (/^\/api\/avatar\/[A-Za-z0-9._-]{1,120}$/.test(s)) return s;
   if (/^https:\/\/[^\s"']+\.(png|jpe?g|gif|webp|svg)(\?[^\s"']*)?$/i.test(s)) return s.slice(0, 500);
   return null; // 非法
 }
@@ -114,6 +116,58 @@ app.put('/', async (c) => {
   return ok(c, {
     profile: { uid: p.uid, avatar: p.avatar || DEFAULT_AVATAR, nickname: p.nickname || '', bio: p.bio || '' },
   });
+});
+
+
+/** POST /api/profile/avatar —— 上传自定义头像到 R2（multipart/form-data） */
+app.post('/avatar', async (c) => {
+  const u = c.get('user');
+  if (!u) return fail(c, '请先登录', 401, { needLogin: true });
+  if (!c.env.AVATARS) return fail(c, '未启用头像存储（R2），请联系管理员配置', 501);
+
+  let form;
+  try { form = await c.req.formData(); } catch { return fail(c, '上传格式不正确'); }
+  const file = form.get('file');
+  if (!file || typeof file === 'string') return fail(c, '请选择图片文件');
+
+  const maxKb = Number(c.env.AVATAR_MAX_KB || 2048);
+  if (file.size > maxKb * 1024) return fail(c, `图片不能超过 ${maxKb} KB`);
+  if (file.size < 16) return fail(c, '图片文件无效');
+
+  // 只接受图片类型
+  const type = String(file.type || '').toLowerCase();
+  const extMap = {
+    'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg',
+    'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
+  };
+  const ext = extMap[type];
+  if (!ext) return fail(c, '仅支持 PNG / JPG / GIF / WebP / SVG 图片');
+  if (ext === 'svg') return fail(c, '出于安全考虑不支持 SVG，请上传 PNG / JPG');
+
+  // 读取前 8 字节校验图片魔数，防止伪造 Content-Type
+  const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const magicOk =
+    (ext === 'png' && head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) ||
+    (ext === 'jpg' && head[0] === 0xff && head[1] === 0xd8) ||
+    (ext === 'gif' && head[0] === 0x47 && head[1] === 0x49 && head[2] === 0x46) ||
+    (ext === 'webp' && head[0] === 0x52 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x46);
+  if (!magicOk) return fail(c, '文件内容与声明的类型不符，请上传真实图片');
+
+  const key = `u${u.id}-${Date.now().toString(36)}.${ext}`;
+  await c.env.AVATARS.put(key, await file.arrayBuffer(), {
+    httpMetadata: { contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}` },
+  });
+
+  const publicBase = String(c.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, '');
+  const url = publicBase ? `${publicBase}/${key}` : `/api/avatar/${key}`;
+
+  await loadProfile(c.env, u.id);
+  await c.env.DB.prepare('UPDATE user_profiles SET avatar = ?, updated_at = ? WHERE user_id = ?')
+    .bind(url, now(), u.id)
+    .run();
+  await audit(c, u.id, 'user.avatar.upload', u.email, key);
+
+  return ok(c, { url, key });
 });
 
 export default app;

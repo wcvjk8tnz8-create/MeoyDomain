@@ -11,6 +11,8 @@ const SHELL_NAV = [
   { key: 'whois', name: 'WHOIS 查询', icon: 'search', href: '/whois.html' },
   { key: 'chat', name: '聊天地', icon: 'chat', href: '/chat.html' },
   { key: 'profile', name: '个人资料', icon: 'user', href: '/profile.html' },
+  { key: 'tickets', name: '工单系统', icon: 'ticket', href: '/tickets.html' },
+  { key: 'transfer', name: '域名转移', icon: 'swap', href: '/transfer.html' },
 ];
 
 const SHELL_ICON = {
@@ -20,6 +22,8 @@ const SHELL_ICON = {
   search: '<path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/>',
   chat: '<path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1Zm2 4v2h12V7H6Zm0 4v2h9v-2H6Z"/>',
   user: '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.4-8 5.3V22h16v-2.7c0-2.9-3.6-5.3-8-5.3Z"/>',
+  ticket: '<path d="M4 3h16a1 1 0 0 1 1 1v5a2 2 0 0 0 0 4v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a2 2 0 0 0 0-4V4a1 1 0 0 1 1-1Zm7 4v2H6v2h5v2h2v-2h5v-2h-5V7h-2Z"/>',
+  swap: '<path d="M7 4 3 8l4 4V9h9a2 2 0 0 1 2 2v1h2v-1a4 4 0 0 0-4-4H7V4Zm10 12 4-4-4-4v3H8a2 2 0 0 0-2 2v1H4v-1a4 4 0 0 1 4-4h9v3Z"/>',
   admin: '<path d="M12 2 3 6v6c0 5 3.8 9.4 9 10 5.2-.6 9-5 9-10V6l-9-4Zm0 2.2 7 3.1V12c0 4-2.9 7.5-7 8-4.1-.5-7-4-7-8V7.3l7-3.1Zm-1 4v2H8v2h3v2h2v-2h3v-2h-3V8.2h-2Z"/>',
   terms: '<path d="M6 2h9l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 2v4h4l-4-4ZM8 11h8v2H8v-2Zm0 4h8v2H8v-2Z"/>',
   logout: '<path d="M5 3h9a1 1 0 0 1 1 1v4h-2V5H6v14h7v-3h2v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm9.6 4.6 1.4 1.4L18 11H9v2h9l-2 2-1.4 1.4L19.2 11l-4.6-4.6Z"/>',
@@ -229,7 +233,20 @@ async function mountShell(active, opt = {}) {
     </div>`;
 
   const tg = document.getElementById('sideToggle');
-  if (tg) tg.onclick = () => document.body.classList.toggle('side-open');
+  const setSide = (open) => document.body.classList.toggle('side-open', open);
+  if (tg) tg.onclick = () => setSide(!document.body.classList.contains('side-open'));
+  // 移动端：点遮罩关闭、Esc 关闭、点菜单项后自动关闭（此前只能再点汉堡，容易「卡住」）
+  document.addEventListener('click', (e) => {
+    if (!document.body.classList.contains('side-open')) return;
+    if (e.target.closest?.('#sideToggle') || e.target.closest?.('.sidebar')) {
+      if (e.target.closest?.('.side-item')) setSide(false);   // 选中导航后收起
+      return;
+    }
+    setSide(false);   // 点遮罩/其它区域 → 关闭
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { setSide(false); const mm = document.getElementById('userMenu'); if (mm) { mm.classList.remove('on'); document.getElementById('userChip')?.classList.remove('on'); } }
+  });
 
   /* 用户菜单：点 chip 展开，点外部或按 Esc 关闭 */
   const chip = document.getElementById('userChip');

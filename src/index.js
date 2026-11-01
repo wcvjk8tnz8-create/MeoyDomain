@@ -13,6 +13,8 @@ import adminRoutes from './routes/admin.js';
 import redeemRoutes from './routes/redeem.js';
 import chatRoutes from './routes/chat.js';
 import profileRoutes from './routes/profile.js';
+import ticketRoutes from './routes/tickets.js';
+import transferRoutes from './routes/transfer.js';
 
 const app = new Hono();
 
@@ -72,6 +74,20 @@ app.get('/api/health', (c) =>
   ok(c, { ok: true, root: c.env.ROOT_DOMAIN, mock: c.env.CF_MOCK === '1', time: new Date().toISOString() })
 );
 
+// 头像读取代理（未配置 R2 公开域名时走这里；已配置则可直连 R2）
+app.get('/api/avatar/:key', async (c) => {
+  const key = String(c.req.param('key') || '');
+  if (!/^[A-Za-z0-9._-]{1,120}$/.test(key)) return c.text('bad key', 400);
+  if (!c.env.AVATARS) return c.text('avatar storage not configured', 404);
+  const obj = await c.env.AVATARS.get(key);
+  if (!obj) return c.text('not found', 404);
+  const headers = new Headers();
+  headers.set('Content-Type', obj.httpMetadata?.contentType || 'image/png');
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  return new Response(obj.body, { headers });
+});
+
 // 前端初始化配置
 // 公开配置（含站点品牌，登录页也要用）
 app.get('/api/config', async (c) => {
@@ -110,9 +126,13 @@ app.use('/api/admin/*', requireAuth, requireAdmin);
 app.use('/api/redeem/*', requireAuth);
 app.use('/api/chat/*', requireAuth);
 app.use('/api/profile/*', requireAuth);
+app.use('/api/tickets/*', requireAuth);
+app.use('/api/transfer/*', requireAuth);
 
 app.route('/api', recordRoutes);
 app.route('/api/profile', profileRoutes);
+app.route('/api/tickets', ticketRoutes);
+app.route('/api/transfer', transferRoutes);
 app.route('/api/points', pointRoutes);
 app.route('/api/subdomains', subdomainRoutes);
 // NS 委派：/api/delegation/providers 与 /api/subdomains/:id/delegation

@@ -278,3 +278,35 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   bio         TEXT,                       -- 个人简介 / 签名
   updated_at  INTEGER
 );
+
+-- 工单系统
+CREATE TABLE IF NOT EXISTS tickets (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL,
+  subject    TEXT    NOT NULL,
+  status     TEXT    NOT NULL DEFAULT 'open',   -- open=待处理 pending=处理中 answered=有回复 closed=已关闭
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ticket_replies (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id  INTEGER NOT NULL,
+  user_id    INTEGER NOT NULL,
+  is_admin   INTEGER NOT NULL DEFAULT 0,
+  content    TEXT    NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_replies_ticket ON ticket_replies(ticket_id, id);
+
+-- 域名转移记录（不可逆，留痕备查）
+CREATE TABLE IF NOT EXISTS transfers (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  subdomain_id INTEGER NOT NULL,
+  fqdn         TEXT    NOT NULL,
+  from_user    INTEGER NOT NULL,
+  to_user      INTEGER NOT NULL,
+  to_email     TEXT    NOT NULL,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_transfers_fqdn ON transfers(fqdn, created_at DESC);
