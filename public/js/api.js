@@ -25,10 +25,47 @@ const api = {
   del: (p) => api.req('DELETE', p),
 };
 
-/* ---------- 壁纸：初音未来 / GUMI ---------- */
+/* ---------- 樱花飘落（合成器动画，不触发重排） ---------- */
+function mountSakura() {
+  if (document.getElementById('sakura')) return;
+  // 减少动态效果偏好时不开；小屏减少数量省性能
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  if (reduce) return;
+  const narrow = window.innerWidth < 720;
+  const n = narrow ? 9 : 16;
+
+  const box = document.createElement('div');
+  box.id = 'sakura';
+  box.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('i');
+    p.className = 'petal';
+    // 随机化：位置、时长、延迟、横向漂移、旋转、大小
+    p.style.left = (Math.random() * 100).toFixed(2) + 'vw';
+    p.style.setProperty('--dx', (Math.random() * 24 - 12).toFixed(1) + 'vw');
+    p.style.setProperty('--rot', (Math.random() * 720 - 360).toFixed(0) + 'deg');
+    p.style.animationDuration = (13 + Math.random() * 9).toFixed(1) + 's';
+    p.style.animationDelay = (-Math.random() * 18).toFixed(1) + 's';
+    p.style.width = p.style.height = (7 + Math.random() * 6).toFixed(1) + 'px';
+    p.style.opacity = (0.5 + Math.random() * 0.4).toFixed(2);
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+}
+
+/* ---------- 猫爪 SVG（站点吉祥物，多处复用） ---------- */
+const PAW_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  '<ellipse cx="7" cy="8.5" rx="2.1" ry="2.6"/>' +
+  '<ellipse cx="12" cy="7" rx="2.1" ry="2.7"/>' +
+  '<ellipse cx="17" cy="8.5" rx="2.1" ry="2.6"/>' +
+  '<path d="M12 12c3.4 0 6 2.1 6 4.6 0 2.2-1.9 3.6-4.2 3.6h-3.6C8 20.2 6 18.8 6 16.6 6 14.1 8.6 12 12 12Z"/>' +
+  '</svg>';
+
+/* ---------- 壁纸：樱花猫 ---------- */
 const WALLPAPERS = [
-  { key: 'miku', name: 'Miku', url: '/img/miku.jpg' },
-  { key: 'gumi', name: 'GUMI', url: '/img/gumi.jpg' },
+  { key: 'sakura1', name: '樱花喵 1', url: '/img/sakura1.jpg' },
+  { key: 'sakura2', name: '樱花喵 2', url: '/img/sakura2.jpg' },
 ];
 
 function applyWallpaper(key) {
@@ -45,8 +82,8 @@ function applyWallpaper(key) {
 }
 
 function mountWallpaper() {
-  let saved = 'miku';
-  try { saved = localStorage.getItem('meoy_wallpaper') || 'miku'; } catch {}
+  let saved = 'sakura1';
+  try { saved = localStorage.getItem('meoy_wallpaper') || 'sakura1'; } catch {}
   applyWallpaper(saved);
 }
 
@@ -240,3 +277,6 @@ document.addEventListener('click', (e) => {
 try { sessionStorage.removeItem('meoy_whois_n'); } catch {}
 
 mountWallpaper();
+// 樱花飘落：等首屏内容就绪再挂，不抢占渲染
+if (document.readyState === 'complete') setTimeout(mountSakura, 400);
+else window.addEventListener('load', () => setTimeout(mountSakura, 400), { once: true });

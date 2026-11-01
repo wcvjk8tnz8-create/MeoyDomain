@@ -151,6 +151,7 @@ async function mountShell(active, opt = {}) {
       <a class="top-brand" href="/dashboard.html">
         <img id="topLogo" src="${esc(brand.logoUrl)}" alt="">
         <span data-brand-name>${esc(brand.siteName)}</span>
+        <span class="paw" title="喵">${PAW_SVG}</span>
       </a>
       <div class="top-right">
         ${me
