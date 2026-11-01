@@ -113,7 +113,8 @@ document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 
   if (!pre) {
     const seg = location.pathname.split('/').filter(Boolean);
     const last = seg[seg.length - 1] || '';
-    if (last && last.toLowerCase() !== 'whois.html') pre = decodeURIComponent(last);
+    // 排除页面自身路径（whois / whois.html），否则访问 /whois 会把 "whois" 当成查询目标
+    if (last && !/^whois(\.html)?$/i.test(last)) pre = decodeURIComponent(last);
   }
   if (pre) { document.getElementById('q').value = pre; doQuery(); }
 

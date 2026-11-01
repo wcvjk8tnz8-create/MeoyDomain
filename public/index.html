@@ -7,47 +7,81 @@
 <link rel="stylesheet" href="/css/style.css">
 <script>
   /* ── 入口分流（同步执行，早于页面渲染）──
+     默认显示登录页；只有确认要跳转时才由 JS 主动隐藏，避免任何异常导致白/黑屏。
      1) whois.<根域名> → WHOIS 查询页（免登录）
      2) 已登录 → 直接进控制台，不再闪登录页
      加 ?login=1 可强制留在登录页（切换账号用） */
   (function () {
+    var root = document.documentElement;
+    var settled = false;
+
+    // 显示登录页（隐藏由 JS 主动加，失败/超时一律恢复显示）
+    function show() {
+      if (settled) return;
+      settled = true;
+      root.classList.remove('auth-probing');
+      var tip = document.getElementById('jumpTip');
+      if (tip && tip.parentNode) tip.parentNode.removeChild(tip);
+    }
+    // 隐藏登录页（仅在确定要跳转时）
+    function hide() { root.classList.add('auth-probing'); }
+
     var qs = location.search || '';
     var wantLogin = /(?:^|[?&])login=1(?:&|$)/.test(qs);
     var p = location.pathname.replace(/^\/+|\/+$/g, '');
     var seg0 = (p.split('/')[0] || '');
+
+    // 兜底：任何原因导致 2.5 秒内没跳转成功，就恢复显示登录页
+    setTimeout(show, 2500);
+    // 页面完全加载后仍未跳转也恢复显示
+    window.addEventListener('load', function () { setTimeout(show, 600); });
 
     // 1) whois.<根域名>：一律落到 WHOIS 查询页（该页免登录，不会跳回来）。
     //    带计数熔断，万一将来 whois 页又要求登录也不会无限刷新。
     try {
       var parts = location.hostname.toLowerCase().split('.');
       if (parts.length >= 3 && parts[0] === 'whois') {
-        if (/^whois(\.html)?$/i.test(seg0)) return;        // 已经到了
+        if (/^whois(\.html)?$/i.test(seg0)) { show(); return; }   // 已经到了
         var n = Number(sessionStorage.getItem('meoy_whois_n') || '0');
-        if (n >= 3) { document.documentElement.setAttribute('data-auth', 'guest'); return; }
+        if (n >= 3) { show(); return; }                            // 熔断：停在登录页，别空转
         sessionStorage.setItem('meoy_whois_n', String(n + 1));
+        hide();
+        // 显示跳转提示，避免跳转挂起时看到纯黑屏
+        try {
+          var tip = document.createElement('div');
+          tip.id = 'jumpTip';
+          tip.textContent = '正在跳转到 WHOIS 查询…';
+          document.documentElement.appendChild(tip);
+        } catch (e) {}
         location.replace('/whois.html' + qs);
+        // replace 若被拦截/挂起，兜底会把页面显示回来
         return;
       }
-    } catch (e) {}
+    } catch (e) { show(); }
 
     // 2) 已登录直接进控制台
-    if (wantLogin) { document.documentElement.setAttribute('data-auth', 'guest'); return; }
-    window.__authProbe = fetch('/api/auth/me', { headers: { Accept: 'application/json' } })
+    if (wantLogin) { show(); return; }
+    hide();
+    var done = false;
+    fetch('/api/auth/me', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('guest')); })
       .then(function (d) {
-        if (d && d.success && d.user) { location.replace('/dashboard'); return null; }
-        document.documentElement.setAttribute('data-auth', 'guest');
-        return null;
+        if (d && d.success && d.user) { done = true; location.replace('/dashboard'); }
+        else show();
       })
-      .catch(function () {
-        document.documentElement.setAttribute('data-auth', 'guest');
-        return null;
-      });
+      .catch(function () { show(); });
+    // 探测超过 2 秒没结果就不等了，直接显示登录页
+    setTimeout(function () { if (!done) show(); }, 2000);
   })();
 </script>
 <style>
-  /* 未确定登录态前不显示登录表单，避免已登录用户看到闪屏 */
-  html:not([data-auth]) .auth-wrap { visibility: hidden; }
+  /* 仅在 JS 确认要跳转时由 .auth-probing 触发；默认不隐藏，杜绝异常黑屏 */
+  html.auth-probing .auth-wrap { visibility: hidden; }
+  #jumpTip {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 10001; font-family: var(--mono, monospace); font-size: 13px;
+    color: #00e5ff; letter-spacing: .5px;
+  }
 </style>
 </head>
 <body>
