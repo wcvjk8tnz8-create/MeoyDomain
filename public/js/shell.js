@@ -76,6 +76,26 @@ function bindPrefetch(root) {
   });
 }
 
+/* ---------- 用户信息缓存：切页时侧栏立即渲染，不等网络 ---------- */
+const USER_KEY = 'meoy_user';
+
+function readUserCache() {
+  try {
+    const raw = sessionStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function writeUserCache(u) {
+  try { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); } catch {}
+}
+
+// 注意：shell.js 以普通 <script> 加载，不能用 export 语法
+function clearUserCache() {
+  try { sessionStorage.removeItem(USER_KEY); } catch {}
+}
+
 /** 生成侧边栏一项 */
 function shellItem(it, active, isAdmin) {
   if (it.key === 'admin' && !isAdmin) return '';
@@ -96,15 +116,22 @@ async function mountShell(active, opt = {}) {
   const side = document.getElementById('sidebar');
   if (!host || !side) return;
 
-  // 品牌信息走 sessionStorage 缓存，命中时不等待网络 —— 切页零阻塞
+  // 品牌 + 用户信息都走 sessionStorage 缓存，命中时不等待任何网络往返 —— 切页零阻塞
   let brand = readBrandCache() || { siteName: 'Meoy', logoUrl: '/img/logo.jpg' };
+  let me = readUserCache();
 
-  let me = null;
-  try {
-    const r = await api.get('/api/auth/me');
-    me = (r && r.user) || r || null;   // 接口返回 { success, user }
-  } catch { me = null; }
-  if (!me && !opt.optional) { location.href = '/'; return; }
+  // 无缓存时才等网络（首次进入 / 硬刷新）
+  if (!me || !me.id) {
+    try {
+      const r = await api.get('/api/auth/me');
+      me = (r && r.user) || r || null;   // 接口返回 { success, user }
+      if (me && me.id) writeUserCache(me);
+    } catch { me = null; }
+  }
+  if (!me || !me.id) {
+    if (!opt.optional) { location.href = '/'; return; }
+    me = null;
+  }
 
   document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = brand.siteName));
   // 后台刷新品牌（不阻塞渲染），拿到后再就地更新
@@ -152,6 +179,7 @@ async function mountShell(active, opt = {}) {
   if (tg) tg.onclick = () => document.body.classList.toggle('side-open');
 
   const out = async () => {
+    clearUserCache();
     try { await api.post('/api/auth/logout', {}); } catch {}
     location.href = '/?login=1';
   };

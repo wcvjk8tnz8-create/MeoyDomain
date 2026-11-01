@@ -42,10 +42,15 @@
   --shadow: 0 6px 22px rgba(120, 100, 190, .18), 0 2px 6px rgba(120, 100, 190, .1);
   --glow: 0 6px 18px rgba(123, 108, 246, .35);
 
-  /* 字体：Redaction 35（拉丁/数字） + 中文圆体（dnsneko 那种柔和感） */
-  --sans: 'Redaction 35', 'GenSenRounded', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  --cn: 'GenSenRounded', 'ZCOOL KuaiLe', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --mono: 'Redaction 35', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* 字体：Redaction 35（拉丁/数字） + 圆体（中文）
+     圆体优先用 Google Fonts 的 Zen Maru Gothic / M PLUS Rounded 1c（含汉字），
+     日文中没有的简体特有字回落 Noto Sans SC。 */
+  --rounded: 'Zen Maru Gothic', 'M PLUS Rounded 1c', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --sans: 'Redaction 35', var(--rounded);
+  --cn: var(--rounded);
+  /* 等宽栈也改为 Redaction 35 优先 —— 用户要求全局统一字体。
+     域名/记录值改用 tabular-nums 保持数字对齐，不再使用系统等宽字体。 */
+  --mono: 'Redaction 35', var(--rounded);
 }
 
 * { box-sizing: border-box; }
@@ -127,7 +132,7 @@ h3 { font-size: 12.5px; font-family: var(--mono); text-transform: uppercase; let
 
 .sub { color: var(--muted); font-size: 12px; }
 .dim { color: var(--muted); font-size: 12px; }
-.mono, code { font-family: var(--mono); }
+.mono, code { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 a { color: var(--c1); text-decoration: none; }
 a:hover { text-decoration: underline; text-shadow: var(--glow); }
@@ -291,7 +296,7 @@ tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--c1); }
 .right { text-align: right; }
 .nowrap { white-space: nowrap; }
 .empty { text-align: center; color: var(--muted); padding: 26px 0; font-family: var(--mono); font-size: 12px; }
-.fqdn { font-family: var(--mono); font-size: 13px; color: var(--ink); font-weight: 600; }
+.fqdn { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink); font-weight: 600; }
 tr.locked td { background: rgba(185, 140, 255, .1); }
 tr.rejected td { background: rgba(255, 92, 114, .09); }
 
