@@ -5,7 +5,24 @@
 //  3) Mock（CF_MOCK=1）：内存模拟，方便本地跑通全部流程
 // ============================================================
 
+import { zoneIdFor, matchRoot } from './roots.js';
+
 const BASE = 'https://api.cloudflare.com/client/v4';
+
+/**
+ * 取得某个域名对应的 Zone ID。
+ * 支持多根域名：优先按域名查 CF_ZONE_IDS 映射，查不到再回落默认 CF_ZONE_ID。
+ * @param {any} env
+ * @param {string} [domain] 域名或 FQDN，如 meoy.top / mail.meoy.top
+ */
+export function zoneFor(env, domain) {
+  if (!domain) return String(env.CF_ZONE_ID || '').trim();
+  const direct = zoneIdFor(env, domain);
+  if (direct) return direct;
+  const root = matchRoot(env, domain);
+  if (root?.zoneId) return root.zoneId;
+  return String(env.CF_ZONE_ID || '').trim();
+}
 
 /* ---------- 自定义 DNS 提供商配置 ----------
    站点设置键：dns_api_url / dns_api_key / dns_api_secret
@@ -44,6 +61,16 @@ export async function dnsProvider(env) {
   customCache = cfg;
   customAt = nowTs;
   return cfg;
+}
+
+/**
+ * 与 dnsProvider 相同，但把 zone 换成「指定域名」对应的 Zone ID（多根域名）。
+ * 未传 domain 时行为与 dnsProvider 完全一致。
+ */
+export async function dnsProviderFor(env, domain) {
+  const p = await dnsProvider(env);
+  if (!domain) return p;
+  return { ...p, zone: zoneFor(env, domain) };
 }
 
 /** 后台改了配置后清空缓存，使其立即生效 */
@@ -94,9 +121,9 @@ async function mockCreate(payload) {
   return { ok: true, result: mockStore.get(id) };
 }
 
-export async function cfCreate(env, payload) {
+export async function cfCreate(env, payload, domain) {
   if (env.CF_MOCK === '1' || env.CF_MOCK === 'true') return mockCreate(payload);
-  const p = await dnsProvider(env);
+  const p = await dnsProviderFor(env, domain);
   const r = await fetch(recordsPath(p), {
     method: 'POST',
     headers: authHeaders(env, p),
@@ -105,7 +132,7 @@ export async function cfCreate(env, payload) {
   return cfParse(r);
 }
 
-export async function cfUpdate(env, id, payload) {
+export async function cfUpdate(env, id, payload, domain) {
   if (env.CF_MOCK === '1' || env.CF_MOCK === 'true') {
     const old = mockStore.get(id);
     if (!old) return { ok: false, errors: [{ message: '记录不存在（mock）' }] };
@@ -120,7 +147,7 @@ export async function cfUpdate(env, id, payload) {
     });
     return { ok: true, result: old };
   }
-  const p = await dnsProvider(env);
+  const p = await dnsProviderFor(env, domain);
   const r = await fetch(`${recordsPath(p)}/${id}`, {
     method: 'PATCH',
     headers: authHeaders(env, p),
@@ -129,12 +156,12 @@ export async function cfUpdate(env, id, payload) {
   return cfParse(r);
 }
 
-export async function cfDelete(env, id) {
+export async function cfDelete(env, id, domain) {
   if (env.CF_MOCK === '1' || env.CF_MOCK === 'true') {
     mockStore.delete(id);
     return { ok: true, result: { id } };
   }
-  const p = await dnsProvider(env);
+  const p = await dnsProviderFor(env, domain);
   const r = await fetch(`${recordsPath(p)}/${id}`, {
     method: 'DELETE',
     headers: authHeaders(env, p),

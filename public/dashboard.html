@@ -79,7 +79,7 @@
         <label>子域名</label>
         <div class="row" style="gap:0;flex-wrap:nowrap">
           <input id="label" placeholder="mail" style="border-radius:var(--radius-s) 0 0 var(--radius-s);border-right:none" autocomplete="off">
-          <span class="mono" style="padding:0 11px;background:rgba(90,169,230,.12);border:1px solid var(--line);border-radius:0 var(--radius-s) var(--radius-s) 0;display:flex;align-items:center;white-space:nowrap;color:var(--c1);font-size:12px">.<span id="rootDomain"></span></span>
+          <span class="mono" id="rootWrap" style="padding:0 11px;background:rgba(90,169,230,.12);border:1px solid var(--line);border-radius:0 var(--radius-s) var(--radius-s) 0;display:flex;align-items:center;white-space:nowrap;color:var(--c1);font-size:12px">.<span id="rootDomain"></span></span>
         </div>
         <div class="hint" id="checkTip"></div>
       </div>
@@ -316,11 +316,52 @@ function renderPage() {
   });
 }
 
+/* ---------- 多根域名 ---------- */
+let ROOTS = [];
+
+function rootQuery() {
+  const r = currentRoot();
+  return r ? '&root=' + encodeURIComponent(r) : '';
+}
+
+function currentRoot() {
+  const sel = document.getElementById('rootDomainSel');
+  if (sel && sel.value) return sel.value;
+  return ROOTS[0] || '';
+}
+
+/* 单个根域名：保持原来的静态后缀；多个：换成下拉选择 */
+async function setupRoots() {
+  try {
+    const cfg = await api.get('/api/config');
+    const list = Array.isArray(cfg.rootDomains) && cfg.rootDomains.length
+      ? cfg.rootDomains
+      : (cfg.rootDomain ? [cfg.rootDomain] : []);
+    ROOTS = list;
+    const wrap = document.getElementById('rootWrap');
+    const span = document.getElementById('rootDomain');
+    if (!wrap) return;
+    if (list.length <= 1) {
+      if (span) span.textContent = list[0] || '';
+      return;
+    }
+    // 多根：把静态后缀换成下拉
+    wrap.innerHTML = '<span style="opacity:.5">.</span><select id="rootDomainSel" style="border:none;background:transparent;color:var(--c1);font-family:var(--mono);font-size:12px;padding:0 2px;outline:none;cursor:pointer">'
+      + list.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join('')
+      + '</select>';
+    const sel = document.getElementById('rootDomainSel');
+    sel.onchange = () => {
+      const v = document.getElementById('label').value.trim();
+      if (v) runCheck(v);
+    };
+  } catch {}
+}
+
 async function runCheck(v) {
   const tip = document.getElementById('checkTip');
   if (!v) { tip.innerHTML = ''; return; }
   try {
-    const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v));
+    const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v) + rootQuery());
     const link = `<a href="/whois.html?name=${encodeURIComponent(v)}" target="_blank" style="font-size:11.5px;margin-left:6px">whois 详情</a>`;
     let costHtml = '';
     if (r.available && r.cost > 0) {
@@ -381,7 +422,7 @@ document.getElementById('btnApply').onclick = async () => {
   }
   try {
     localStorage.setItem('meoy_agree_use', '1');
-    const r = await api.post('/api/subdomains', { label, note });
+    const r = await api.post('/api/subdomains', { label, note, root: currentRoot() });
     toast(r.status === 'approved' ? '申请成功，已开通' : '已提交，等待管理员审核');
     document.getElementById('label').value = '';
     document.getElementById('note').value = '';
@@ -490,6 +531,7 @@ document.getElementById('btnPwd').onclick = () => {
 mountShell('domains').then(async (me) => {
   currentUser = me || null;
   applyBranding(await loadBranding());
+  await setupRoots();   // 必须先于 load()，否则查询用的是空 root
   load();
   loadPoints();
 }).catch(() => {});

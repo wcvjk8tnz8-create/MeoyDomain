@@ -1,3 +1,13 @@
+import { matchRoot } from '../lib/roots.js';
+
+/**
+ * 取某条子域名所属的根域名，用于选择对应的 Cloudflare Zone。
+ * 优先用库里的 root_domain 列，缺失时从 fqdn 反推。
+ */
+function rootOf(c, sub) {
+  if (!sub) return '';
+  return String(sub.root_domain || matchRoot(c.env, sub.fqdn)?.domain || '').trim();
+}
 import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
 import { buildRecord, resolveHost, RECORD_TYPES, VERIFY_PRESETS, formatDisplay } from '../lib/records.js';
@@ -92,7 +102,7 @@ app.post('/subdomains/:id/records', async (c) => {
   if (locked) return fail(c, '该记录正在被「根域名验证」占用，请先完成认证并解除锁定');
 
   const payload = { ...built.payload, name: hostRes.name };
-  const cf = await cfCreate(c.env, payload);
+  const cf = await cfCreate(c.env, payload, rootOf(c, sub));
   if (!cf.ok) return fail(c, `Cloudflare 写入失败：${cfErrorMessage(cf)}`, 502, { cf: cf.errors });
 
   const res = await c.env.DB.prepare(
@@ -155,7 +165,7 @@ app.patch('/records/:id', async (c) => {
   if (locked) return fail(c, '目标记录名正在被「根域名验证」占用');
 
   const payload = { ...built.payload, name: hostRes.name };
-  const cf = await cfUpdate(c.env, rec.cf_record_id, payload);
+  const cf = await cfUpdate(c.env, rec.cf_record_id, payload, rootOf(c, sub));
   if (!cf.ok) return fail(c, `Cloudflare 更新失败：${cfErrorMessage(cf)}`, 502, { cf: cf.errors });
 
   await c.env.DB.prepare(
@@ -192,7 +202,7 @@ app.delete('/records/:id', async (c) => {
   const block = requireActive(sub);
   if (block && sub.status !== 'rejected') return fail(c, block, 403);
 
-  const cf = await cfDelete(c.env, rec.cf_record_id);
+  const cf = await cfDelete(c.env, rec.cf_record_id, rootOf(c, sub));
   if (!cf.ok) return fail(c, `Cloudflare 删除失败：${cfErrorMessage(cf)}`, 502, { cf: cf.errors });
   await c.env.DB.prepare('DELETE FROM dns_records WHERE id = ?').bind(rid).run();
   await audit(c, u.id, 'record.delete', rec.name, `${rec.type}`);
@@ -220,8 +230,10 @@ app.post('/subdomains/:id/verify', async (c) => {
 
   // 作用域：root = 根域名（_vercel.meoy.top），sub = 当前子域名（_vercel.xxx.meoy.top）
   const scope = String(body.scope || 'root') === 'sub' ? 'sub' : 'root';
-  const rootDomain = String(c.env.ROOT_DOMAIN || '').toLowerCase().replace(/\.+$/, '');
-  if (scope === 'root' && !rootDomain) return fail(c, '未配置 ROOT_DOMAIN，无法在根域名下写入验证记录');
+  // 多根域名：用该子域名所属的根域名（而非全局默认），否则会把记录写到错误的 zone
+  const rootDomain = String(sub.root_domain || matchRoot(c.env, sub.fqdn)?.domain || c.env.ROOT_DOMAIN || '')
+    .toLowerCase().replace(/\.+$/, '');
+  if (scope === 'root' && !rootDomain) return fail(c, '未配置根域名，无法在根域名下写入验证记录');
   const base = scope === 'root' ? rootDomain : sub.fqdn;
   const baseLabel = scope === 'root' ? '' : sub.label;
 
@@ -251,7 +263,7 @@ app.post('/subdomains/:id/verify', async (c) => {
     content: value,
     ttl: 1,
     comment: 'root-domain verification (locked)',
-  });
+  }, rootOf(c, sub));
   if (!cf.ok) return fail(c, `Cloudflare 写入失败：${cfErrorMessage(cf)}`, 502, { cf: cf.errors });
 
   const res = await c.env.DB.prepare(
@@ -298,7 +310,7 @@ app.post('/records/:id/verify-confirm', async (c) => {
   const keep = Boolean(body.keep);
 
   if (!keep) {
-    const cf = await cfDelete(c.env, rec.cf_record_id);
+    const cf = await cfDelete(c.env, rec.cf_record_id, rootOf(c, sub));
     if (!cf.ok) return fail(c, `Cloudflare 删除失败：${cfErrorMessage(cf)}`, 502, { cf: cf.errors });
     await c.env.DB.prepare('DELETE FROM dns_records WHERE id = ?').bind(rid).run();
   } else {
@@ -321,7 +333,8 @@ app.post('/records/:id/force-unlock', async (c) => {
   if (!rec) return fail(c, '记录不存在', 404);
   const body = await c.req.json().catch(() => ({}));
   if (body.delete !== false) {
-    await cfDelete(c.env, rec.cf_record_id);
+    const owner = await c.env.DB.prepare('SELECT root_domain, fqdn FROM subdomains WHERE id = ?').bind(rec.subdomain_id).first();
+    await cfDelete(c.env, rec.cf_record_id, rootOf(c, owner));
     await c.env.DB.prepare('DELETE FROM dns_records WHERE id = ?').bind(rid).run();
   } else {
     await c.env.DB.prepare(

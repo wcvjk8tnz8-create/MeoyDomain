@@ -1,3 +1,4 @@
+import { listRoots } from './lib/roots.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -97,6 +98,7 @@ app.get('/api/config', async (c) => {
   const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
   return ok(c, {
     rootDomain: c.env.ROOT_DOMAIN,
+    rootDomains: listRoots(c.env).map((r) => r.domain),
     allowSignup: c.env.ALLOW_SIGNUP !== '0',
     requireApproval: c.env.REQUIRE_APPROVAL === '1',
     recordTypes: TYPE_NAMES.map((k) => ({ key: k, ...RECORD_TYPES[k] })),

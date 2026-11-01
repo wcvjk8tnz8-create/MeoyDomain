@@ -40,6 +40,8 @@ const KEYS = [
   'ROOT_DOMAIN', 'DEFAULT_QUOTA', 'ALLOW_SIGNUP', 'REQUIRE_APPROVAL', 'RESERVED_LABELS', 'CF_MOCK',
   // R2：桶名（需与 ensure-r2.mjs 创建的一致）、公开外链地址
   'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'AVATAR_MAX_KB',
+  // 多根域名
+  'ROOT_DOMAINS', 'CF_ZONE_IDS',
 ];
 let n = 0;
 for (const k of KEYS) if (apply(k, process.env[k])) n++;

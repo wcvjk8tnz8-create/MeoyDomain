@@ -473,3 +473,30 @@ npm run typecheck   # tsc --noEmit，只检查 .ts
 
 **新代码约定**：新增模块请用 `.ts`，并 `import type { Env, UserRow } from '../types'`；
 存量 `.js` 保持不动，除非要顺手重写。
+
+
+---
+
+## 多个根域名
+
+一个站点可以同时分发多个根域名下的子域名（如 `meoy.top` 与 `foo.com`）。
+
+**配置**（仓库 Settings → Variables，或 `wrangler.toml` 的 `[vars]`）：
+
+| 变量 | 示例 | 说明 |
+|---|---|---|
+| `ROOT_DOMAINS` | `meoy.top,foo.com` | 允许的根域名列表，逗号分隔 |
+| `CF_ZONE_IDS` | `meoy.top:aaa...,foo.com:bbb...` | 每个根域名对应的 Zone ID |
+| `ROOT_DOMAIN` | `meoy.top` | 默认根域名（向后兼容，必须保留） |
+| `CF_ZONE_ID` | `aaa...` | 默认 Zone（向后兼容） |
+
+**向后兼容**：只填 `ROOT_DOMAIN` / `CF_ZONE_ID` 时，行为与单根域名完全一致。
+
+**配额口径**：跨根域名**共享**。配额 5 就是总共 5 个，不按根域名分别计算 —— 避免通过多根域名绕过限制。
+
+**使用**：控制台申请框在配置了多个根域名时会自动把静态后缀换成下拉选择，切换后实时重新查询可用性。
+
+**数据结构**：`subdomains` 表新增 `root_domain` 列，同时**去掉了 `label` 的 UNIQUE 约束** ——
+否则 `mail.meoy.top` 与 `mail.foo.com` 会互斥。唯一性改由 `fqdn` 承担（fqdn 已包含根域名）。
+迁移在 `schema.sql` 里自动完成，`root_domain` 由 `fqdn` 反推，可重复执行。
+旧表会保留为 `subdomains_old_mr`，确认无误后可自行删除。

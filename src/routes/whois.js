@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ok, fail } from '../lib/util.js';
 import { lookupLabel } from './subdomains.js';
+import { matchRoot, defaultRoot } from '../lib/roots.js';
 import { UNLIMITED_POINTS, ensurePoints, domainCost } from '../lib/points.js';
 import { pointRules } from './points.js';
 import { lookupExternal, isValidDomain, isDnsheDomain, getCached, getCachedAny, setCached } from '../lib/whoisExt.js';
@@ -42,11 +43,12 @@ app.get('/whois', async (c) => {
   const raw = String(c.req.query('name') || c.req.query('q') || c.req.query('fqdn') || '').trim().toLowerCase();
   if (!raw) return fail(c, '请输入要查询的域名');
 
-  const root = String(c.env.ROOT_DOMAIN || '').toLowerCase().replace(/\.+$/, '');
+  // 多根域名：先判断输入属于哪个根域名
+  const root = matchRoot(c.env, raw)?.domain || defaultRoot(c.env);
 
   // 归一化：允许写完整域名或只写标签
   let label = raw.replace(/\.+$/, '');
-  if (label.endsWith('.' + root)) label = label.slice(0, -(root.length + 1));
+  if (root && label.endsWith('.' + root)) label = label.slice(0, -(root.length + 1));
 
   // 仍带点 → 外部域名（可查任意域名，含 DNSHE / .com 等）
   if (label.includes('.')) return externalWhois(c, label, root);

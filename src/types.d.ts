@@ -29,6 +29,10 @@ export interface Env {
 
   // ── Vars（wrangler.toml [vars] / CI 注入）──
   ROOT_DOMAIN?: string;
+  /** 多根域名：逗号分隔的根域名列表 */
+  ROOT_DOMAINS?: string;
+  /** 多根域名：\`域名:ZoneID\` 逗号分隔 */
+  CF_ZONE_IDS?: string;
   DEFAULT_QUOTA?: string;
   ALLOW_SIGNUP?: string;
   REQUIRE_APPROVAL?: string;

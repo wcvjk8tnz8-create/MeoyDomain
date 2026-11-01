@@ -1,3 +1,4 @@
+import { listRoots } from '../lib/roots.js';
 import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
 import { cfDelete, cfErrorMessage } from '../lib/cf.js';
@@ -26,6 +27,7 @@ app.get('/stats', async (c) => {
     records: recs.n || 0,
     locked: locked.n || 0,
     rootDomain: c.env.ROOT_DOMAIN,
+    rootDomains: listRoots(c.env),
     mock: c.env.CF_MOCK === '1',
   });
 });

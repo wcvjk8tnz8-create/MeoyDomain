@@ -26,6 +26,13 @@ database_id = "00000000000000000000000000000000"
 [vars]
 # 根域名（用户申请到的子域名都挂在这个域下）
 ROOT_DOMAIN = "meoy.top"
+# 多根域名（可选）：不填则只用上面的 ROOT_DOMAIN
+# 允许申请的根域名列表，逗号分隔
+ROOT_DOMAINS = ""
+# 每个根域名对应的 Cloudflare Zone ID，格式 "域名:ZoneID" 逗号分隔
+# 例：ROOT_DOMAINS = "meoy.top,foo.com"
+#     CF_ZONE_IDS  = "meoy.top:aaa...,foo.com:bbb..."
+CF_ZONE_IDS = ""
 # 每个用户默认可持有的子域名数量
 DEFAULT_QUOTA = "5"
 # 是否开放注册（"0" = 关闭注册，仅管理员可开号）

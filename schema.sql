@@ -310,3 +310,55 @@ CREATE TABLE IF NOT EXISTS transfers (
   created_at   INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_transfers_fqdn ON transfers(fqdn, created_at DESC);
+
+-- ══════════════════════════════════════════════════════════
+-- 多根域名支持（幂等，可重复执行）
+-- ══════════════════════════════════════════════════════════
+-- 背景：原表 label 是 UNIQUE，导致同一 label 无法存在于不同根域名下
+--      （如 mail.meoy.top 与 mail.foo.com 互斥）。
+-- 做法：重建表，去掉 label 的 UNIQUE，唯一性改由 fqdn 承担（fqdn 已含根域名）。
+-- 注意：不使用 ALTER TABLE ADD COLUMN —— SQLite 不支持 IF NOT EXISTS，
+--      重复执行会报 duplicate column 并中断整个 schema。
+--      root_domain 改由 fqdn 反推（substr 表达式），因此完全幂等。
+
+CREATE TABLE IF NOT EXISTS subdomains_mr (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  label         TEXT    NOT NULL,
+  root_domain   TEXT    NOT NULL DEFAULT '',
+  fqdn          TEXT    NOT NULL UNIQUE,
+  user_id       INTEGER NOT NULL,
+  status        TEXT    NOT NULL DEFAULT 'pending',
+  reason        TEXT,
+  note          TEXT,
+  expires_at    INTEGER,
+  renewed_at    INTEGER,
+  perpetual     INTEGER NOT NULL DEFAULT 0,
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL,
+  reviewed_at   INTEGER,
+  reviewed_by   INTEGER
+);
+
+-- 迁移：仅当新表为空时执行（避免重复部署覆盖已有数据）
+-- root_domain 从 fqdn 反推：mail.meoy.top → meoy.top
+INSERT INTO subdomains_mr (id, label, root_domain, fqdn, user_id, status, reason, note,
+                           expires_at, renewed_at, perpetual, created_at, updated_at,
+                           reviewed_at, reviewed_by)
+SELECT id, label,
+       CASE WHEN instr(fqdn, '.') > 0 THEN substr(fqdn, instr(fqdn, '.') + 1) ELSE '' END,
+       fqdn, user_id, status, reason, note,
+       expires_at, renewed_at, COALESCE(perpetual, 0),
+       created_at, updated_at, reviewed_at, reviewed_by
+FROM subdomains
+WHERE (SELECT COUNT(*) FROM subdomains_mr) = 0;
+
+-- 原子切换：旧表改名保留（不 DROP，防误删数据），新表转正
+DROP TABLE IF EXISTS subdomains_old_mr;
+ALTER TABLE subdomains RENAME TO subdomains_old_mr;
+ALTER TABLE subdomains_mr RENAME TO subdomains;
+
+-- 重建索引
+CREATE INDEX IF NOT EXISTS idx_subdomains_user   ON subdomains(user_id);
+CREATE INDEX IF NOT EXISTS idx_subdomains_status ON subdomains(status);
+CREATE INDEX IF NOT EXISTS idx_subdomains_root   ON subdomains(root_domain, label);
+CREATE INDEX IF NOT EXISTS idx_subdomains_fqdn   ON subdomains(fqdn);

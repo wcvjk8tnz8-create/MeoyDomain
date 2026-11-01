@@ -5,6 +5,7 @@ import { cfDelete, cfErrorMessage } from '../lib/cf.js';
 import { UNLIMITED_POINTS, ensurePoints, addPoints, domainCost } from '../lib/points.js';
 import { pointRules } from './points.js';
 import { expiryRules, computeExpiry, expiryState, renewExpiry, migrateLegacyPerpetual, ensureExpiryColumns } from '../lib/expiry.js';
+import { defaultRoot, isAllowedRoot, listRoots } from '../lib/roots.js';
 
 const app = new Hono();
 
@@ -22,11 +23,13 @@ export async function loadSubdomain(c, id, { admin = false } = {}) {
  * 关键：结果必须与「真正提交申请」时的判定一致，否则会出现
  * “页面显示可注册、点申请却说已被注册”的不一致。
  */
-export async function lookupLabel(c, rawLabel) {
+export async function lookupLabel(c, rawLabel, rootOverride) {
   const v = validateLabel(rawLabel);
   if (!v.ok) return { ok: false, fqdn: '', available: false, message: v.error };
 
-  const fqdn = `${v.label}.${c.env.ROOT_DOMAIN}`;
+  // 多根域名：未指定时用默认根域名
+  const root = String(rootOverride || defaultRoot(c.env)).toLowerCase().replace(/\.+$/, '');
+  const fqdn = `${v.label}.${root}`;
   const u = c.get('user');
   const isAdmin = !!(u && u.role === 'admin');
   const myId = u ? u.id : null;
@@ -36,9 +39,9 @@ export async function lookupLabel(c, rawLabel) {
             (SELECT COUNT(*) FROM dns_records r WHERE r.subdomain_id = s.id) AS record_count,
             u.email AS holder_email
      FROM subdomains s LEFT JOIN users u ON u.id = s.user_id
-     WHERE s.label = ?`
+     WHERE s.fqdn = ?`
   )
-    .bind(v.label)
+    .bind(fqdn)
     .first();
 
   const reserved = String(c.env.RESERVED_LABELS || '')
@@ -82,7 +85,7 @@ export async function lookupLabel(c, rawLabel) {
 
 // 可用性检查
 app.get('/check', async (c) => {
-  const r = await lookupLabel(c, c.req.query('label'));
+  const r = await lookupLabel(c, c.req.query('label'), c.req.query('root'));
   const u = c.get('user');
   const isAdmin = !!(u && u.role === 'admin');
   const rules = await pointRules(c.env);
@@ -156,7 +159,7 @@ app.get('/', listMine);
 const createMine = async (c) => {
   const u = c.get('user');
   await ensureExpiryColumns(c.env);
-  const { label, note } = await c.req.json().catch(() => ({}));
+  const { label, note, root: rootReq } = await c.req.json().catch(() => ({}));
   const v = validateLabel(label);
   if (!v.ok) return fail(c, v.error);
 
@@ -168,7 +171,12 @@ const createMine = async (c) => {
   const isReserved = reserved.includes(v.label);
 
   // 与 /check、/api/whois 使用同一套判定，避免「显示可注册、提交却说已注册」
-  const lk = await lookupLabel(c, v.label);
+  // 根域名：body.root 指定或取默认；非法则报错（提前声明，下面多处复用）
+  const reqRoot = String(rootReq || defaultRoot(c.env)).toLowerCase().replace(/\.+$/, '');
+  if (rootReq && !isAllowedRoot(c.env, reqRoot))
+    return fail(c, `根域名 ${reqRoot} 未配置，可选：${listRoots(c.env).map((r) => r.domain).join('、')}`);
+
+  const lk = await lookupLabel(c, v.label, reqRoot);
   if (!lk.ok) return fail(c, lk.message);
   if (!lk.available) return fail(c, lk.message, 409);
 
@@ -233,13 +241,14 @@ const createMine = async (c) => {
     }
     await c.env.DB.prepare('DELETE FROM dns_records WHERE subdomain_id = ?').bind(dup.id).run();
     await c.env.DB.prepare('DELETE FROM subdomains WHERE id = ?').bind(dup.id).run();
-    await audit(c, u.id, 'subdomain.reapply', `${v.label}.${c.env.ROOT_DOMAIN}`, '清除此前被驳回的同名记录');
+    await audit(c, u.id, 'subdomain.reapply', `${v.label}.${reqRoot}`, '清除此前被驳回的同名记录');
   }
 
   // 免审核：全局关闭审核，或管理员申请（管理员自建即开通，含保留域名）
   const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin;
   const status = autoApprove ? 'approved' : 'pending';
-  const fqdn = `${v.label}.${c.env.ROOT_DOMAIN}`;
+  // 多根域名：允许 body.root 指定，必须是已配置的根域名之一
+  const fqdn = `${v.label}.${reqRoot}`;
 
   // 有效期：即时开通的（管理员 / 免审核）现在就起算，待审核的等批准时再起算
   const expRules = await expiryRules(c.env);
@@ -248,8 +257,8 @@ const createMine = async (c) => {
   let res;
   try {
     res = await c.env.DB.prepare(
-      `INSERT INTO subdomains (label, fqdn, user_id, status, note, expires_at, created_at, updated_at, reviewed_at)
-       VALUES (?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO subdomains (label, root_domain, fqdn, user_id, status, note, expires_at, created_at, updated_at, reviewed_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`
     )
       .bind(
         v.label, fqdn, u.id, status, String(note || '').slice(0, 300),
