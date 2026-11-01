@@ -134,6 +134,16 @@
 
 > ⚠️ 曾经踩过的坑：跳转逻辑写了两份（前端 `api.js` 一份、服务端一份），前端那份会在**每个页面**执行，于是访问 `/dashboard` 被踢去 `/whois.html?name=dashboard`，而登录页又把已登录的人送回 `/dashboard`，两边互相抢夺形成死循环。
 > 现在**前端不再做任何 whois 跳转**，只由服务端处理。新增跳转逻辑时务必只写一处。
+
+**WHOIS 页豁免规则**（它必须完全不受影响）：
+
+1. **服务端**：中间件第一条判断就是 `/^\/whois(\.html)?$/i` → 无条件放行，任何 host 都不重定向
+2. **免登录**：`mountNav('whois', { optional: true })`，未登录也正常渲染
+3. **401 不踢人**：公开页设 `window.MEOY_PUBLIC_PAGE = true`，`api.req` 遇到 401 时不跳转登录页。
+   这一条很关键 —— 未登录时 `/api/auth/me` 必然返回 401，若照旧跳 `/`，在 whois 子域下就形成 `/whois → / → /whois.html` 循环
+4. **清理历史标记**：页面 head 清除 `meoy_whois_rd` / `meoy_whois_n`，不受旧版本残留状态影响
+
+条款页同样按公开页处理。
 为此 `wrangler.toml` 设了 `run_worker_first = true`，Worker 处理完后通过 `ASSETS.fetch()` 回落静态资源。**不要再手动改写路径**（补 `index.html`、去 `.html`）—— ASSETS 自带 `/xxx.html ⇄ /xxx` 规范化，两边都改会形成自指 307 死循环。
 
 **入口分流**（`index.html` 头部同步脚本，早于页面渲染，作为前端兜底）：

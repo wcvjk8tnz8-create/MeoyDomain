@@ -30,29 +30,30 @@ app.use('/api/*', async (c, next) => {
  * whois.<根域名> 服务端重定向（不依赖前端 JS，最可靠）
  *  - /            → /whois.html
  *  - /google      → /whois.html?name=google
- *  - /whois.html  → 放行（不再匹配，故不会循环）
- * 静态资源（css/js/img）与 /api 不处理。
- * 需在 wrangler.toml 的 run_worker_first 里放行 "/" 与 "/index.html" 才会命中。
+ *
+ * 铁律：WHOIS 页本身（/whois.html、/whois、带查询串）永不被重定向，
+ * 且不受任何登录态影响。下面的白名单在任何其它判断之前生效。
  */
 app.use('*', async (c, next) => {
   let u;
   try { u = new URL(c.req.url); } catch { return next(); }
+  const p = u.pathname;
+
+  // ① WHOIS 页与接口、静态资源：绝对放行，任何 host 都不重定向
+  if (/^\/whois(\.html)?$/i.test(p)) return next();
+  if (p.startsWith('/api/')) return next();
+  if (/\.(css|js|png|jpg|jpeg|ico|svg|json|txt|woff2?)$/i.test(p)) return next();
+
   const seg = u.hostname.toLowerCase().split('.');
   if (seg.length < 3 || seg[0] !== 'whois') return next();
 
-  const p = u.pathname;
-  if (p.startsWith('/api/')) return next();
-
-  // 只接管入口页（/ 与 /index.html）。
-  // 其它路径（/dashboard、/admin、/whois、/domain…）一律放行 ——
-  // 否则会把 /dashboard 变成“查询 dashboard”，与已登录跳控制台的逻辑互相抢夺形成循环。
+  // ② 只接管入口页（/ 与 /index.html）
   const root = p.replace(/^\/+|\/+$/g, '');
   if (root === '' || root === 'index.html') {
     return c.redirect('/whois.html', 302);
   }
 
-  // whois.<域>/<名称> 直接查询：仅限看起来像域名前缀的单一路径段
-  // （排除已知页面名与任何带后缀的资源，避免误伤）
+  // ③ whois.<域>/<名称> 直接查询：仅限单一路径段且不是任何已知页面
   const KNOWN = new Set(['whois', 'whois.html', 'dashboard', 'dashboard.html',
     'admin', 'admin.html', 'domain', 'domain.html', 'terms', 'terms.html', 'index.html']);
   if (!KNOWN.has(root.toLowerCase()) && !/[./]/.test(root) && !u.search) {

@@ -11,6 +11,9 @@ const api = {
       throw new Error('网络请求失败');
     }
     if (res.status === 401) {
+      // 公开页（WHOIS / 条款）免登录，401 是正常现象，不能踢去登录页 ——
+      // 否则在 whois 子域下会形成 /whois → / → /whois.html 的循环。
+      if (window.MEOY_PUBLIC_PAGE) return data;   // 交给调用方自行处理
       if (!['/', '/index'].includes(location.pathname)) location.href = '/';
     }
     if (!data.success) throw new Error(data.message || '请求失败');

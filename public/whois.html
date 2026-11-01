@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WHOIS 查询 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
+<script>
+  /* WHOIS 页是免登录、免跳转的公开页。
+     本页不做任何自动跳转（除非用户主动点「申请这个域名」），
+     这里只清理历史遗留的跳转标记，避免旧版本留下的状态把本页踢走。 */
+  (function () {
+    // 声明为公开页：接口返回 401 时不跳转登录页（本页免登录）
+    window.MEOY_PUBLIC_PAGE = true;
+    try {
+      sessionStorage.removeItem('meoy_whois_rd');
+      sessionStorage.removeItem('meoy_whois_n');
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 <div id="bg"></div>
