@@ -39,7 +39,10 @@
       </div>
       <button class="btn primary" id="btnQuery" style="flex:0 0 auto">查询</button>
     </div>
-    <div class="hint" style="margin-top:6px">只写前缀（如 <span class="mono">me</span>）或完整域名（如 <span class="mono">me.meoy.top</span>）都可以。</div>
+    <div class="hint" style="margin-top:6px">
+      只写前缀（如 <span class="mono">me</span>）查本站子域名；
+      输入完整域名（如 <span class="mono">example.com</span>、<span class="mono">foo.de5.net</span>）可查<b>任意域名</b>。
+    </div>
   </div>
 
   <div class="card" id="result" style="display:none"></div>
@@ -47,12 +50,15 @@
   <div class="card flat">
     <h3>说明</h3>
     <div style="color:var(--text-2);font-size:12.5px;line-height:1.9">
+      · <b>本站子域名</b>：只写前缀即可，显示注册状态、持有人与积分价格。<br>
+      · <b>任意域名</b>：输入完整域名，DNSHE 系（<span class="mono">de5.net</span> / <span class="mono">us.ci</span> / <span class="mono">cc.cd</span> / <span class="mono">ccwu.cc</span> / <span class="mono">bot.cd</span>）走 DNSHE 公开接口，其它后缀走 RDAP 注册局数据。<br>
       · <b>可注册</b>：名称未被占用，可立即申请。<br>
       · <b>审核中</b>：已有人提交申请，等待管理员审核。<br>
       · <b>已注册</b>：已被注册并生效。<br>
       · <b>已驳回</b>：申请未通过，原申请人可修正后重新申请。<br>
       · <b>已停用</b>：因违规被停用。<br>
-      · 持有人邮箱默认脱敏显示，本人与管理员可见完整地址。
+      · 持有人邮箱默认脱敏显示，本人与管理员可见完整地址。<br>
+      · 外部查询结果缓存 6 小时，避免触发上游限流。
     </div>
   </div>
 </div>
@@ -68,6 +74,8 @@ async function doQuery() {
   if (!name) { box.style.display = 'none'; return toast('请输入要查询的域名', 'err'); }
   try {
     const r = await api.get('/api/whois?name=' + encodeURIComponent(name));
+    // 外部域名（可查任意域名，含 DNSHE / .com 等）
+    if (r.external) return renderExternal(r, box);
     const cls = r.available ? 'ok' : r.status === 'pending' ? 'warn' : 'danger';
     const badge = r.available
       ? '<span class="badge ok">可注册</span>'
@@ -105,6 +113,83 @@ async function doQuery() {
     box.style.display = '';
     box.innerHTML = `<div class="alert danger" style="margin:0">${esc(e.message)}</div>`;
   }
+}
+
+/* ---------------- 外部域名结果 ---------------- */
+const SRC_NAME = { dnshe: 'DNSHE 公开 WHOIS', rdap: 'RDAP（注册局）' };
+
+function renderExternal(r, box) {
+  box.style.display = '';
+  const d = r.domain || r.query;
+  const srcName = SRC_NAME[r.source] || r.source || '外部查询';
+
+  // 查询出错
+  if (r.registered === null && r.error) {
+    box.innerHTML = `
+      <div class="row between" style="margin-bottom:10px">
+        <span class="fqdn">${esc(d)}</span>
+        <span class="badge warn">查询失败</span>
+      </div>
+      <div class="alert danger" style="margin:0">${esc(r.error)}</div>
+      ${r.stale ? `<div class="hint" style="margin-top:10px">以下是 ${fmtTime(r.stale.cachedAt)} 的缓存结果：</div>${extBody(r.stale, d, srcName)}` : ''}
+      ${linkRow(r)}
+      <div class="hint" style="margin-top:10px">提示：${r.source === 'dnshe' ? 'DNSHE 公开接口限制 2 次/分钟/IP' : '部分注册局对 RDAP 有频率限制'}，稍后再试即可。</div>`;
+    return;
+  }
+
+  box.innerHTML = extBody(r, d, srcName) + linkRow(r);
+}
+
+function extBody(r, d, srcName) {
+  const reg = r.registered;
+  const badge = reg === null
+    ? '<span class="badge warn">未知</span>'
+    : reg
+      ? '<span class="badge ok">已注册</span>'
+      : '<span class="badge inf">未注册</span>';
+
+  const statusHtml = (r.status && r.status.length)
+    ? `<div class="k">域名状态</div><div class="mono" style="font-size:11.5px">${r.status.map((s) => esc(s)).join('<br>')}</div>`
+    : '';
+  const nsHtml = (r.nameservers && r.nameservers.length)
+    ? `<div class="k">NS 服务器</div><div class="mono" style="font-size:11.5px">${r.nameservers.map((n) => esc(n)).join('<br>')}</div>`
+    : '';
+  const regHtml = r.registrar
+    ? `<div class="k">注册商</div><div>${esc(r.registrar)}${r.registrarIanaId ? ` <span class="dim">(IANA ${esc(r.registrarIanaId)})</span>` : ''}</div>`
+    : '';
+  const mailHtml = (r.registrant && r.registrant.email)
+    ? `<div class="k">注册人邮箱</div><div class="mono">${esc(r.registrant.email)}</div>`
+    : '';
+
+  return `
+    <div class="row between" style="margin-bottom:12px">
+      <span class="fqdn">${esc(d)}</span>
+      <div>${badge} <span class="badge inf">${esc(srcName)}</span></div>
+    </div>
+    <div class="kv">
+      <div class="k">查询名称</div><div class="mono">${esc(r.query || d)}</div>
+      <div class="k">注册状态</div><div>${reg === null ? '未知' : reg ? '已注册' : '未注册（可能可注册）'}</div>
+      ${regHtml}
+      ${r.createdAt ? `<div class="k">注册时间</div><div>${esc(r.createdAt)}</div>` : ''}
+      ${r.expiresAt ? `<div class="k">到期时间</div><div>${esc(r.expiresAt)}</div>` : ''}
+      ${r.updatedAt ? `<div class="k">更新时间</div><div>${esc(r.updatedAt)}</div>` : ''}
+      ${statusHtml}
+      ${nsHtml}
+      ${mailHtml}
+    </div>
+    ${reg === false ? '<div class="alert ok" style="margin:14px 0 0">注册局没有该域名的记录，通常意味着尚未被注册。</div>' : ''}
+    ${r.cached ? `<div class="hint" style="margin-top:8px">缓存结果（${fmtTime(r.cachedAt)}），6 小时内复用。</div>` : ''}
+    ${r.privacy && reg ? '<div class="hint" style="margin-top:6px">注册人信息已被注册商/隐私服务隐藏（GDPR）。</div>' : ''}`;
+}
+
+function linkRow(r) {
+  const links = r.externalLinks || [];
+  if (!links.length) return '';
+  return `
+    <div class="row" style="margin-top:14px;gap:6px;flex-wrap:wrap">
+      <span class="dim" style="font-size:12px">在其它站点查询：</span>
+      ${links.map((l) => `<a class="btn sm ghost" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join('')}
+    </div>`;
 }
 
 let isLoggedIn = false;

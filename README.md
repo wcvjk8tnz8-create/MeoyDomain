@@ -118,7 +118,35 @@
 - 申请输入框实时显示「消耗 X 分 · 余额 Y 分」，不足时标红
 - WHOIS 页也显示价格与余额，积分不足时申请按钮禁用
 
-### 9. WHOIS 查询
+### 9. WHOIS 查询（可查任意域名）
+
+同一个输入框，两种模式：
+
+| 输入 | 行为 |
+|---|---|
+| `me` | 查本站子域名（注册状态、持有人、积分价格） |
+| `me.meoy.top` | 同上 |
+| `example.com` | **查任意域名** → RDAP 注册局数据 |
+| `foo.de5.net` | **查任意域名** → DNSHE 公开 WHOIS |
+
+**数据源**
+
+- **DNSHE 系后缀**（`de5.net` `us.ci` `cc.cd` `ccwu.cc` `bot.cd` `dnshe.com`）
+  → `https://api005.dnshe.com/index.php?m=domain_hub&endpoint=whois&domain=xxx`
+  官方公开接口，**免认证**，限制 2 次/分钟/IP
+- **其它后缀** → `https://rdap.org/domain/xxx`（自动 302 到对应注册局），免 key，返回结构化 JSON
+  - HTTP 404 = 注册局无记录，判为未注册
+  - 解析出：注册商 + IANA ID、注册/到期/更新时间、EPP 状态、NS
+  - GDPR 下注册人信息基本都被脱敏，代码不尝试解析
+
+**缓存**：结果写入 `whois_cache` 表，TTL 6 小时。上游失败时若有旧缓存仍展示，并标注时间。
+
+**第三方直达链接**（结果卡片底部）：whois.com / whois.dnshe.com / ICANN Lookup。
+
+新增数据源：编辑 `src/lib/whoisExt.js`。
+
+> 注意：Cloudflare Workers 有真实出网能力，上述接口在部署后可正常访问。
+> 本地沙盒若禁止外部出站，会走「查询失败 + 外链引导」分支，属正常降级。
 
 `GET /api/whois?name=me`（公开，无需登录）或访问 `/whois.html`：
 

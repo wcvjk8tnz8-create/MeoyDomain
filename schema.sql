@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS registrations (
 CREATE INDEX IF NOT EXISTS idx_reg_ip    ON registrations(ip);
 CREATE INDEX IF NOT EXISTS idx_reg_user  ON registrations(user_id);
 
+-- 外部域名 WHOIS 结果缓存（避免触发 DNSHE 2次/分钟、RDAP 注册局限流）
+CREATE TABLE IF NOT EXISTS whois_cache (
+  domain     TEXT    PRIMARY KEY,
+  data       TEXT    NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
+
 -- NS 委派：把子域名托管到第三方 DNS（anyns.io / DNSHE / Cloudflare / 自定义）
 CREATE TABLE IF NOT EXISTS delegations (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -3,6 +3,7 @@ import { ok, fail } from '../lib/util.js';
 import { lookupLabel } from './subdomains.js';
 import { UNLIMITED_POINTS, ensurePoints, domainCost } from '../lib/points.js';
 import { pointRules } from './points.js';
+import { lookupExternal, isValidDomain, isDnsheDomain, getCached, getCachedAny, setCached } from '../lib/whoisExt.js';
 
 const app = new Hono();
 
@@ -45,8 +46,9 @@ app.get('/whois', async (c) => {
   // 归一化：允许写完整域名或只写标签
   let label = raw.replace(/\.+$/, '');
   if (label.endsWith('.' + root)) label = label.slice(0, -(root.length + 1));
-  // 仍带点说明是别的域名，直接判为不归本站管理
-  if (label.includes('.')) return fail(c, `仅支持查询 ${root} 下的二级子域名`);
+
+  // 仍带点 → 外部域名（可查任意域名，含 DNSHE / .com 等）
+  if (label.includes('.')) return externalWhois(c, label, root);
 
   const r = await lookupLabel(c, label);
   if (!r.ok) return ok(c, { found: false, query: raw, label, fqdn: `${label}.${root}`, available: false, statusText: r.message, message: r.message });
@@ -102,5 +104,66 @@ app.get('/whois', async (c) => {
     })()),
   });
 });
+
+/* ---------------- 外部域名（可查任意域名） ---------------- */
+async function externalWhois(c, domain, root) {
+  if (!isValidDomain(domain)) return fail(c, '域名格式不正确');
+
+  const dnshe = isDnsheDomain(domain);
+  const cacheKey = domain;
+
+  // 命中缓存直接返回（限流时的救命稻草）
+  const hit = await getCached(c.env.DB, cacheKey);
+  if (hit) {
+    return ok(c, {
+      external: true,
+      source: hit.source || (dnshe ? 'dnshe' : 'rdap'),
+      query: domain,
+      domain,
+      rootDomain: root,
+      ...hit,
+      externalLinks: externalLinks(domain),
+    });
+  }
+
+  const r = await lookupExternal(domain);
+  if (!r.ok) {
+    // 上游失败时，若有过期缓存也先用着
+    const stale = await getCachedAny(c.env.DB, cacheKey);
+    return ok(c, {
+      external: true,
+      source: r.source,
+      query: domain,
+      domain,
+      rootDomain: root,
+      registered: null,
+      error: r.error,
+      rateLimited: !!r.rateLimited,
+      stale: stale || null,
+      externalLinks: externalLinks(domain),
+    });
+  }
+
+  await setCached(c.env.DB, cacheKey, r);
+  return ok(c, {
+    external: true,
+    source: r.source,
+    query: domain,
+    domain,
+    rootDomain: root,
+    ...r,
+    externalLinks: externalLinks(domain),
+  });
+}
+
+/** 第三方查询站直达链接 */
+function externalLinks(domain) {
+  const d = encodeURIComponent(domain);
+  return [
+    { name: 'whois.com', url: `https://www.whois.com/whois/${d}` },
+    { name: 'whois.dnshe.com', url: `https://whois.dnshe.com/?domain=${d}` },
+    { name: 'ICANN Lookup', url: `https://lookup.icann.org/en/lookup?name=${d}` },
+  ];
+}
 
 export default app;
