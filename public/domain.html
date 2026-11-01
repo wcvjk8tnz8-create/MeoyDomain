@@ -10,24 +10,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap"></noscript>
 <link rel="stylesheet" href="/css/style.css">
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  /* Tailwind 主题：字体沿用 Redaction 35 + 圆体；配色用中性 slate + 单色强调（无渐变） */
-  if (typeof tailwind !== 'undefined') {   /* CDN 加载失败时不中断页面其它脚本 */
-  tailwind.config = {
-    corePlugins: { preflight: false },
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['Redaction 35', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'sans-serif'],
-          mono: ['Redaction 35', 'PingFang SC', 'Microsoft YaHei', 'monospace'],
-        },
-        borderRadius: { card: '14px' },
-        colors: { brand: '#4f46e5' },
-      }
-    }
-  }
-  }</script>
 </head>
 <body>
 <div id="bg"></div>
@@ -67,10 +49,20 @@
       <!-- DNS 解析 -->
       <div class="tabpane" data-pane="dns">
   <div class="card">
-    <h2>根域名验证</h2>
+    <h2>自助验证</h2>
     <div class="sub" style="margin-bottom:12px">
-      粘贴平台给出的验证记录（主机名 + 值），系统会写入一条 TXT 并锁定。锁定期间任何人都不能修改或删除，
-      只有发起者点击「确认认证完成」后才会释放，避免被抢注或破坏。
+      选择域名 → 选择平台 → 主机名会自动填入 → 粘贴平台给出的验证值 → 写入锁定。
+      锁定期间任何人都不能修改或删除，只有发起者点击「确认认证完成」后才会移除该验证 TXT。
+    </div>
+    <div class="field">
+      <label>① 选择域名</label>
+      <select id="vDomain"></select>
+      <div class="hint">验证记录默认写在这条域名所属的<b>根域名</b>下（如 <span class="mono">_vercel.meoy.top</span>）。</div>
+    </div>
+    <div class="field">
+      <label>② 选择平台</label>
+      <div class="preset-grid" id="presets"></div>
+      <div class="hint" id="presetHint"></div>
     </div>
     <div class="field">
       <label>写入位置</label>
@@ -83,12 +75,12 @@
     <div class="preset-grid" id="presets"></div>
     <div class="grid2">
       <div class="field">
-        <label>主机名（无需带域名后缀）</label>
+        <label>③ 验证主机名（已按平台自动填入，可微调）</label>
         <input id="vHost" placeholder="_vercel" autocomplete="off">
         <div class="hint">将生成 <span class="mono" id="vPreview"></span></div>
       </div>
       <div class="field">
-        <label>验证值（TXT）</label>
+        <label>④ 验证值（从平台复制粘贴）</label>
         <textarea id="vValue" placeholder="粘贴平台提供的验证值"></textarea>
       </div>
     </div>
@@ -169,6 +161,8 @@ const params = new URLSearchParams(location.search);
 const subId = params.get('id');
 let cfg = null, sub = null, records = [], presets = [];
 let verifyScope = 'root'; // root = 根域名（_vercel.meoy.top），sub = 当前子域名
+let verifyTargetId = null;  // 自助验证的目标域名（默认当前，可切换）
+let myDomains = [];         // 我名下的域名，供下拉切换
 
 const TEMPLATES = [
   { n: 'Vercel CNAME', type: 'CNAME', host: '', content: 'cname.vercel-dns.com', proxied: false },
@@ -183,6 +177,7 @@ const TEMPLATES = [
 async function loadAll() {
   cfg = await api.get('/api/config');
   presets = cfg.verifyPresets;
+  await loadMyDomains();
   const d = await api.get('/api/subdomains/' + subId);
   sub = d.subdomain;
   records = d.records;
@@ -357,9 +352,40 @@ function renderPresets() {
       document.querySelectorAll('.preset').forEach((x) => x.classList.remove('active'));
       el.classList.add('active');
       if (el.dataset.host) document.getElementById('vHost').value = el.dataset.host;
+      // 提示该平台的值长什么样，并给输入框占位
+      const p = presets.find((x) => x.key === el.dataset.key);
+      const hintEl = document.getElementById('presetHint');
+      if (hintEl && p) hintEl.textContent = p.hint ? `${p.hint}｜值形如：${p.valueHint || '平台给出的字符串'}` : '';
+      const vv = document.getElementById('vValue');
+      if (vv && p && p.valueHint) vv.placeholder = '例如：' + p.valueHint;
       updatePreview();
     };
   });
+}
+
+
+/* ---------- 自助验证：域名下拉 ---------- */
+async function loadMyDomains() {
+  try {
+    const d = await api.get('/api/subdomains');
+    myDomains = (d.items || []).filter((x) => x.status === 'approved' || x.status === 'pending');
+  } catch { myDomains = []; }
+
+  const sel = document.getElementById('vDomain');
+  if (!sel) return;
+  if (!myDomains.length) {
+    sel.innerHTML = '<option value="">（暂无可用域名）</option>';
+    return;
+  }
+  // 默认选当前正在查看的域名
+  if (!verifyTargetId || !myDomains.some((x) => String(x.id) === String(verifyTargetId))) {
+    verifyTargetId = myDomains.some((x) => String(x.id) === String(subId)) ? subId : myDomains[0].id;
+  }
+  sel.innerHTML = myDomains
+    .map((x) => `<option value="${x.id}"${String(x.id) === String(verifyTargetId) ? ' selected' : ''}>${esc(x.fqdn)}</option>`)
+    .join('');
+  sel.onchange = () => { verifyTargetId = Number(sel.value); updatePreview(); };
+  updatePreview();
 }
 
 function updatePreview() {
@@ -433,16 +459,17 @@ function renderRecords() {
     const r = records.find((x) => x.id === Number(b.dataset.confirm));
     openModal('确认认证完成', `
       <div class="alert ok">验证记录 <span class="mono">${esc(r.name)}</span> 即将解锁。</div>
-      <p style="color:var(--text-2);font-size:12.5px;margin:0 0 12px">多数平台的验证记录在验证完成后不再需要，建议删除以释放该主机名；若平台要求长期保留（如 Google 站点验证），请勾选保留。</p>
-      <label class="check" style="margin:0 0 14px"><input type="checkbox" id="keepRec"> 保留这条 TXT 记录（仅解除锁定）</label>
+      <p style="color:var(--text-2);font-size:12.5px;margin:0 0 12px">验证完成后这条 TXT 通常不再需要。默认<b>移除该验证记录</b>并释放主机名；若平台要求长期保留（如 Google 站点验证），请取消勾选。</p>
+      <label class="check" style="margin:0 0 14px"><input type="checkbox" id="removeRec" checked> 移除这条验证 TXT 记录（推荐）</label>
       <div class="row end">
         <button class="btn" onclick="closeModal()">取消</button>
         <button class="btn primary" id="okConfirm">确认认证完成</button>
       </div>`);
     document.getElementById('okConfirm').onclick = async () => {
       try {
-        await api.post('/api/records/' + r.id + '/verify-confirm', { keep: document.getElementById('keepRec').checked });
-        toast('已解锁'); closeModal(); loadAll();
+        const keep = !document.getElementById('removeRec').checked;
+        await api.post('/api/records/' + r.id + '/verify-confirm', { keep });
+        toast(keep ? '已解锁（记录保留）' : '已完成并移除验证记录'); closeModal(); loadAll();
       } catch (e) { toast(e.message, 'err'); }
     };
   });
@@ -565,7 +592,8 @@ document.getElementById('btnVerify').onclick = async () => {
   if (!host) return toast('请填写验证主机名，如 _vercel', 'err');
   if (!value) return toast('请粘贴平台给出的验证值', 'err');
   try {
-    await api.post('/api/subdomains/' + subId + '/verify', {
+    const tid = verifyTargetId || subId;
+    await api.post('/api/subdomains/' + tid + '/verify', {
       preset: active ? active.dataset.key : 'custom',
       host,
       value,

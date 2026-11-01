@@ -149,16 +149,20 @@ export const RECORD_TYPES = {
 export const TYPE_NAMES = Object.keys(RECORD_TYPES);
 
 // 根域名（平台域名）验证常用预设
+/* 平台验证预设：host 为平台给出的「主机记录」，选中后自动填入；
+   记录值（valuePrefix 仅为提示）由用户从平台复制后粘贴。
+   EdgeOne 主机记录为 edgeonereclaim、记录值以 reclaim- 开头（腾讯云官方文档）。 */
 export const VERIFY_PRESETS = [
-  { key: 'vercel', host: '_vercel', label: 'Vercel', hint: 'Vercel 项目域名验证用 TXT 记录' },
-  { key: 'netlify', host: '_netlify', label: 'Netlify', hint: 'Netlify 域名所有权验证用 TXT 记录' },
-  { key: 'dnspod', host: '_dnsauth', label: 'DNSPod / 腾讯云', hint: '_dnsauth 开头的 TXT 验证记录' },
-  { key: 'dnspod2', host: '_dnspod', label: 'DNSPod (_dnspod)', hint: '_dnspod 开头的 TXT 验证记录' },
-  { key: 'aliyun', host: 'dnsauth', label: '阿里云云解析', hint: 'dnsauth 开头的 TXT 验证记录' },
-  { key: 'cloudflare', host: '_cf-verify', label: 'Cloudflare', hint: '_cf-verify 开头的 TXT 验证记录' },
-  { key: 'github', host: '_github-pages-challenge', label: 'GitHub Pages', hint: '验证值里的用户名部分请自行补全' },
-  { key: 'google', host: 'google-site-verification', label: 'Google Search Console', hint: 'Google 站点验证 TXT' },
-  { key: 'custom', host: '', label: '自定义', hint: '手动填写主机名与 TXT 值' },
+  { key: 'vercel', host: '_vercel', label: 'Vercel', hint: 'Vercel 项目域名验证', valueHint: 'vc-domain-verify=...' },
+  { key: 'netlify', host: '_netlify', label: 'Netlify', hint: 'Netlify 域名所有权验证', valueHint: 'netlify-domain-verification=...' },
+  { key: 'dnspod', host: '_dnsauth', label: 'DNSPod / 腾讯云', hint: '_dnsauth 开头的 TXT 验证', valueHint: '平台给出的随机串' },
+  { key: 'dnspod2', host: '_dnspod', label: 'DNSPod (_dnspod)', hint: '_dnspod 开头的 TXT 验证', valueHint: '平台给出的随机串' },
+  { key: 'edgeone', host: 'edgeonereclaim', label: 'EdgeOne', hint: '腾讯云 EdgeOne 归属权验证（官方文档：主机记录 edgeonereclaim）', valueHint: 'reclaim-...' },
+  { key: 'aliyun', host: 'dnsauth', label: '阿里云云解析', hint: 'dnsauth 开头的 TXT 验证', valueHint: '平台给出的随机串' },
+  { key: 'cloudflare', host: '_cf-verify', label: 'Cloudflare', hint: '_cf-verify 开头的 TXT 验证', valueHint: '平台给出的随机串' },
+  { key: 'github', host: '_github-pages-challenge', label: 'GitHub Pages', hint: '验证值含用户名，请完整粘贴', valueHint: '平台给出的随机串' },
+  { key: 'google', host: 'google-site-verification', label: 'Google Search Console', hint: 'Google 站点验证 TXT', valueHint: 'google-site-verification=...' },
+  { key: 'custom', host: '', label: '自定义', hint: '手动填写主机名与 TXT 值', valueHint: '' },
 ];
 
 // ------------------------- 校验工具 -------------------------

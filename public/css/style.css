@@ -4,46 +4,85 @@
    - 蓝紫 / 樱粉糖果色系，配初音未来 / GUMI 壁纸作底层
    - 圆润字体、胶囊徽章、渐变按钮；去掉 CRT 扫描线与霓虹直角角标 */
 
+/* ══════════════════════════════════════════════════════════
+   shadcn/ui 设计令牌（rose 主题 · light）
+   采用 HSL 通道值，便于 hsl(var(--x) / opacity) 的写法
+   ══════════════════════════════════════════════════════════ */
 :root {
-  /* 樱花猫主题：粉调墨色（不是冷灰，带一点紫粉） */
-  /* 清爽浅蓝白为底（参考 DnsNeko），樱花粉只作强调点缀 */
-  --ink: #243044;        /* 蓝灰墨 */
-  --ink-2: #4c5d74;
-  --ink-3: #8496ab;
+  /* 基底 */
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
 
-  /* 主强调：樱花粉；辅助：晴空蓝 */
-  --c1: #ef7da6;         /* 樱花粉 */
-  --c2: #f7a8c4;         /* 浅樱 */
-  --c3: #ffd0dd;         /* 花瓣 */
-  --c1-dim: #d65f8c;     /* 深樱 */
-  --sky: #5aa9e6;        /* 晴空蓝（辅助强调） */
+  /* 主色：rose（保留原来的樱花粉调性，但用 shadcn 的色标） */
+  --primary: 346.8 77.2% 49.8%;
+  --primary-foreground: 355.7 100% 97.3%;
 
-  /* 面板：纯白卡片 + 极淡蓝底 */
-  --panel: #ffffff;
-  --panel-2: rgba(240, 246, 253, .8);
-  --panel-hi: #ffffff;
+  /* 次级 / 弱化 */
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
 
-  /* 描边：冷调细线，比粉调更干净 */
-  --line: rgba(36, 48, 68, .1);
-  --line-hi: rgba(36, 48, 68, .22);
-  --line-warm: rgba(239, 125, 166, .45);
+  /* 语义色 */
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 142.1 76.2% 36.3%;
+  --success-foreground: 0 0% 98%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 48 96% 89%;
+  --info: 199 89% 48%;
+  --info-foreground: 0 0% 98%;
 
-  /* 文字 */
-  --text: #243044;
-  --text-2: #4c5d74;
-  --muted: #8496ab;
-
-  /* 状态色 */
-  --ok: #2fb37a;
-  --warn: #e5a13a;
-  --danger: #e8606f;
-  --lock: #8f7bd8;
+  /* 描边 / 输入 / 聚焦环 */
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 346.8 77.2% 49.8%;
 
   --paw-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Ccircle%20cx%3D%227%22%20cy%3D%229%22%20r%3D%222.2%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%227.2%22%20r%3D%222.2%22%2F%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%229%22%20r%3D%222.2%22%2F%3E%3Cpath%20d%3D%22M12%2012.5c3.2%200%205.8%202%205.8%204.4%200%202-1.7%203.3-3.9%203.3h-3.8C8%2020.2%206.2%2018.9%206.2%2016.9c0-2.4%202.6-4.4%205.8-4.4Z%22%2F%3E%3C%2Fsvg%3E");
-  --radius: 16px;        /* 收敛：22px 太笨 */
-  --radius-s: 10px;
-  --shadow: 0 1px 2px rgba(36, 48, 68, .05), 0 4px 14px rgba(36, 48, 68, .06);
-  --glow: 0 4px 12px rgba(239, 125, 166, .32);
+
+  --radius: 0.5rem;
+  --radius-s: calc(var(--radius) - 2px);
+  --x: 0px;
+
+  /* ── 兼容层：把旧变量名映射到 shadcn 令牌，避免逐处改 CSS ── */
+  --ink: hsl(var(--foreground));
+  --ink-2: hsl(240 5% 26%);
+  --ink-3: hsl(var(--muted-foreground));
+  --text: hsl(var(--foreground));
+  --text-2: hsl(240 5% 34%);
+  --muted: hsl(var(--muted-foreground));
+
+  --c1: hsl(var(--primary));
+  --c2: hsl(346.8 77.2% 62%);
+  --c3: hsl(346.8 87% 88%);
+  --c1-dim: hsl(346.8 77.2% 42%);
+  --sky: hsl(var(--info));
+
+  --panel: hsl(var(--card));
+  --panel-2: hsl(var(--muted));
+  --panel-hi: hsl(var(--card));
+
+  --line: hsl(var(--border));
+  --line-hi: hsl(240 5% 76%);
+  --line-warm: hsl(var(--primary) / .5);
+
+  --ok: hsl(var(--success));
+  --warn: hsl(var(--warning));
+  --danger: hsl(var(--destructive));
+  --lock: hsl(262 83% 58%);
+
+  /* shadcn 的阴影：极低饱和、近乎不可见 */
+  --shadow: 0 1px 2px 0 hsl(240 6% 10% / .05);
+  --shadow-md: 0 4px 6px -1px hsl(240 6% 10% / .08), 0 2px 4px -2px hsl(240 6% 10% / .06);
+  --shadow-lg: 0 10px 15px -3px hsl(240 6% 10% / .08), 0 4px 6px -4px hsl(240 6% 10% / .06);
+  --glow: 0 0 0 3px hsl(var(--ring) / .18);
+
 
   /* 字体
      · Redaction 35：拉丁与数字（像素/位图感，保留）
@@ -72,7 +111,7 @@ html, body {
   font-size: 13px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  background: linear-gradient(170deg, #f2f7fd 0%, #f8fbff 45%, #fdf6fa 100%);
+  background: hsl(var(--background));
 }
 
 /* ---------- 背景：角色壁纸 + 网格 ---------- */
@@ -109,7 +148,7 @@ html, body {
   background:
     radial-gradient(90% 70% at 12% 4%, rgba(150, 190, 255, .38), transparent 60%),
     radial-gradient(80% 80% at 92% 96%, rgba(255, 170, 210, .4), transparent 62%),
-    rgba(250, 252, 255, .8);   /* 浅蓝白遮罩：壁纸淡入背景，文字保持清晰 */
+    hsl(var(--background) / .82);   /* 中性遮罩：壁纸淡入背景，文字保持清晰 */
 }
 
 /* 无扫描线：糖果风不需要 CRT 质感 */
@@ -1206,3 +1245,130 @@ h1, h2, h3, .stat-v, .sc-num, .brand-name, .w-hi, .q-txt, .page-title {
 /* 顶栏：任何宽度都不换行 */
 .topbar-in > * { flex-shrink: 0; }
 .top-brand { overflow: hidden; }
+
+/* ══════════════════════════════════════════════════════════
+   shadcn 组件观感（在原有类名上收敛，不动结构）
+   ══════════════════════════════════════════════════════════ */
+
+/* Card：白底 + 1px 细边 + 极低饱和阴影 */
+.card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: hsl(var(--card-foreground));
+}
+.card::before { display: none; }        /* 去掉糖果高光条 */
+.card:hover { box-shadow: var(--shadow-md); transform: none; }
+
+/* Button：shadcn 默认变体 —— 深色实心主按钮 */
+.btn {
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  box-shadow: var(--shadow);
+  font-weight: 500;
+  transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
+}
+.btn:hover { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); transform: none; }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / .35); }
+
+.btn.primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+.btn.primary:hover { background: hsl(var(--primary) / .9); color: hsl(var(--primary-foreground)); }
+.btn.primary:focus-visible { box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / .4); }
+
+.btn.ghost { border-color: transparent; background: transparent; box-shadow: none; }
+.btn.ghost:hover { background: hsl(var(--accent)); }
+
+.btn.danger {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-color: hsl(var(--destructive));
+}
+.btn.danger:hover { background: hsl(var(--destructive) / .9); }
+
+/* Input / Select / Textarea */
+input, select, textarea {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: var(--shadow);
+  transition: border-color .15s, box-shadow .15s;
+}
+input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground)); }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / .18);
+}
+
+/* Badge：shadcn 三种变体 */
+.badge {
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  font-weight: 500;
+}
+.badge.ok { background: hsl(var(--success) / .12); color: hsl(var(--success)); border-color: hsl(var(--success) / .25); }
+.badge.warn { background: hsl(var(--warning) / .14); color: hsl(38 92% 40%); border-color: hsl(var(--warning) / .3); }
+.badge.danger { background: hsl(var(--destructive) / .1); color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .25); }
+.badge.inf { background: hsl(var(--primary) / .1); color: hsl(var(--primary)); border-color: hsl(var(--primary) / .25); }
+.badge.lock { background: hsl(262 83% 58% / .1); color: hsl(262 83% 50%); border-color: hsl(262 83% 58% / .25); }
+
+/* Table：细分隔线 + hover 淡灰 */
+.tablewrap table { border: 1px solid hsl(var(--border)); border-radius: var(--radius); overflow: hidden; }
+.tablewrap thead th {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
+}
+.tablewrap tbody td { border-bottom: 1px solid hsl(var(--border)); }
+.tablewrap tbody tr:hover td { background: hsl(var(--muted) / .6); }
+
+/* 侧栏 / 顶栏 */
+.topbar { background: hsl(var(--background)); border-bottom: 1px solid hsl(var(--border)); box-shadow: none; }
+.sidebar { background: hsl(var(--background)); border-right: 1px solid hsl(var(--border)); }
+.side-item.on { background: hsl(var(--secondary)); color: hsl(var(--foreground)); font-weight: 500; }
+.side-item:hover { background: hsl(var(--accent)); }
+
+/* 统计卡与快捷入口 */
+.stat-card, .quick {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.stat-card:hover, .quick:hover {
+  border-color: hsl(var(--primary) / .4);
+  box-shadow: var(--shadow-md);
+  transform: none;
+}
+.welcome { background: hsl(var(--muted) / .6); border: 1px solid hsl(var(--border)); }
+
+/* Alert */
+.alert { border-radius: var(--radius); border: 1px solid hsl(var(--border)); }
+.alert.info { background: hsl(var(--info) / .08); border-color: hsl(var(--info) / .25); color: hsl(199 89% 35%); }
+.alert.danger { background: hsl(var(--destructive) / .08); border-color: hsl(var(--destructive) / .25); color: hsl(var(--destructive)); }
+
+/* 标签页：shadcn tabs 下划线式 */
+.tab {
+  border-radius: calc(var(--radius) - 2px);
+  color: hsl(var(--muted-foreground));
+}
+.tab.active { background: hsl(var(--background)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); box-shadow: var(--shadow); }
+
+/* 弹层 */
+.modal-card, .user-menu {
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  color: hsl(var(--popover-foreground));
+}

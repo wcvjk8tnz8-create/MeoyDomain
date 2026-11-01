@@ -23,24 +23,6 @@
     } catch (e) {}
   })();
 </script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  /* Tailwind 主题：字体沿用 Redaction 35 + 圆体；配色用中性 slate + 单色强调（无渐变） */
-  if (typeof tailwind !== 'undefined') {   /* CDN 加载失败时不中断页面其它脚本 */
-  tailwind.config = {
-    corePlugins: { preflight: false },
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['Redaction 35', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'sans-serif'],
-          mono: ['Redaction 35', 'PingFang SC', 'Microsoft YaHei', 'monospace'],
-        },
-        borderRadius: { card: '14px' },
-        colors: { brand: '#4f46e5' },
-      }
-    }
-  }
-  }</script>
 </head>
 <body>
 <div id="bg"></div>
