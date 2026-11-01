@@ -612,9 +612,8 @@ tr.rejected td { background: rgba(255, 92, 114, .09); }
   background: #ffffff;   /* 顶栏：白色 + 底边细线，原蓝紫渐变已移除 */
   border-bottom: 1px solid var(--line);
   box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-  overflow: hidden;
-}
-  55%, 100% { transform: translateX(100%); }
+  /* 不能加 overflow: hidden —— 用户下拉菜单是 absolute 定位在顶栏下沿之外，
+     加了会被裁掉，只露出一条。此前正是这个原因导致菜单/右侧被「截断」。 */
 }
 .topbar-in {
   max-width: 1280px;
@@ -742,7 +741,7 @@ tr.rejected td { background: rgba(255, 92, 114, .09); }
   font-family: var(--cn);
   font-size: 12.5px; font-weight: 600;
   color: var(--ink);
-  max-width: 108px;
+  max-width: 150px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .u-role { font-size: 10px; color: var(--muted); letter-spacing: .3px; }
@@ -754,6 +753,8 @@ tr.rejected td { background: rgba(255, 92, 114, .09); }
   position: absolute;
   top: calc(100% + 9px);
   right: 0;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   min-width: 206px;
   z-index: 400;
   background: #fff;
@@ -1132,9 +1133,13 @@ h1, h2, h3,
 @media (max-width: 860px) { .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* 顶栏：任何宽度都不换行、不溢出（此前窄屏会被挤到第二行） */
-.topbar-in { flex-wrap: nowrap; }
-.top-brand { flex: 0 1 auto; min-width: 0; }
-.top-right { flex: 0 0 auto; }
+/* 顶栏：不换行；品牌区可收缩并省略号截断，右侧工具区不收缩（保证用户胶囊完整） */
+.topbar-in { flex-wrap: nowrap; min-width: 0; }
+.top-brand { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.brand-txt { min-width: 0; }
+.top-right { flex: 0 0 auto; margin-left: auto; }
+/* 中屏：品牌区优先让位，而不是把右侧挤出可视区 */
+@media (max-width: 1100px) { .brand-sub { display: none; } }
 @media (max-width: 720px) {
   .brand-txt { display: none; }            /* 只留 Logo */
   .top-brand { padding: 4px; gap: 0; }
@@ -1242,9 +1247,6 @@ h1, h2, h3, .stat-v, .sc-num, .brand-name, .w-hi, .q-txt, .page-title {
 /* 域名/记录值等：Redaction 35 优先，中文回落到正文字体 */
 .mono, .fqdn, code { font-family: var(--mono); }
 
-/* 顶栏：任何宽度都不换行 */
-.topbar-in > * { flex-shrink: 0; }
-.top-brand { overflow: hidden; }
 
 /* ══════════════════════════════════════════════════════════
    shadcn 组件观感（在原有类名上收敛，不动结构）
