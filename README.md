@@ -130,7 +130,10 @@
 | `reason` | 驳回或停用原因 |
 
 **whois 子域名自动跳转**：访问 `whois.<根域名>`（如 `whois.meoy.top`）自动进入查询页；`whois.meoy.top/<名称>` 直接查询该名称。
-**服务端重定向**（`src/index.js` 中间件，不依赖前端 JS，最可靠）：Worker 检测 Host 首段为 `whois`，把 `/` 与 `/<名称>` 302 到 WHOIS 页。已在 WHOIS 页、带查询串、静态资源、`/api` 一律放行，因此不会循环。
+**服务端重定向**（`src/index.js` 中间件，不依赖前端 JS，最可靠）：Worker 检测 Host 首段为 `whois`，把 `/` 与 `/<名称>` 302 到 WHOIS 页。**只接管入口页** —— `/dashboard`、`/admin`、`/whois`、`/domain` 等一律放行。
+
+> ⚠️ 曾经踩过的坑：跳转逻辑写了两份（前端 `api.js` 一份、服务端一份），前端那份会在**每个页面**执行，于是访问 `/dashboard` 被踢去 `/whois.html?name=dashboard`，而登录页又把已登录的人送回 `/dashboard`，两边互相抢夺形成死循环。
+> 现在**前端不再做任何 whois 跳转**，只由服务端处理。新增跳转逻辑时务必只写一处。
 为此 `wrangler.toml` 设了 `run_worker_first = true`，Worker 处理完后通过 `ASSETS.fetch()` 回落静态资源。**不要再手动改写路径**（补 `index.html`、去 `.html`）—— ASSETS 自带 `/xxx.html ⇄ /xxx` 规范化，两边都改会形成自指 307 死循环。
 
 **入口分流**（`index.html` 头部同步脚本，早于页面渲染，作为前端兜底）：

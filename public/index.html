@@ -29,37 +29,37 @@
     var qs = location.search || '';
     var wantLogin = /(?:^|[?&])login=1(?:&|$)/.test(qs);
     var p = location.pathname.replace(/^\/+|\/+$/g, '');
-    var seg0 = (p.split('/')[0] || '');
+    var isEntry = (p === '' || p === 'index.html');   // 只接管入口页
 
     // 兜底：任何原因导致 2.5 秒内没跳转成功，就恢复显示登录页
     setTimeout(show, 2500);
-    // 页面完全加载后仍未跳转也恢复显示
     window.addEventListener('load', function () { setTimeout(show, 600); });
 
-    // 1) whois.<根域名>：一律落到 WHOIS 查询页（该页免登录，不会跳回来）。
-    //    带计数熔断，万一将来 whois 页又要求登录也不会无限刷新。
+    var isWhoisHost = false;
     try {
       var parts = location.hostname.toLowerCase().split('.');
-      if (parts.length >= 3 && parts[0] === 'whois') {
-        if (/^whois(\.html)?$/i.test(seg0)) { show(); return; }   // 已经到了
-        var n = Number(sessionStorage.getItem('meoy_whois_n') || '0');
-        if (n >= 3) { show(); return; }                            // 熔断：停在登录页，别空转
-        sessionStorage.setItem('meoy_whois_n', String(n + 1));
-        hide();
-        // 显示跳转提示，避免跳转挂起时看到纯黑屏
-        try {
-          var tip = document.createElement('div');
-          tip.id = 'jumpTip';
-          tip.textContent = '正在跳转到 WHOIS 查询…';
-          document.documentElement.appendChild(tip);
-        } catch (e) {}
-        location.replace('/whois.html' + qs);
-        // replace 若被拦截/挂起，兜底会把页面显示回来
-        return;
-      }
-    } catch (e) { show(); }
+      isWhoisHost = parts.length >= 3 && parts[0] === 'whois';
+    } catch (e) {}
 
-    // 2) 已登录直接进控制台
+    /* 优先级（只针对入口页，其它页面一律不跳转，避免互相抢夺）：
+       1) whois.<根域名>/  → WHOIS 查询页
+       2) 主域 + 已登录     → dashboard
+       3) 主域 + 未登录     → 留在本页 */
+    if (!isEntry) { show(); return; }
+
+    if (isWhoisHost) {
+      // 正常情况服务端已 302，这里是兜底
+      hide();
+      try {
+        var tip = document.createElement('div');
+        tip.id = 'jumpTip';
+        tip.textContent = '正在跳转到 WHOIS 查询…';
+        document.documentElement.appendChild(tip);
+      } catch (e) {}
+      location.replace('/whois.html' + qs);
+      return;
+    }
+
     if (wantLogin) { show(); return; }
     hide();
     var done = false;
@@ -70,7 +70,6 @@
         else show();
       })
       .catch(function () { show(); });
-    // 探测超过 2 秒没结果就不等了，直接显示登录页
     setTimeout(function () { if (!done) show(); }, 2000);
   })();
 </script>

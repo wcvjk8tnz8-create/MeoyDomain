@@ -35,25 +35,30 @@ app.use('/api/*', async (c, next) => {
  * 需在 wrangler.toml 的 run_worker_first 里放行 "/" 与 "/index.html" 才会命中。
  */
 app.use('*', async (c, next) => {
-  let host = '';
-  try { host = new URL(c.req.url).hostname.toLowerCase(); } catch { return next(); }
-  const seg = host.split('.');
+  let u;
+  try { u = new URL(c.req.url); } catch { return next(); }
+  const seg = u.hostname.toLowerCase().split('.');
   if (seg.length < 3 || seg[0] !== 'whois') return next();
 
-  const u = new URL(c.req.url);
   const p = u.pathname;
   if (p.startsWith('/api/')) return next();
-  if (/\.(css|js|png|jpg|jpeg|ico|svg|json|txt|woff2?)$/i.test(p)) return next();
-  // 已在 WHOIS 页（含 ASSETS 规范化后的无后缀形态 /whois）→ 放行
-  if (/^\/whois(\.html)?$/i.test(p)) return next();
-  // 已带查询串 → 说明是重定向后的请求，放行，否则会与 ASSETS 的 .html 规范化形成循环
-  if (u.search) return next();
 
-  const name = p.replace(/^\/+|\/+$/g, '');
-  const target = name && name !== 'index.html'
-    ? `/whois.html?name=${encodeURIComponent(name)}`
-    : '/whois.html';
-  return c.redirect(target, 302);
+  // 只接管入口页（/ 与 /index.html）。
+  // 其它路径（/dashboard、/admin、/whois、/domain…）一律放行 ——
+  // 否则会把 /dashboard 变成“查询 dashboard”，与已登录跳控制台的逻辑互相抢夺形成循环。
+  const root = p.replace(/^\/+|\/+$/g, '');
+  if (root === '' || root === 'index.html') {
+    return c.redirect('/whois.html', 302);
+  }
+
+  // whois.<域>/<名称> 直接查询：仅限看起来像域名前缀的单一路径段
+  // （排除已知页面名与任何带后缀的资源，避免误伤）
+  const KNOWN = new Set(['whois', 'whois.html', 'dashboard', 'dashboard.html',
+    'admin', 'admin.html', 'domain', 'domain.html', 'terms', 'terms.html', 'index.html']);
+  if (!KNOWN.has(root.toLowerCase()) && !/[./]/.test(root) && !u.search) {
+    return c.redirect(`/whois.html?name=${encodeURIComponent(root)}`, 302);
+  }
+  return next();
 });
 
 app.use('*', attachUser);

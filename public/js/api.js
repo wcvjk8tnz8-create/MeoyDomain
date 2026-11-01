@@ -222,42 +222,10 @@ document.addEventListener('click', (e) => {
   if (e.target.id === 'modal') closeModal();
 });
 
-/* ---------- WHOIS 子域名自动跳转 ----------
-   访问 whois.<根域名>（如 whois.meoy.top）自动进入 WHOIS 查询页。
-   支持直接查询：whois.meoy.top/google → /whois.html?name=google
-   同步执行，不依赖任何异步配置。 */
-const WHOIS_SUBDOMAIN = 'whois'; // 想换前缀改这里
-
-(function whoisSubdomainRedirect() {
-  try {
-    const parts = location.hostname.toLowerCase().split('.');
-    // whois.meoy.top（3 段及以上）；根域名与 localhost 不触发
-    if (parts.length < 3 || parts[0] !== WHOIS_SUBDOMAIN) return;
-
-    const p = location.pathname.replace(/^\/+|\/+$/g, '');
-    const seg = p.split('/');
-
-    // ① 已经到达 WHOIS 页（whois.html / whois / whois/xxx）→ 清除熔断计数并停止
-    //    注意：部分托管会把 /whois.html 规范化成 /whois，两种形态都要识别
-    if (/^whois(\.html)?$/i.test(seg[0] || '')) {
-      try { sessionStorage.removeItem('meoy_whois_n'); } catch {}
-      return;
-    }
-
-    // ② 静态资源与接口路径不处理
-    if (/\.(html|css|js|png|jpg|jpeg|ico|svg|json)$/i.test(p) || p.startsWith('api/')) return;
-
-    // ③ 入口页 → 查询页；/google → 直接查询 google
-    const target = (p === '' || p === 'index.html')
-      ? '/whois.html'
-      : '/whois.html?name=' + encodeURIComponent(p);
-
-    // 计数熔断：正常情况下一次就落地（WHOIS 页免登录，不会再跳回登录页）
-    const n = Number(sessionStorage.getItem('meoy_whois_n') || '0');
-    if (n >= 3) return;
-    sessionStorage.setItem('meoy_whois_n', String(n + 1));
-    location.replace(target);
-  } catch { /* 忽略 */ }
-})();
+/* ---------- WHOIS 子域名跳转 ----------
+   已由 Worker 服务端中间件处理（见 src/index.js），前端不再做任何跳转。
+   此前前端也做一份，结果在 /dashboard 上又把它踢去 /whois.html?name=dashboard，
+   与「已登录 → 控制台」逻辑互相抢夺，形成来回跳转。此处只保留清理旧计数的逻辑。 */
+try { sessionStorage.removeItem('meoy_whois_n'); } catch {}
 
 mountWallpaper();
