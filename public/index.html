@@ -6,23 +6,49 @@
 <title>账户登录 · Meoy</title>
 <link rel="stylesheet" href="/css/style.css">
 <script>
-  // whois.<根域名> 直接进 WHOIS 查询页（提前执行，避免首页闪一下）
-  // 只在入口页（/ 或 /index.html）触发，且同一次会话只跳一次，避免循环刷新
+  /* ── 入口分流（同步执行，早于页面渲染）──
+     1) whois.<根域名> → WHOIS 查询页（免登录）
+     2) 已登录 → 直接进控制台，不再闪登录页
+     加 ?login=1 可强制留在登录页（切换账号用） */
   (function () {
+    var qs = location.search || '';
+    var wantLogin = /(?:^|[?&])login=1(?:&|$)/.test(qs);
+    var p = location.pathname.replace(/^\/+|\/+$/g, '');
+    var seg0 = (p.split('/')[0] || '');
+
+    // 1) whois.<根域名>：一律落到 WHOIS 查询页（该页免登录，不会跳回来）。
+    //    带计数熔断，万一将来 whois 页又要求登录也不会无限刷新。
     try {
       var parts = location.hostname.toLowerCase().split('.');
-      if (parts.length < 3 || parts[0] !== 'whois') return;
-      var p = location.pathname.replace(/^\/+|\/+$/g, '');
-      if (p !== '' && p !== 'index.html') return;          // 非入口页不处理
-      if (/^whois(\.html)?$/i.test(p.split('/')[0] || '')) return; // 已在 whois 页
-      var target = '/whois.html' + (location.search || '');
-      var key = 'meoy_whois_rd';
-      if (sessionStorage.getItem(key) === target) return;  // 上次跳转没落地 → 停手
-      sessionStorage.setItem(key, target);
-      location.replace(target);
+      if (parts.length >= 3 && parts[0] === 'whois') {
+        if (/^whois(\.html)?$/i.test(seg0)) return;        // 已经到了
+        var n = Number(sessionStorage.getItem('meoy_whois_n') || '0');
+        if (n >= 3) { document.documentElement.setAttribute('data-auth', 'guest'); return; }
+        sessionStorage.setItem('meoy_whois_n', String(n + 1));
+        location.replace('/whois.html' + qs);
+        return;
+      }
     } catch (e) {}
+
+    // 2) 已登录直接进控制台
+    if (wantLogin) { document.documentElement.setAttribute('data-auth', 'guest'); return; }
+    window.__authProbe = fetch('/api/auth/me', { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('guest')); })
+      .then(function (d) {
+        if (d && d.success && d.user) { location.replace('/dashboard'); return null; }
+        document.documentElement.setAttribute('data-auth', 'guest');
+        return null;
+      })
+      .catch(function () {
+        document.documentElement.setAttribute('data-auth', 'guest');
+        return null;
+      });
   })();
 </script>
+<style>
+  /* 未确定登录态前不显示登录表单，避免已登录用户看到闪屏 */
+  html:not([data-auth]) .auth-wrap { visibility: hidden; }
+</style>
 </head>
 <body>
 <div id="bg"></div>
@@ -202,7 +228,7 @@ api.get('/api/rules').then((r) => {
     `我已阅读并同意<a href="/terms.html" target="_blank">《服务条款与免责声明》</a>，了解并接受禁止滥用与免责条款`;
 }).catch(() => {});
 
-api.get('/api/auth/me').then(() => { location.href = '/dashboard'; }).catch(() => {});
+// 登录态探测已由 head 脚本完成（命中则直接跳控制台），这里不再重复请求
 
 // 从 WHOIS 页带名称过来：/?q=xxx
 const preQ = new URLSearchParams(location.search).get('q');

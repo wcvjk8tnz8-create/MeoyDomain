@@ -125,21 +125,13 @@ document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 
   }
 })();
 
-mountNav('dash').then(async (u) => {
-  if (u) { applyBranding(await loadBranding()); isLoggedIn = true; }
-  else {
-    const nav = document.getElementById('nav');
-    if (nav) {
-      nav.innerHTML = `
-        <div class="logo"><img src="/img/logo.jpg" alt="" style="width:30px;height:30px;object-fit:contain;border-radius:3px"><span class="logo-text">Meoy</span></div>
-        <div class="spacer"></div>
-        <div class="links">
-          <a class="navlink" href="/">登录</a>
-          <a class="navlink active" href="/whois.html">WHOIS</a>
-          <a class="navlink" href="/terms.html">服务条款</a>
-        </div>`;
-    }
-  }
+// 免登录页面：未登录也正常渲染（若这里要求登录，会与 whois 子域的自动跳转形成死循环）
+mountNav('whois', { optional: true }).then(async (u) => {
+  applyBranding(await loadBranding());
+  isLoggedIn = !!u;
+  // 登录态变化后再刷一次结果，让「申请」按钮状态正确
+  const pre = document.getElementById('q').value.trim();
+  if (pre) doQuery();
 }).catch(() => {});
 </script>
 </body>

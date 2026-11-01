@@ -130,6 +130,20 @@
 | `reason` | 驳回或停用原因 |
 
 **whois 子域名自动跳转**：访问 `whois.<根域名>`（如 `whois.meoy.top`）自动进入查询页；`whois.meoy.top/<名称>` 直接查询该名称。
+**入口分流**（`index.html` 头部同步脚本，早于页面渲染）：
+
+| 访问 | 结果 |
+|---|---|
+| `meoy.top/` 已登录 | 直接进 `/dashboard`，不闪登录页 |
+| `meoy.top/` 未登录 | 登录页 |
+| `meoy.top/?login=1` | 强制留在登录页（切换账号用） |
+| `whois.meoy.top/` | → `/whois.html` |
+| `whois.meoy.top/google` | → `/whois.html?name=google` |
+
+已登录时登录表单用 `visibility:hidden` 压住，直到确认是访客才显示，所以不会闪一下。
+
+**WHOIS 是免登录页面**（`mountNav(..., { optional: true })`）。这一点很关键：早期版本它要求登录，未登录就跳 `/`，而 whois 子域又把 `/` 跳回 `/whois.html`，形成死循环。现在它不要求登录，并有计数熔断兜底。
+
 防循环三重保护：只在入口页（`/`、`/index.html`）触发；识别 `whois` 与 `whois.html` 两种形态（部分托管会规范化掉 `.html`）；同一次会话内对同一目标只跳一次，落地后即清除标记。即使 `whois.html` 缺失被回退到首页也不会无限刷新。
 需要先把 `whois` 这个主机名指向本 Worker —— 在 Cloudflare 的 Worker 设置里添加**自定义域/路由** `whois.meoy.top/*`（或在 DNS 里加一条指向 Worker 的记录并开启代理）。前缀可在 `public/js/api.js` 顶部的 `WHOIS_SUBDOMAIN` 改。
 

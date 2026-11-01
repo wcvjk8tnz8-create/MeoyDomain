@@ -200,7 +200,7 @@ async function mountNav(active, opts = {}) {
     </div>`;
   document.getElementById('btnLogout').onclick = async () => {
     await api.post('/api/auth/logout', {});
-    location.href = '/';
+    location.href = '/?login=1';   // 带 login=1，避免被「已登录直入控制台」的逻辑带走
   };
   document.querySelectorAll('.bgswitch button').forEach((b) => {
     b.onclick = () => applyWallpaper(b.dataset.wp);
@@ -235,34 +235,29 @@ const WHOIS_SUBDOMAIN = 'whois'; // 想换前缀改这里
     if (parts.length < 3 || parts[0] !== WHOIS_SUBDOMAIN) return;
 
     const p = location.pathname.replace(/^\/+|\/+$/g, '');
-
-    // ① 已经在 WHOIS 页（whois.html / whois / whois/xxx / 带查询串）→ 清除标记并停止
-    //    注意：部分托管会把 /whois.html 规范化成 /whois，两种形态都要识别
     const seg = p.split('/');
+
+    // ① 已经到达 WHOIS 页（whois.html / whois / whois/xxx）→ 清除熔断计数并停止
+    //    注意：部分托管会把 /whois.html 规范化成 /whois，两种形态都要识别
     if (/^whois(\.html)?$/i.test(seg[0] || '')) {
-      try { sessionStorage.removeItem('meoy_whois_rd'); } catch {}
+      try { sessionStorage.removeItem('meoy_whois_n'); } catch {}
       return;
     }
 
-    // ② 只有停在入口页（/ 或 /index.html）时才跳转，避免任何路径被反复改写
-    if (p !== '' && p !== 'index.html') {
-      // 非入口页：/google 这类直接查询（静态资源与接口路径除外）
-      if (/\.(html|css|js|png|jpg|jpeg|ico|svg|json)$/i.test(p) || p.startsWith('api/')) return;
-      whoisGo('/whois.html?name=' + encodeURIComponent(p));
-      return;
-    }
-    whoisGo('/whois.html');
-  } catch { /* 忽略 */ }
+    // ② 静态资源与接口路径不处理
+    if (/\.(html|css|js|png|jpg|jpeg|ico|svg|json)$/i.test(p) || p.startsWith('api/')) return;
 
-  // 同一次会话内对同一目标只跳一次，杜绝任何原因造成的循环刷新
-  function whoisGo(target) {
-    try {
-      const key = 'meoy_whois_rd';
-      if (sessionStorage.getItem(key) === target) return;
-      sessionStorage.setItem(key, target);
-    } catch {}
+    // ③ 入口页 → 查询页；/google → 直接查询 google
+    const target = (p === '' || p === 'index.html')
+      ? '/whois.html'
+      : '/whois.html?name=' + encodeURIComponent(p);
+
+    // 计数熔断：正常情况下一次就落地（WHOIS 页免登录，不会再跳回登录页）
+    const n = Number(sessionStorage.getItem('meoy_whois_n') || '0');
+    if (n >= 3) return;
+    sessionStorage.setItem('meoy_whois_n', String(n + 1));
     location.replace(target);
-  }
+  } catch { /* 忽略 */ }
 })();
 
 mountWallpaper();
