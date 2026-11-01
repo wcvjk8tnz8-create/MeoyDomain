@@ -14,7 +14,7 @@ run_worker_first = true
 # 若不使用自定义头像上传，可整段删除（上传接口会自动禁用）
 [[r2_buckets]]
 binding = "AVATARS"
-bucket_name = "meoy-avatars"
+bucket_name = "meoy-avatars"   # CI 可用 vars.R2_BUCKET_NAME 覆盖（见 inject-config.mjs）
 
 # D1 数据库
 [[d1_databases]]

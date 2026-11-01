@@ -1,4 +1,10 @@
-# 二级域名分发系统
+# MeoyDomain
+
+**MeoyDomain** —— 免费、开源的新一代二级域名分发与 DNS 管理系统。
+基于 **Cloudflare Workers + D1 + R2**，用户自助申请 `xxx.你的根域名`，审核通过后自行添加 DNS 记录，所有记录通过 **Cloudflare API** 实时下发到你的 Zone。
+
+> 内置落地首页（`/home.html`）、12 种 DNS 记录、根域名验证、域名托管委派、工单与转移、积分与兑换券。
+
 
 基于 **Cloudflare Workers + D1** 的二级域名注册平台（类似 dnshe / hapdns）。用户自助申请 `xxx.你的根域名`，审核通过后自行添加 DNS 记录，所有记录通过 **Cloudflare API** 实时下发到你的 Zone。
 

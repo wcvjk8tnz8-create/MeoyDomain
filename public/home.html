@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeoyDomain · 免费二级域名分发</title>
+<meta name="description" content="MeoyDomain —— 免费、开源的新一代二级域名分发与 DNS 管理系统，支持 12 种 DNS 记录类型，基于 Cloudflare Workers + D1。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap"></noscript>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="bg"></div>
+
+<!-- ── 落地页顶栏（独立于控制台顶栏） ── -->
+<header class="home-top">
+  <div class="home-top-in">
+    <a class="home-brand" href="/home.html">
+      <img data-logo-img src="/img/logo.jpg" alt="">
+      <span><b data-site-name>Meoy</b><i>二级域名分发</i></span>
+    </a>
+    <nav class="home-nav">
+      <a href="/whois.html">WHOIS</a>
+      <a href="/terms.html">条款</a>
+      <a class="btn sm primary" href="/">登录 / 注册</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ── Hero：大标题 + 域名查询 ── -->
+<section class="hero">
+  <div class="hero-in">
+    <div class="hero-badge">免费 · 开源 · Cloudflare 驱动</div>
+    <h1 class="hero-title">你的子域名<span class="hero-accent">即刻部署</span></h1>
+    <p class="hero-sub">免费，开源，新一代二级域名分发与 DNS 管理系统</p>
+
+    <form class="hero-search" id="searchForm">
+      <input id="qName" placeholder="yourname" autocomplete="off" spellcheck="false">
+      <span class="hero-suffix">.<span id="qRoot">meoy.top</span></span>
+      <button type="submit" class="btn primary">浏览域名 →</button>
+    </form>
+    <div class="hero-tip" id="qTip"></div>
+  </div>
+</section>
+
+<!-- ── 功能卡片 ── -->
+<section class="home-sec">
+  <div class="home-sec-in">
+    <div class="feat-grid">
+      <div class="card feat">
+        <div class="feat-ico">⚡</div>
+        <h3>即时生效</h3>
+        <p>通过 Cloudflare API 直写解析记录，添加后秒级生效，支持开启代理（CDN）。</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico">☁️</div>
+        <h3>Cloudflare 驱动</h3>
+        <p>运行在 Cloudflare Workers 上，数据存于 D1，全球边缘加速、无需服务器。</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico">🎛️</div>
+        <h3>完全控制</h3>
+        <p>自定义 TTL、根域名验证锁定、域名托管委派、有效期与续期，全部自助。</p>
+      </div>
+      <div class="card feat feat-wide">
+        <div class="feat-ico">🧩</div>
+        <h3>支持的记录类型</h3>
+        <div class="rt-list" id="rtList">A · AAAA · CNAME · MX · TXT · NS · SOA · PTR · SRV · CAA · NAPTR · DS</div>
+        <p class="feat-note">覆盖主流场景：网站、邮箱、验证、服务发现与 DNSSEC 委派。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 三步上手 ── -->
+<section class="home-sec home-sec-alt">
+  <div class="home-sec-in">
+    <h2 class="sec-title">几分钟即可上手</h2>
+    <div class="step3">
+      <div class="card s3">
+        <div class="s3-num">1</div>
+        <h3>认领子域名</h3>
+        <p>注册账号后申请你喜欢的名字，审核通过即刻拥有完整管理权。</p>
+      </div>
+      <div class="card s3">
+        <div class="s3-num">2</div>
+        <h3>添加 DNS 记录</h3>
+        <p>按需添加 A / CNAME / MX / TXT 等记录，也可以一键托管到 anyns、DNSHE。</p>
+      </div>
+      <div class="card s3">
+        <div class="s3-num">3</div>
+        <h3>上线</h3>
+        <p>解析生效后即可访问。支持根域名验证，方便接入 Vercel、Netlify、EdgeOne。</p>
+      </div>
+    </div>
+    <div class="row center" style="margin-top:22px">
+      <a class="btn primary" href="/">立即开始 →</a>
+    </div>
+  </div>
+</section>
+
+<footer class="home-foot">
+  <div class="home-sec-in">
+    <div class="row between" style="flex-wrap:wrap;gap:10px">
+      <div class="sub" style="margin:0">
+        <b data-site-name>Meoy</b> · MeoyDomain — 二级域名分发与 DNS 管理
+      </div>
+      <nav class="home-nav">
+        <a href="/whois.html">WHOIS 查询</a>
+        <a href="/terms.html">服务条款</a>
+        <a href="/">控制台</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/api.js"></script>
+<script>
+/* ---------- 品牌信息 ---------- */
+loadBranding().then(applyBranding).catch(() => {});
+
+/* ---------- 根域名 ---------- */
+(async () => {
+  try {
+    const cfg = await api.get('/api/config');
+    const root = cfg.rootDomain || 'meoy.top';
+    document.getElementById('qRoot').textContent = root;
+    if (Array.isArray(cfg.recordTypes) && cfg.recordTypes.length) {
+      document.getElementById('rtList').textContent = cfg.recordTypes.map((t) => t.key).join(' · ');
+    }
+  } catch {}
+})();
+
+/* ---------- 域名查询：走公开 WHOIS ---------- */
+document.getElementById('searchForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('qName').value.trim();
+  const tip = document.getElementById('qTip');
+  if (!name) { tip.textContent = '请输入想查询的名称'; tip.className = 'hero-tip err'; return; }
+  tip.textContent = '查询中…'; tip.className = 'hero-tip';
+  try {
+    const d = await api.get('/api/whois?name=' + encodeURIComponent(name));
+    const r = d.result || d;
+    const state = r.state || r.status || '';
+    const av = ['free', 'available', '可注册'].includes(state);
+    const txt = {
+      free: '可注册', available: '可注册',
+      pending: '审核中', registered: '已注册', taken: '已注册',
+      rejected: '已驳回', suspended: '已停用', reserved: '系统保留',
+    }[state] || state || '未知';
+    tip.innerHTML = `<b>${esc(r.fqdn || r.name || name)}</b> — ${esc(txt)}`;
+    tip.className = 'hero-tip ' + (av ? 'ok' : 'warn');
+  } catch (err) {
+    tip.textContent = err.message || '查询失败';
+    tip.className = 'hero-tip err';
+  }
+});
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@ const SHELL_NAV = [
   { key: 'profile', name: '个人资料', icon: 'user', href: '/profile.html' },
   { key: 'tickets', name: '工单系统', icon: 'ticket', href: '/tickets.html' },
   { key: 'transfer', name: '域名转移', icon: 'swap', href: '/transfer.html' },
+  { key: 'home', name: '站点首页', icon: 'home', href: '/home.html' },
 ];
 
 const SHELL_ICON = {
@@ -23,6 +24,7 @@ const SHELL_ICON = {
   chat: '<path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1Zm2 4v2h12V7H6Zm0 4v2h9v-2H6Z"/>',
   user: '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.4-8 5.3V22h16v-2.7c0-2.9-3.6-5.3-8-5.3Z"/>',
   ticket: '<path d="M4 3h16a1 1 0 0 1 1 1v5a2 2 0 0 0 0 4v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a2 2 0 0 0 0-4V4a1 1 0 0 1 1-1Zm7 4v2H6v2h5v2h2v-2h5v-2h-5V7h-2Z"/>',
+  home: '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5Z"/>',
   swap: '<path d="M7 4 3 8l4 4V9h9a2 2 0 0 1 2 2v1h2v-1a4 4 0 0 0-4-4H7V4Zm10 12 4-4-4-4v3H8a2 2 0 0 0-2 2v1H4v-1a4 4 0 0 1 4-4h9v3Z"/>',
   admin: '<path d="M12 2 3 6v6c0 5 3.8 9.4 9 10 5.2-.6 9-5 9-10V6l-9-4Zm0 2.2 7 3.1V12c0 4-2.9 7.5-7 8-4.1-.5-7-4-7-8V7.3l7-3.1Zm-1 4v2H8v2h3v2h2v-2h3v-2h-3V8.2h-2Z"/>',
   terms: '<path d="M6 2h9l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 2v4h4l-4-4ZM8 11h8v2H8v-2Zm0 4h8v2H8v-2Z"/>',

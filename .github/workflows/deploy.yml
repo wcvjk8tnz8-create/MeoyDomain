@@ -64,6 +64,18 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
 
+      # R2 存储桶：存在就复用，不存在自动创建（用于自定义头像上传）
+      # 头像默认走 Worker 的 /api/avatar/<key> 代理，本身即公网可访问，不需要 R2 公开访问
+      # 如需外链直连，可在 Variables 里填 R2_CUSTOM_DOMAIN（如 img.meoy.top）
+      - name: 准备 R2 存储桶
+        run: node scripts/ensure-r2.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_BUCKET_NAME: ${{ vars.R2_BUCKET_NAME }}
+          R2_CUSTOM_DOMAIN: ${{ vars.R2_CUSTOM_DOMAIN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+
       # 把 Variables 写进 wrangler.toml
       # database_id 由上一步自动写入环境，此处不再覆盖
       - name: 注入配置
@@ -75,6 +87,9 @@ jobs:
           REQUIRE_APPROVAL: ${{ vars.REQUIRE_APPROVAL }}
           RESERVED_LABELS: ${{ vars.RESERVED_LABELS }}
           CF_MOCK: ${{ vars.CF_MOCK }}
+          R2_BUCKET_NAME: ${{ vars.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+          AVATAR_MAX_KB: ${{ vars.AVATAR_MAX_KB }}
 
       # 敏感值写入 Worker 的加密环境变量（等同 wrangler secret put）
       # DNSHE_API_KEY / DNSHE_API_SECRET 为可选项：不填则退回公开模式

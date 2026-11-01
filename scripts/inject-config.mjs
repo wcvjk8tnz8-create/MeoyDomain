@@ -36,7 +36,11 @@ if (d1) {
 }
 
 // 其余可选变量
-const KEYS = ['ROOT_DOMAIN', 'DEFAULT_QUOTA', 'ALLOW_SIGNUP', 'REQUIRE_APPROVAL', 'RESERVED_LABELS', 'CF_MOCK'];
+const KEYS = [
+  'ROOT_DOMAIN', 'DEFAULT_QUOTA', 'ALLOW_SIGNUP', 'REQUIRE_APPROVAL', 'RESERVED_LABELS', 'CF_MOCK',
+  // R2：桶名（需与 ensure-r2.mjs 创建的一致）、公开外链地址
+  'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'AVATAR_MAX_KB',
+];
 let n = 0;
 for (const k of KEYS) if (apply(k, process.env[k])) n++;
 if (!n) console.log('  · 无可选变量需要覆盖');
