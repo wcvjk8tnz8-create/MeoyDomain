@@ -2999,10 +2999,11 @@ body::before {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420' fill='none' stroke='%239cc3ff' stroke-opacity='.35' stroke-width='1.2'><path d='M-10 80c60-40 110 30 170 0s90-70 150-30 90 20 130-10'/><path d='M-10 130c60-40 110 30 170 0s90-70 150-30 90 20 130-10'/><path d='M-10 180c60-40 110 30 170 0s90-70 150-30 90 20 130-10'/><path d='M-10 260c70 40 120-30 180 10s100 50 160 0 70-30 100-10'/><path d='M-10 310c70 40 120-30 180 10s100 50 160 0 70-30 100-10'/><path d='M-10 360c70 40 120-30 180 10s100 50 160 0 70-30 100-10'/></svg>");
 }
 /* 内容层必须高于装饰层 */
-.topbar, .sidebar, .main, .footer, .site-foot { position: relative; z-index: 1; }
+.main, .footer, .site-foot { position: relative; z-index: 1; }
+/* 注意：.topbar / .sidebar 不能在这里写 position —— 它们是 position:fixed，
+   写成 relative 会让它们变回文档流内元素，把整个主内容向下顶。 */
 .sidebar { z-index: 250; }
 .topbar { z-index: 300; }
-.main { z-index: 1; }
 
 /* ---------- 闪光装饰 ---------- */
 .spark {
@@ -3419,3 +3420,56 @@ body .site-foot { margin-left: 224px; }
 [data-theme="dark"] .quote { background: linear-gradient(135deg, hsl(217 33% 16%), hsl(338 30% 17%)); color: hsl(210 30% 84%); }
 [data-theme="dark"] .sec-item:hover { background: hsl(222 44% 15%); }
 [data-theme="dark"] .info-row { border-top-color: hsl(217 25% 26%); }
+
+/* ══════════════════════════════════════════════════════════════
+   布局定位 · 权威声明
+   ──────────────────────────────────────────────────────────────
+   必须放在样式表最末尾：本文件历史上有多套骨架，
+   前面残留的规则会互相覆盖 position / margin / padding。
+
+   历史上出过的 bug（不要再犯）：
+   1. `.topbar,.sidebar{position:relative}` 把 fixed 覆盖成文档流内元素
+      → 顶栏占 64px，.main 又 padding-top:64px，内容整体下移 128px
+   2. 旧版抽屉 `.sidebar{transform:translateX(-100%)}` 未清理
+      → 侧栏被移出屏幕
+   3. `.topbar{left:0;right:0}` 横跨整页 → 盖住侧栏顶部的 logo
+
+   当前方案（三件套，缺一不可）：
+     .sidebar  fixed，left:0，宽 224px
+     .topbar   fixed，left:224px（让开侧栏），高 64px
+     .main     margin-left:224px + padding-top:64px（让开 fixed 顶栏）
+   ══════════════════════════════════════════════════════════════ */
+.sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 224px;
+  height: 100vh;
+  z-index: 250;
+  transform: none;              /* 清掉旧版抽屉的 translateX(-100%) */
+  transition: none;
+  overflow-y: auto;
+}
+.topbar {
+  position: fixed;
+  top: 0; left: 224px; right: 0;
+  height: 64px;
+  margin-left: 0;
+  z-index: 300;
+}
+.main {
+  position: relative;
+  z-index: 1;
+  margin-left: 224px;
+  padding: 64px 0 0;            /* 顶栏是 fixed，必须让开这 64px */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.footer, .site-foot { position: relative; z-index: 1; }
+
+@media (max-width: 1000px) {
+  .sidebar { width: 68px; }
+  .topbar  { left: 68px; }
+  .main    { margin-left: 68px; }
+  body .site-foot { margin-left: 68px; }
+}
