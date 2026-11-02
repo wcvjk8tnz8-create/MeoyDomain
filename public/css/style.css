@@ -2043,19 +2043,21 @@ html.theme-anim .sidebar {
 [data-theme="dark"] .page-home.has-cloud .nk-h1 { color: #fff; }
 [data-theme="dark"] .page-home.has-cloud .nk-h1,
 [data-theme="dark"] .page-home.has-cloud .nk-lead { text-shadow: 0 1px 12px rgba(0, 0, 0, .55); }
-/* 插画是白底的，给个柔和白色柔光托底，避免直接压在蓝天上显生硬 */
-.page-home.has-cloud .nk-hero-art {
-  position: relative;
-  border-radius: 18px;
+/* 插画浮在云层之上（现为透明 PNG，不再需要白底柔光托底） */
+.page-home.has-cloud .nk-hero-art { position: relative; }
+.page-home.has-cloud .nk-hero-art img,
+.nk-hero-art img {
+  filter: drop-shadow(0 8px 22px rgba(10, 40, 80, .22));
+  animation: floatY 6s ease-in-out infinite;
 }
-.page-home.has-cloud .nk-hero-art::before {
-  content: '';
-  position: absolute; inset: -6% -4%;
-  background: radial-gradient(60% 55% at 50% 50%, rgba(255, 255, 255, .82), rgba(255, 255, 255, 0) 72%);
-  z-index: 0;                       /* 不要用 -1：会沉到云层下面 */
-  pointer-events: none;
+[data-theme="dark"] .nk-hero-art img { filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .45)); }
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
 }
-.page-home.has-cloud .nk-hero-art img { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .nk-hero-art img { animation: none; }
+}
 
 /* ── 深色下侧栏可读性 ── */
 [data-theme="dark"] .side-item { color: hsl(210 32% 88%); }
@@ -2254,4 +2256,153 @@ input:focus, select:focus, textarea:focus {
   }
   .card:hover, .btn:not(:disabled):hover, .stat-card:hover, .quick:hover,
   .nk-suf:hover, .nk-svc-card:hover, .nk-res:hover { transform: none; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   深色主题补丁：把仍写死白色的组件改成深色
+   （这些是兼容层遗留的硬编码值，不跟随令牌，深色下会露白导致文字看不清）
+   ══════════════════════════════════════════════════════════ */
+[data-theme="dark"] .sidebar {
+  background: hsl(222 47% 9% / .96);
+  border-right-color: hsl(var(--border));
+}
+[data-theme="dark"] .topbar { background: hsl(222 47% 9% / .92); }
+[data-theme="dark"] .home-top { background: hsl(222 47% 9% / .88); }
+[data-theme="dark"] .user-menu { background: hsl(var(--popover)); border-color: hsl(var(--border)); }
+[data-theme="dark"] .user-chip:hover,
+[data-theme="dark"] .user-chip.on { background: hsl(var(--secondary)); }
+[data-theme="dark"] .card { border-color: rgba(255, 255, 255, .06); }
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select { background: hsl(222 44% 13%); }
+[data-theme="dark"] .tab:hover,
+[data-theme="dark"] .op-btn { background: hsl(var(--secondary)); }
+[data-theme="dark"] ::-webkit-scrollbar-track { background: hsl(222 44% 10%); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: hsl(217 25% 26%); }
+[data-theme="dark"] .svc li { border-bottom-color: hsl(var(--border)); }
+[data-theme="dark"] .tablewrap,
+[data-theme="dark"] .card.flat { border-color: hsl(var(--border)); }
+/* 硬编码的次级文字色：深色下提亮，否则中灰压在深底上几乎不可读 */
+[data-theme="dark"] { --text-2: hsl(210 25% 78%); --line-hi: hsl(217 25% 26%); }
+
+/* ══════════════════════════════════════════════════════════
+   浮动布局：界面元素与按钮"浮"起来
+   用多层柔和阴影营造高度差，hover 抬升、按下回落
+   ══════════════════════════════════════════════════════════ */
+:root {
+  /* 三级高度：静止 / 悬停 / 按下 */
+  --elev-0: 0 1px 2px rgba(16, 24, 40, .05),
+            0 2px 6px rgba(16, 24, 40, .04);
+  --elev-1: 0 2px 4px rgba(16, 24, 40, .06),
+            0 8px 18px rgba(16, 24, 40, .07),
+            0 18px 36px rgba(16, 24, 40, .05);
+  --elev-2: 0 4px 8px rgba(16, 24, 40, .08),
+            0 14px 28px rgba(16, 24, 40, .10),
+            0 28px 56px rgba(16, 24, 40, .07);
+}
+[data-theme="dark"] {
+  --elev-0: 0 1px 2px rgba(0, 0, 0, .35),
+            0 2px 8px rgba(0, 0, 0, .28);
+  --elev-1: 0 2px 6px rgba(0, 0, 0, .40),
+            0 10px 22px rgba(0, 0, 0, .34),
+            0 20px 40px rgba(0, 0, 0, .26);
+  --elev-2: 0 6px 12px rgba(0, 0, 0, .46),
+            0 16px 32px rgba(0, 0, 0, .38),
+            0 32px 64px rgba(0, 0, 0, .30);
+}
+
+/* ---------- 卡片浮起 ---------- */
+.card,
+.stat-card,
+.quick,
+.modal-card,
+.pane,
+.tablewrap,
+.nk-suf,
+.nk-svc-card,
+.nk-res,
+.nk-tool-list .card,
+.nk-dns3 .card {
+  box-shadow: var(--elev-0);
+  transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s var(--ease);
+  will-change: transform;
+}
+.card:hover,
+.stat-card:hover,
+.quick:hover,
+.nk-suf:hover,
+.nk-svc-card:hover,
+.nk-res:hover,
+.nk-dns3 .card:hover,
+.nk-tool-list .card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--elev-2);
+  border-color: hsl(var(--primary) / .40);
+}
+.card:active, .stat-card:active, .quick:active { transform: translateY(-1px); box-shadow: var(--elev-1); }
+
+/* ---------- 按钮浮起 ---------- */
+.btn {
+  box-shadow: var(--elev-0);
+  transition: transform .18s var(--ease), box-shadow .18s var(--ease),
+              background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
+  will-change: transform;
+}
+.btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elev-1);
+}
+.btn:not(:disabled):active {
+  transform: translateY(0) scale(.97);
+  box-shadow: var(--elev-0);
+}
+.btn.primary:not(:disabled):hover {
+  box-shadow: 0 2px 6px hsl(var(--primary) / .30),
+              0 10px 22px hsl(var(--primary) / .22);
+}
+
+/* ---------- 输入框：内凹但整体浮在页面上 ---------- */
+input, textarea, select {
+  box-shadow: var(--elev-0);
+  transition: box-shadow .18s var(--ease), border-color .18s var(--ease);
+}
+input:focus, textarea:focus, select:focus {
+  box-shadow: var(--elev-1), 0 0 0 3px hsl(var(--primary) / .16);
+}
+
+/* ---------- 顶栏 / 侧栏 / 下拉：浮在内容之上 ---------- */
+.topbar, .home-top { box-shadow: var(--elev-0); }
+.sidebar { box-shadow: var(--elev-1); }
+.user-menu { box-shadow: var(--elev-2); }
+.modal-card { box-shadow: var(--elev-2); }
+.toast-item { box-shadow: var(--elev-1); }
+
+/* ---------- 侧栏项：选中时抬起 ---------- */
+.side-item {
+  transition: background .18s var(--ease), color .18s var(--ease),
+              transform .18s var(--ease), box-shadow .18s var(--ease);
+}
+.side-item:hover {
+  transform: translateX(3px);
+  background: hsl(var(--secondary));
+  box-shadow: var(--elev-0);
+}
+.side-item.active {
+  background: hsl(var(--primary) / .10);
+  color: hsl(var(--primary));
+  font-weight: 600;
+  box-shadow: var(--elev-0);
+}
+
+/* ---------- 统计卡数字：轻微浮起 ---------- */
+.stat-card .sc-num { text-shadow: 0 2px 8px hsl(var(--primary) / .18); }
+
+/* ---------- 徽章 ---------- */
+.badge { box-shadow: var(--elev-0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover, .stat-card:hover, .quick:hover, .btn:not(:disabled):hover,
+  .side-item:hover, .nk-suf:hover, .nk-svc-card:hover, .nk-res:hover {
+    transform: none;
+  }
 }
