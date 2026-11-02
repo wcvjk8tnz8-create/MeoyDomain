@@ -492,12 +492,14 @@ else window.addEventListener('load', () => setTimeout(mountSakura, 400), { once:
   function mount() {
     if (document.querySelector('.theme-btn')) return;
     var host =
-      document.querySelector('.topbar-in .top-right') ||
+      document.querySelector('.topbar-in') ||
       document.querySelector('.home-top-in .home-nav');
     if (!host) return;
     var b = makeBtn();
-    // 放在顶栏最右侧第一个（雪岭的图标就在右侧）
-    host.insertBefore(b, host.firstChild);
+    // 放到铃铛前面，与其它图标按钮成一组
+    var bell = host.querySelector('.bell');
+    if (bell) host.insertBefore(b, bell);
+    else host.insertBefore(b, host.firstChild);
     apply(current(), false);
   }
 

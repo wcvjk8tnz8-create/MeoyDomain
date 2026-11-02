@@ -5,30 +5,31 @@
    ============================================================ */
 
 const SHELL_NAV = [
-  { key: 'domains', name: '域名管理', icon: 'globe', href: '/dashboard.html' },
-  { key: 'checkin', name: '签到地', icon: 'calendar', href: '/checkin.html' },
-  { key: 'rewards', name: '奖励中心', icon: 'gift', href: '/rewards.html' },
-  { key: 'whois', name: 'WHOIS 查询', icon: 'search', href: '/whois.html' },
-  { key: 'chat', name: '聊天地', icon: 'chat', href: '/chat.html' },
-  { key: 'profile', name: '个人资料', icon: 'user', href: '/profile.html' },
-  { key: 'tickets', name: '工单系统', icon: 'ticket', href: '/tickets.html' },
-  { key: 'transfer', name: '域名转移', icon: 'swap', href: '/transfer.html' },
-  { key: 'home', name: '站点首页', icon: 'home', href: '/home.html' },
+  { key: 'domains', name: '域名管理', icon: 'globe', href: '/dashboard.html', group: '控制台' },
+  { key: 'whois', name: 'WHOIS 查询', icon: 'search', href: '/whois.html', group: '资源管理' },
+  { key: 'transfer', name: '域名转移', icon: 'swap', href: '/transfer.html', group: '资源管理' },
+  { key: 'checkin', name: '签到地', icon: 'calendar', href: '/checkin.html', group: '用户中心' },
+  { key: 'rewards', name: '奖励中心', icon: 'gift', href: '/rewards.html', group: '用户中心' },
+  { key: 'chat', name: '聊天地', icon: 'chat', href: '/chat.html', group: '用户中心' },
+  { key: 'tickets', name: '工单系统', icon: 'ticket', href: '/tickets.html', group: '用户中心' },
+  { key: 'profile', name: '个人资料', icon: 'user', href: '/profile.html', group: '用户中心' },
+  { key: 'home', name: '站点首页', icon: 'home', href: '/home.html', group: '用户中心' },
 ];
 
 const SHELL_ICON = {
-  globe: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2c1.3 0 2.6 2 3.2 5H8.8C9.4 6 10.7 4 12 4ZM4.3 9h3.1c-.1 1-.2 2.1-.2 3s.1 2 .2 3H4.3a8 8 0 0 1 0-6Zm1.1 8h3.4c.6 3 1.9 5 3.2 5-2.5 0-4.8-2-6.6-5Zm4.6 0h7.9c-1.8 3-4.1 5-6.6 5 1.3 0 2.6-2 3.2-5h-4.5Zm8.6-2c.1-1 .2-2.1.2-3s-.1-2-.2-3h3.1a8 8 0 0 1 0 6h-3.1Z"/>',
-  calendar: '<path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7Zm12 8v9H5v-9h14ZM8 12h3v3H8v-3Z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/>',
   gift: '<path d="M20 7h-2.2A3 3 0 0 0 12 3.2 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h8V8h2v3h8V8a1 1 0 0 0-1-1ZM4 13v7a1 1 0 0 0 1 1h6v-8H4Zm9 8h6a1 1 0 0 0 1-1v-7h-7v8Z"/>',
-  search: '<path d="M10 2a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/>',
-  chat: '<path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1Zm2 4v2h12V7H6Zm0 4v2h9v-2H6Z"/>',
-  user: '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.4-8 5.3V22h16v-2.7c0-2.9-3.6-5.3-8-5.3Z"/>',
-  ticket: '<path d="M4 3h16a1 1 0 0 1 1 1v5a2 2 0 0 0 0 4v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a2 2 0 0 0 0-4V4a1 1 0 0 1 1-1Zm7 4v2H6v2h5v2h2v-2h5v-2h-5V7h-2Z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/>',
+  chat: '<path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8l-4 4V5a1 1 0 0 1 1-1Z"/><path d="M8 9h8M8 13h5"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  ticket: '<path d="M4 5h16a1 1 0 0 1 1 1v4a2 2 0 0 0 0 4v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a2 2 0 0 0 0-4V6a1 1 0 0 1 1-1Z"/><path d="M9 9v6"/>',
   home: '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5Z"/>',
   swap: '<path d="M7 4 3 8l4 4V9h9a2 2 0 0 1 2 2v1h2v-1a4 4 0 0 0-4-4H7V4Zm10 12 4-4-4-4v3H8a2 2 0 0 0-2 2v1H4v-1a4 4 0 0 1 4-4h9v3Z"/>',
-  admin: '<path d="M12 2 3 6v6c0 5 3.8 9.4 9 10 5.2-.6 9-5 9-10V6l-9-4Zm0 2.2 7 3.1V12c0 4-2.9 7.5-7 8-4.1-.5-7-4-7-8V7.3l7-3.1Zm-1 4v2H8v2h3v2h2v-2h3v-2h-3V8.2h-2Z"/>',
-  terms: '<path d="M6 2h9l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 2v4h4l-4-4ZM8 11h8v2H8v-2Zm0 4h8v2H8v-2Z"/>',
-  logout: '<path d="M5 3h9a1 1 0 0 1 1 1v4h-2V5H6v14h7v-3h2v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm9.6 4.6 1.4 1.4L18 11H9v2h9l-2 2-1.4 1.4L19.2 11l-4.6-4.6Z"/>',
+  admin: '<path d="M12 3 4 6v6c0 5 3.4 9.3 8 10 4.6-.7 8-5 8-10V6l-8-3Z"/><path d="M9.5 12l1.8 1.8L15 10"/>',
+  terms: '<path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',
+  logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
+  bell: '<path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/>',
 };
 
 /* ---------- 品牌信息缓存（避免每次切页都等一个网络往返） ---------- */
@@ -52,8 +53,10 @@ function writeBrandCache(v) {
 /** 就地更新品牌（顶栏 logo / 站点名 / 标题） */
 function applyBrand(b) {
   document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = b.siteName));
-  const li = document.getElementById('topLogo');
-  if (li && li.src !== b.logoUrl) li.src = b.logoUrl;
+  // 品牌 logo 现在在侧栏（顶栏改为面包屑）
+  document.querySelectorAll('.side-brand img').forEach((li) => {
+    if (li.getAttribute('src') !== b.logoUrl) li.src = b.logoUrl;
+  });
   const t = document.title;
   const i = t.lastIndexOf(' · ');
   if (i > 0) document.title = t.slice(0, i) + ' · ' + b.siteName;
@@ -167,6 +170,11 @@ async function mountShell(active, opt = {}) {
   }).catch(() => {});
 
   const isAdmin = me && me.role === 'admin';
+  // 面包屑当前页名
+  const EXTRA_NAME = { admin: '管理后台', terms: '服务条款', domain: '域名详情' };
+  const _all = [...SHELL_NAV, { key: 'admin', name: '管理后台' }];
+  const _cur = _all.find((x) => x.key === active);
+  const curName = (opt.title || (_cur && _cur.name) || EXTRA_NAME[active] || '控制台');
 
   // 头像用邮箱首字符（圆形色块），比堆一长串邮箱更好看
   const initial = me ? (me.email || '?').trim().charAt(0).toUpperCase() : '';
@@ -176,59 +184,68 @@ async function mountShell(active, opt = {}) {
   host.innerHTML = `
     <div class="topbar-in">
       <button class="side-toggle" id="sideToggle" aria-label="菜单">
-        <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
 
-      <a class="top-brand" href="/dashboard.html">
-        <img id="topLogo" src="${esc(brand.logoUrl)}" alt="">
-        <span class="brand-txt">
-          <span class="brand-name" data-brand-name>${esc(brand.siteName)}</span>
-          <span class="brand-sub">二级域名分发</span>
-        </span>
-      </a>
+      <div class="crumb">首页<span>/</span><b>${esc(curName)}</b></div>
 
-      <div class="top-right">
-        ${me ? `
-          <button class="theme-paw" id="pawBtn" title="喵一个" aria-label="猫爪">
-            ${PAW_SVG}
-          </button>
-          <div class="user-chip" id="userChip" title="${esc(me.email)}">
+      <button class="top-search" id="topSearch" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:15px;height:15px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/></svg>
+        <span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+
+      ${me ? `
+        <button class="bell" id="bellBtn" title="通知" aria-label="通知">
+          <svg viewBox="0 0 24 24">${SHELL_ICON.bell}</svg>
+          <b id="bellCount" hidden></b>
+        </button>
+        <div class="user-chip" id="userChip" title="${esc(me.email)}" style="display:flex;align-items:center;gap:0;background:none;border:none;padding:0;box-shadow:none">
+          <span class="avatar">${esc(initial)}</span>
+        </div>
+        <div class="user-menu" id="userMenu">
+          <div class="um-head">
             <span class="avatar">${esc(initial)}</span>
-            <span class="u-meta">
-              <span class="u-name">${esc(shortName)}</span>
-              <span class="u-role">${isAdmin ? '管理员' : '用户'}</span>
-            </span>
-            <svg class="chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
-          </div>
-          <div class="user-menu" id="userMenu">
-            <div class="um-head">
-              <span class="avatar">${esc(initial)}</span>
-              <div>
-                <div class="um-name">${esc(shortName)}</div>
-                <div class="um-mail">${esc(me.email)}</div>
-              </div>
-            </div>
-            <div class="um-body">
-              <a href="/dashboard.html">我的域名</a>
-              <a href="/rewards.html">奖励中心</a>
-              ${isAdmin ? '<a href="/admin.html">管理后台</a>' : ''}
-              <a href="/terms.html">服务条款</a>
-            </div>
-            <div class="um-foot">
-              <button class="btn sm ghost" id="btnLogout">退出登录</button>
+            <div>
+              <div class="um-name">${esc(shortName)}</div>
+              <div class="um-mail">${esc(me.email)}</div>
             </div>
           </div>
-        ` : `<a class="btn sm primary" href="/">登录</a>`}
-      </div>
+          <div class="um-body">
+            <a href="/dashboard.html">我的域名</a>
+            <a href="/rewards.html">奖励中心</a>
+            ${isAdmin ? '<a href="/admin.html">管理后台</a>' : ''}
+            <a href="/terms.html">服务条款</a>
+          </div>
+          <div class="um-foot">
+            <button class="btn sm ghost" id="btnLogout">退出登录</button>
+          </div>
+        </div>
+      ` : `<a class="btn sm" href="/">登录</a>`}
     </div>`;
 
-  const items = [...SHELL_NAV, { key: 'admin', name: '管理后台', icon: 'admin', href: '/admin.html' }];
+  const items = [...SHELL_NAV, { key: 'admin', name: '管理后台', icon: 'admin', href: '/admin.html', group: '系统' }];
+  const visible = items.filter((it) => it.key !== 'admin' || isAdmin);
+  // 按 group 顺序分组渲染（参照后台面板模板）
+  const groups = [];
+  visible.forEach((it) => {
+    let g = groups.find((x) => x.name === it.group);
+    if (!g) { g = { name: it.group, items: [] }; groups.push(g); }
+    g.items.push(it);
+  });
+
   side.innerHTML = `
+    <div class="side-brand">
+      <img src="${esc(brand.logoUrl)}" alt="">
+      <b data-brand-name>${esc(brand.siteName)}</b>
+    </div>
     <div class="side-in">
+      ${groups.map((g) => `
+        <div class="side-group">
+          <div class="side-gtitle">${esc(g.name)}</div>
+          ${g.items.map((it) => shellItem(it, active, isAdmin)).join('')}
+        </div>`).join('')}
       <div class="side-group">
-        ${items.map((it) => shellItem(it, active, isAdmin)).join('')}
-      </div>
-      <div class="side-group">
+        <div class="side-gtitle">其它</div>
         <a class="side-item" href="/terms.html"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.terms}</svg></span><span class="side-txt">服务条款</span></a>
         ${me ? `<a class="side-item" href="#" id="sideLogout"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.logout}</svg></span><span class="side-txt">退出登录</span></a>` : ''}
       </div>
@@ -281,6 +298,60 @@ async function mountShell(active, opt = {}) {
   if (bl) bl.onclick = out;
   const sl = document.getElementById('sideLogout');
   if (sl) sl.onclick = (e) => { e.preventDefault(); out(); };
+
+  /* 铃铛：未读消息数（失败静默） */
+  const bellCount = document.getElementById('bellCount');
+  const bellBtn = document.getElementById('bellBtn');
+  if (bellBtn) {
+    bellBtn.onclick = () => { location.href = '/tickets.html'; };
+    api.get('/api/tickets/unread').then((r) => {
+      const n = (r && (r.count ?? r.unread)) | 0;
+      if (bellCount && n > 0) { bellCount.textContent = n > 99 ? '99+' : n; bellCount.hidden = false; }
+    }).catch(() => {});
+  }
+  /* 搜索框：Ctrl+K 聚焦页面内的域名搜索，聚焦不到就跳域名管理页 */
+  const ts = document.getElementById('topSearch');
+  if (ts) ts.onclick = () => {
+    const el = document.getElementById('label') || document.getElementById('qName') || document.getElementById('whoisName');
+    if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    else location.href = '/dashboard.html';
+  };
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') {
+      e.preventDefault();
+      const el = document.getElementById('label') || document.getElementById('qName') || document.getElementById('whoisName');
+      if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      else location.href = '/dashboard.html';
+    }
+  });
+
+  /* 公告条：后台可配置，未配置则不渲染 */
+  try {
+    const cfg = await api.get('/api/config');
+    const notice = String(cfg.notice || cfg.announcement || '').trim();
+    const main = document.querySelector('.main');
+    if (notice && main && !document.getElementById('shellNotice')) {
+      const n = document.createElement('div');
+      n.id = 'shellNotice';
+      n.className = 'notice';
+      n.innerHTML = '<span class="n-ico"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg></span><span>' + esc(notice) + '</span>';
+      const first = main.querySelector('.main-in') || main.firstElementChild;
+      if (first) main.insertBefore(n, first);
+      else main.insertBefore(n, main.firstChild);
+    }
+  } catch {}
+
+  /* 页脚 */
+  try {
+    const main = document.querySelector('.main');
+    if (main && !document.getElementById('shellFoot')) {
+      const f = document.createElement('footer');
+      f.id = 'shellFoot';
+      f.className = 'main-foot';
+      f.innerHTML = '<b>MeoyDomain</b> · 二级域名分发与 DNS 管理 · <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer" style="color:inherit">GitHub</a>';
+      main.appendChild(f);
+    }
+  } catch {}
 
   bindPrefetch(side);
   // 空闲时预取其余常用页（不抢占当前页资源）
