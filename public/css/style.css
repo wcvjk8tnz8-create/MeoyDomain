@@ -1996,3 +1996,53 @@ html.theme-anim .main,
 html.theme-anim .sidebar {
   transition: background-color .28s var(--ease), color .28s var(--ease), border-color .28s var(--ease);
 }
+
+/* ══════════════════════════════════════════════════════════
+   天空蓝云层背景（public/js/cloud-shader.js）
+   Aceternity 的 cloud-shader 是 React 组件，本项目是原生 HTML/JS，
+   因此用同样的 FBM 体积云思路手写了一份 WebGL 版本。
+   ══════════════════════════════════════════════════════════ */
+.cloud-bg {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #4aa3e8 0%, #79c0f0 45%, #bfe3fb 100%);
+}
+.cloud-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* 无 WebGL 时的降级：静态天空渐变 + 柔和光斑 */
+.cloud-bg.cloud-fallback {
+  background:
+    radial-gradient(60% 40% at 22% 22%, rgba(255, 255, 255, .55), transparent 70%),
+    radial-gradient(50% 34% at 76% 30%, rgba(255, 255, 255, .42), transparent 72%),
+    radial-gradient(70% 44% at 58% 82%, rgba(255, 255, 255, .38), transparent 74%),
+    linear-gradient(180deg, #4aa3e8 0%, #79c0f0 45%, #bfe3fb 100%);
+}
+[data-theme="dark"] .cloud-bg {
+  background: linear-gradient(180deg, #0b2545 0%, #16406b 55%, #1e4f7a 100%);
+}
+[data-theme="dark"] .cloud-bg.cloud-fallback {
+  background:
+    radial-gradient(60% 40% at 22% 22%, rgba(159, 192, 230, .18), transparent 70%),
+    radial-gradient(70% 44% at 58% 82%, rgba(159, 192, 230, .14), transparent 74%),
+    linear-gradient(180deg, #0b2545 0%, #16406b 55%, #1e4f7a 100%);
+}
+
+/* ---------- 落地页：天空蓝 Hero ---------- */
+.nk-hero.cloud-bg { border-bottom: 1px solid hsl(var(--border)); }
+.page-home.has-cloud #bg { opacity: 0; }         /* 有云层时隐藏壁纸，避免叠色 */
+.page-home.has-cloud .home-grid-bg { opacity: .5; }
+/* 云层上的文字加强可读性 */
+.page-home.has-cloud .nk-h1,
+.page-home.has-cloud .nk-lead { text-shadow: 0 1px 10px rgba(12, 48, 90, .35); }
+[data-theme="dark"] .page-home.has-cloud .nk-h1,
+[data-theme="dark"] .page-home.has-cloud .nk-lead { text-shadow: 0 1px 12px rgba(0, 0, 0, .5); }
+/* 插画是白底的，给个柔和白色柔光托底，避免直接压在蓝天上显生硬 */
+.page-home.has-cloud .nk-hero-art {
+  position: relative;
+  border-radius: 18px;
+}
+.page-home.has-cloud .nk-hero-art::before {
+  content: '';
+  position: absolute; inset: -6% -4%;
+  background: radial-gradient(60% 55% at 50% 50%, rgba(255, 255, 255, .82), rgba(255, 255, 255, 0) 72%);
+  z-index: -1;
+}

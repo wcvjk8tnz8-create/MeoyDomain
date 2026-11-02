@@ -19,7 +19,7 @@ if(v!=='dark'&&v!=='light'){v=matchMedia('(prefers-color-scheme: dark)').matches
 if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
 </script>
 </head>
-<body class="page-home">
+<body class="page-home has-cloud">
 <div id="bg" aria-hidden="true"></div>
 <div class="home-grid-bg" aria-hidden="true"></div>
 
@@ -40,7 +40,7 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
 </header>
 
 <!-- ══ Hero ══ -->
-<section class="nk-hero">
+<section class="nk-hero cloud-bg" data-cloud-speed="0.9">
   <div class="nk-wrap">
     <div class="nk-hero-in">
       <div class="nk-hero-txt">
@@ -212,6 +212,7 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
 <div class="toast" id="toast"></div>
 
 <script src="/js/api.js"></script>
+<script src="/js/cloud-shader.js"></script>
 <script>
 loadBranding().then(applyBranding).catch(() => {});
 document.getElementById('yr').textContent = new Date().getFullYear();

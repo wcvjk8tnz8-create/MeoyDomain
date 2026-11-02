@@ -521,3 +521,36 @@ npm run typecheck   # tsc --noEmit，只检查 .ts
 
 **防闪屏**：每个页面 `<head>` 里有一段同步脚本，在渲染前就把 `data-theme`
 写好，避免深色模式刷新时先白一下。
+
+
+---
+
+## 天空蓝云层背景（Cloud Shader）
+
+落地页 Hero 用了 WebGL 云层着色器（`public/js/cloud-shader.js`，纯原生无依赖）。
+
+**关于 `npx shadcn@latest add @aceternity/cloud-shader`**：装不了，两个原因
+
+1. **registry 被挡**：`ui.shadcn.com/r/registries.json` 与 `ui.aceternity.com/registry/*`
+   在当前网络下均返回 403（`No policy rule matched the request`）。
+2. **框架不匹配**：`shadcn info` 显示本项目是 `Manual`（无 React、无 Tailwind、
+   无 `components.json`），而该组件是 React + Tailwind 的 TSX，本项目的原生
+   HTML/CSS/JS（Cloudflare Workers）无法直接运行。
+
+因此按同样的思路手写了一份：全屏 quad + FBM 噪声体积云 + 时间动画，
+配色在深/浅主题下各一套。
+
+**在任意页面启用**：加一个容器即可
+
+```html
+<div class="cloud-bg" data-cloud-speed="0.9"></div>
+```
+
+**特性**：无 WebGL 自动降级为 CSS 天空渐变（`.cloud-fallback`）；
+标签切到后台暂停渲染；`prefers-reduced-motion` 下只画静态一帧；
+DPR 上限 1.75 以照顾移动端性能；主题切换后自动重取配色。
+
+## 壁纸
+
+切换器里有 4 张：樱花喵 1/2、Miku、GUMI。想换回 Miku 主题直接选即可，
+壁纸与深/浅主题互相独立。

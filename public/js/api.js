@@ -69,6 +69,9 @@ const PAW_SVG =
 const WALLPAPERS = [
   { key: 'sakura1', name: '樱花喵 1', url: '/img/sakura1.jpg' },
   { key: 'sakura2', name: '樱花喵 2', url: '/img/sakura2.jpg' },
+  // 想换回 Miku / GUMI 主题时，在切换器里直接选即可（壁纸与主题互相独立）
+  { key: 'miku', name: 'Miku', url: '/img/miku.jpg' },
+  { key: 'gumi', name: 'GUMI', url: '/img/gumi.jpg' },
 ];
 
 function applyWallpaper(key) {
