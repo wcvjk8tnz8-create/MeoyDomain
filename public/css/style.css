@@ -2050,7 +2050,7 @@ html.theme-anim .sidebar {
   filter: drop-shadow(0 8px 22px rgba(10, 40, 80, .22));
   animation: floatY 6s ease-in-out infinite;
 }
-[data-theme="dark"] .nk-hero-art img { filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .45)); }
+[data-theme="dark"] .nk-hero-art img { box-shadow: var(--float-2), inset 0 0 0 1px hsl(0 0% 100% / .06); }
 @keyframes floatY {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-10px); }
@@ -2244,10 +2244,14 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ---------- 插画：白底，浮在云层之上 ---------- */
-.page-home.has-cloud .nk-hero-art img {
-  filter: drop-shadow(0 12px 28px hsl(220 40% 20% / .22));
+/* 插画：完整原图（不抠图），做圆角卡片浮在云层之上 */
+.page-home.has-cloud .nk-hero-art img,
+.nk-hero-art img {
   border-radius: 16px;
+  box-shadow: var(--float-2), var(--bevel);
+  transition: transform .28s var(--ease), box-shadow .28s var(--ease);
 }
+.nk-hero-art img:hover { transform: translateY(-4px); box-shadow: var(--float-3), var(--bevel); }
 
 @media (prefers-reduced-motion: reduce) {
   .card, .btn, .stat-card, .quick, .nk-suf, .nk-svc-card, .nk-res,
