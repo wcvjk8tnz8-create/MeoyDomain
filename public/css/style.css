@@ -44,6 +44,13 @@
   --input: 240 5.9% 90%;
   --ring: 346.8 77.2% 49.8%;
 
+  /* ══ 深色主题（雪岭 domin.xueling.top 那种深蓝云雾科技风）══
+     浅色 = DnsNeko 蓝白网格；深色 = 雪岭深蓝云雾。
+     顶栏有切换按钮（localStorage 记忆 + 首次跟随系统）。 */
+  --bg-glow-1: rgba(150, 190, 255, 0);
+  --bg-glow-2: rgba(255, 170, 210, 0);
+  --bg-dim: 0;
+
   --paw-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Ccircle%20cx%3D%227%22%20cy%3D%229%22%20r%3D%222.2%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%227.2%22%20r%3D%222.2%22%2F%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%229%22%20r%3D%222.2%22%2F%3E%3Cpath%20d%3D%22M12%2012.5c3.2%200%205.8%202%205.8%204.4%200%202-1.7%203.3-3.9%203.3h-3.8C8%2020.2%206.2%2018.9%206.2%2016.9c0-2.4%202.6-4.4%205.8-4.4Z%22%2F%3E%3C%2Fsvg%3E");
 
   --radius: 0.5rem;
@@ -1876,4 +1883,116 @@ tbody tr:hover { background: hsl(var(--primary) / .05); }
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════
+   深色主题（参考 domin.xueling.top 的深蓝云雾科技风）
+   只覆盖令牌，组件样式无需改动 —— 保证浅/深两套皮肤同一套结构
+   ══════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 96%;
+  --card: 222 44% 11%;
+  --card-foreground: 210 40% 96%;
+  --popover: 222 44% 12%;
+  --popover-foreground: 210 40% 96%;
+
+  /* 主色：深色下提亮，保证对比度（雪岭的亮蓝） */
+  --primary: 199 92% 58%;
+  --primary-foreground: 222 47% 8%;
+
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 20%;
+  --accent-foreground: 210 40% 96%;
+
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 210 40% 96%;
+  --success: 142 65% 45%;
+  --success-foreground: 210 40% 96%;
+  --warning: 38 92% 58%;
+  --warning-foreground: 222 47% 8%;
+  --info: 199 89% 58%;
+  --info-foreground: 222 47% 8%;
+
+  --border: 217 25% 22%;
+  --input: 217 25% 24%;
+  --ring: 199 92% 58%;
+
+  /* 云雾光晕：只在深色下出现（雪岭的深蓝云雾） */
+  --bg-glow-1: rgba(120, 170, 255, .30);
+  --bg-glow-2: rgba(90, 130, 220, .26);
+  --bg-dim: .58;
+}
+
+/* 壁纸遮罩：深色下压得更暗，避免浅色壁纸刺眼 */
+[data-theme="dark"] #bg::after {
+  background:
+    radial-gradient(90% 70% at 12% 4%, var(--bg-glow-1), transparent 60%),
+    radial-gradient(80% 80% at 92% 96%, var(--bg-glow-2), transparent 62%),
+    hsl(222 47% 6% / .80);
+}
+[data-theme="dark"] #bg::before { opacity: .25; }
+
+/* 云雾纹理：深色下的层叠柔光（雪岭那种云雾感，不用硬渐变块） */
+[data-theme="dark"] body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(46% 34% at 16% 18%, rgba(120, 170, 255, .16), transparent 70%),
+    radial-gradient(40% 30% at 84% 26%, rgba(160, 200, 255, .12), transparent 70%),
+    radial-gradient(52% 38% at 62% 92%, rgba(80, 130, 220, .16), transparent 72%);
+}
+
+/* 深色下的网格线换成冷蓝 */
+[data-theme="dark"] .home-grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(130, 175, 235, .09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(130, 175, 235, .09) 1px, transparent 1px);
+}
+
+/* 深色下卡片轻微发光（科技感），以及终端/页脚保持深色 */
+[data-theme="dark"] .card,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .modal-card {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 8px 22px rgba(0, 0, 0, .28);
+}
+[data-theme="dark"] table thead th { background: hsl(217 33% 15%); }
+
+/* 落地页深色下的局部调整 */
+[data-theme="dark"] .page-home .home-top { background: hsl(222 47% 9% / .88); }
+[data-theme="dark"] .page-home .nk-sec-alt { background: hsl(222 44% 9% / .6); }
+[data-theme="dark"] .nk-bar { background: linear-gradient(90deg, hsl(199 92% 48%), hsl(215 90% 58%)); }
+
+/* ── 主题切换按钮（雪岭顶栏同款：一个图标按钮）── */
+.theme-btn {
+  width: 32px; height: 32px; flex: 0 0 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9px; cursor: pointer;
+  background: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  transition: color .16s var(--ease), background .16s var(--ease), border-color .16s var(--ease), transform .16s var(--ease);
+}
+.theme-btn:hover { color: hsl(var(--primary)); border-color: hsl(var(--primary) / .4); transform: translateY(-1px); }
+.theme-btn:active { transform: scale(.94); }
+.theme-btn svg { width: 16px; height: 16px; fill: currentColor; }
+/* 默认显示「月亮」（点它进深色）；深色下显示「太阳」 */
+.theme-btn .i-moon { display: inline-block; }
+.theme-btn .i-sun { display: none; }
+[data-theme="dark"] .theme-btn .i-moon { display: none; }
+[data-theme="dark"] .theme-btn .i-sun { display: inline-block; }
+
+/* 平滑过渡：切换主题时不闪（只过渡颜色，不动布局） */
+html.theme-anim,
+html.theme-anim body,
+html.theme-anim .card,
+html.theme-anim .topbar,
+html.theme-anim .home-top,
+html.theme-anim .nk-foot,
+html.theme-anim .main,
+html.theme-anim .sidebar {
+  transition: background-color .28s var(--ease), color .28s var(--ease), border-color .28s var(--ease);
 }

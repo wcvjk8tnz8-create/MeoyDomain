@@ -425,3 +425,96 @@ else window.addEventListener('load', () => setTimeout(mountSakura, 400), { once:
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
+
+/* ══════════════════════════════════════════════════════════════
+   主题切换（浅色 = DnsNeko 蓝白网格 / 深色 = 雪岭深蓝云雾）
+   - 最早执行：避免刷新时白/黑闪屏
+   - 记忆在 localStorage；首次跟随系统 prefers-color-scheme
+   - 顶栏自动挂按钮（控制台 / 落地页 / 登录页都生效）
+   ══════════════════════════════════════════════════════════════ */
+(function theme() {
+  var KEY = 'meoy_theme';
+
+  /** 读取当前应生效的主题 */
+  function current() {
+    try {
+      var v = localStorage.getItem(KEY);
+      if (v === 'dark' || v === 'light') return v;
+    } catch (e) {}
+    try {
+      return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (e) {}
+    return 'light';
+  }
+
+  /** 应用主题（只切 data-theme，样式全由 CSS 令牌接管） */
+  function apply(t, animate) {
+    var html = document.documentElement;
+    if (animate) {
+      html.classList.add('theme-anim');
+      setTimeout(function () { html.classList.remove('theme-anim'); }, 320);
+    }
+    if (t === 'dark') html.setAttribute('data-theme', 'dark');
+    else html.removeAttribute('data-theme');
+    // 同步浏览器 UI（地址栏/滚动条）配色
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#0a1220' : '#ffffff');
+    document.querySelectorAll('.theme-btn').forEach(function (b) {
+      b.title = t === 'dark' ? '切换到浅色' : '切换到深色';
+      b.setAttribute('aria-label', b.title);
+    });
+  }
+
+  // ★ 立即应用（本文件在 <head> 之后、body 渲染前已加载，避免闪屏）
+  apply(current(), false);
+
+  var SUN = '<svg class="i-sun" viewBox="0 0 24 24"><path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m11.32 0 1.41 1.41M4.93 4.93l1.41 1.41M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  var MOON = '<svg class="i-moon" viewBox="0 0 24 24"><path d="M20.7 14.3A9 9 0 0 1 9.7 3.3 9 9 0 1 0 20.7 14.3Z"/></svg>';
+
+  function makeBtn() {
+    var b = document.createElement('button');
+    b.className = 'theme-btn';
+    b.type = 'button';
+    b.innerHTML = MOON + SUN;
+    b.onclick = function () {
+      var next = current() === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+      apply(next, true);
+    };
+    return b;
+  }
+
+  /** 把按钮插到顶栏（控制台/落地页各自的容器） */
+  function mount() {
+    if (document.querySelector('.theme-btn')) return;
+    var host =
+      document.querySelector('.topbar-in .top-right') ||
+      document.querySelector('.home-top-in .home-nav');
+    if (!host) return;
+    var b = makeBtn();
+    // 放在顶栏最右侧第一个（雪岭的图标就在右侧）
+    host.insertBefore(b, host.firstChild);
+    apply(current(), false);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
+  else mount();
+  // 顶栏可能是异步渲染的（shell.js），补两次
+  setTimeout(mount, 300);
+  setTimeout(mount, 1200);
+
+  // 用户没手动选过时，跟随系统变化
+  try {
+    var mq = matchMedia('(prefers-color-scheme: dark)');
+    var onChange = function (e) {
+      var saved = null;
+      try { saved = localStorage.getItem(KEY); } catch (err) {}
+      if (!saved) apply(e.matches ? 'dark' : 'light', true);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  } catch (e) {}
+
+  window.MeoyTheme = { get: current, set: function (t) { try { localStorage.setItem(KEY, t); } catch (e) {} apply(t, true); } };
+})();

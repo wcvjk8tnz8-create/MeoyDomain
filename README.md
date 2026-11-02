@@ -500,3 +500,24 @@ npm run typecheck   # tsc --noEmit，只检查 .ts
 否则 `mail.meoy.top` 与 `mail.foo.com` 会互斥。唯一性改由 `fqdn` 承担（fqdn 已包含根域名）。
 迁移在 `schema.sql` 里自动完成，`root_domain` 由 `fqdn` 反推，可重复执行。
 旧表会保留为 `subdomains_old_mr`，确认无误后可自行删除。
+
+
+---
+
+## 主题：浅色 / 深色双皮肤
+
+顶栏右侧有切换按钮（月亮 ⇄ 太阳），**全站 13 个页面通用**。
+
+| 皮肤 | 参考 |
+|---|---|
+| 浅色（默认） | DnsNeko：蓝白网格底、白色卡片、蓝色主色 |
+| 深色 | domin.xueling.top：深蓝云雾底、深色卡片、亮蓝主色 |
+
+**实现**：只切 `documentElement[data-theme]`，颜色全部由 CSS 令牌接管，
+组件样式不写死颜色 —— 因此两套皮肤共用同一套结构，新增页面自动支持。
+
+**记忆**：选择存 `localStorage.meoy_theme`；未手动选过则跟随系统
+`prefers-color-scheme`，系统切换时实时响应。
+
+**防闪屏**：每个页面 `<head>` 里有一段同步脚本，在渲染前就把 `data-theme`
+写好，避免深色模式刷新时先白一下。
