@@ -250,19 +250,20 @@ const createMine = async (c) => {
   // 多根域名：允许 body.root 指定，必须是已配置的根域名之一
   const fqdn = `${v.label}.${reqRoot}`;
 
-  // 有效期：即时开通的（管理员 / 免审核）现在就起算，待审核的等批准时再起算
+  // 有效期：管理员的域名永久有效；其余即时开通的现在起算，待审核的等批准时再起算
   const expRules = await expiryRules(c.env);
-  const expiresAt = autoApprove ? computeExpiry({ validDays: expRules.validDays }) : null;
+  const isPerpetual = isAdmin ? 1 : 0;
+  const expiresAt = isAdmin ? null : (autoApprove ? computeExpiry({ validDays: expRules.validDays }) : null);
 
   let res;
   try {
     res = await c.env.DB.prepare(
-      `INSERT INTO subdomains (label, root_domain, fqdn, user_id, status, note, expires_at, created_at, updated_at, reviewed_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO subdomains (label, root_domain, fqdn, user_id, status, note, expires_at, perpetual, created_at, updated_at, reviewed_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
     )
       .bind(
-        v.label, fqdn, u.id, status, String(note || '').slice(0, 300),
-        expiresAt, now(), now(), autoApprove ? now() : null
+        v.label, reqRoot, fqdn, u.id, status, String(note || '').slice(0, 300),
+        expiresAt, isPerpetual, now(), now(), autoApprove ? now() : null
       )
       .run();
   } catch (e) {

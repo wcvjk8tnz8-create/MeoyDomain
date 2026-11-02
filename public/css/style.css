@@ -1572,7 +1572,7 @@ input:focus, select:focus, textarea:focus {
    刻意避免的「AI 味」元素：深色渐变 Hero、emoji 图标、彩色大圆角阴影、
    居中大标题堆叠、紫色霓虹。改为：浅底细线、线性 SVG 图标、左文右图。
    ══════════════════════════════════════════════════════════ */
-.page-home { background: #f6f9fd; }
+.page-home { background: hsl(var(--background)); }
 
 /* 背景：极淡的线条网格（DnsNeko 那种清透感），不用色块渐变 */
 .home-grid-bg {
@@ -1593,25 +1593,25 @@ input:focus, select:focus, textarea:focus {
   background: rgba(255, 255, 255, .9);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid #e6edf5;
+  border-bottom: 1px solid hsl(var(--border));
 }
 .home-top-in {
   max-width: 1120px; height: 100%; margin: 0 auto;
   padding: 0 20px;
   display: flex; align-items: center; gap: 12px;
 }
-.home-brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: #1e2a3a; min-width: 0; }
+.home-brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: hsl(var(--foreground)); min-width: 0; }
 .home-brand img { width: 30px; height: 30px; border-radius: 9px; object-fit: cover; flex: 0 0 30px; }
 .home-brand span { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 .home-brand b { font-family: var(--cn); font-size: 14.5px; }
-.home-brand i { font-style: normal; font-size: 10px; color: #8a97a8; }
+.home-brand i { font-style: normal; font-size: 10px; color: hsl(var(--muted-foreground)); }
 .home-nav { margin-left: auto; display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
 .home-nav a {
-  font-size: 12.5px; color: #4a5a6d; text-decoration: none;
+  font-size: 12.5px; color: hsl(var(--muted-foreground)); text-decoration: none;
   padding: 7px 11px; border-radius: 8px; white-space: nowrap;
   transition: background .16s, color .16s;
 }
-.home-nav a:hover { background: #eef4fa; color: #1e2a3a; }
+.home-nav a:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
 
 /* ---------- Hero：左文右图 ---------- */
 .hero2 { padding: 54px 20px 34px; }
@@ -1629,9 +1629,9 @@ input:focus, select:focus, textarea:focus {
 .h2-tag {
   display: inline-block;
   font-size: 11.5px; letter-spacing: .4px;
-  color: #4a7fb5;
-  background: #eaf2fb;
-  border: 1px solid #d7e6f6;
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / .10);
+  border: 1px solid hsl(var(--primary) / .22);
   padding: 4px 11px; border-radius: 999px;
   margin-bottom: 16px;
 }
@@ -1639,40 +1639,40 @@ input:focus, select:focus, textarea:focus {
   font-family: var(--display);
   font-size: clamp(29px, 5.2vw, 44px);
   font-weight: 700;
-  color: #17222f;
+  color: hsl(var(--foreground));
   line-height: 1.26;
   margin: 0 0 12px;
   letter-spacing: .3px;
 }
-.h2-em { color: #3f86c4; }
-.h2-sub { font-size: 14px; color: #6b7a8d; margin: 0 0 22px; }
+.h2-em { color: hsl(var(--primary)); }
+.h2-sub { font-size: 14px; color: hsl(var(--muted-foreground)); margin: 0 0 22px; }
 
 .h2-search {
   display: flex; align-items: center;
   max-width: 470px;
   background: #fff;
-  border: 1px solid #dde5ee;
+  border: 1px solid hsl(var(--border));
   border-radius: 10px;
   padding: 4px 4px 4px 0;
   box-shadow: 0 1px 2px rgba(30, 42, 60, .04);
   transition: border-color .16s, box-shadow .16s;
 }
-.h2-search:focus-within { border-color: #8ab6df; box-shadow: 0 0 0 3px rgba(120, 170, 220, .14); }
+.h2-search:focus-within { border-color: hsl(var(--primary)); box-shadow: 0 0 0 3px rgba(120, 170, 220, .14); }
 .h2-search input {
   flex: 1 1 auto; min-width: 0;
   border: none; background: transparent; box-shadow: none;
   padding: 10px 13px;
-  font-family: var(--mono); font-size: 14.5px; color: #17222f;
+  font-family: var(--mono); font-size: 14.5px; color: hsl(var(--foreground));
 }
 .h2-search input:focus { box-shadow: none; border-color: transparent; }
-.h2-suffix { font-family: var(--mono); font-size: 13.5px; color: #8a97a8; padding-right: 9px; white-space: nowrap; }
+.h2-suffix { font-family: var(--mono); font-size: 13.5px; color: hsl(var(--muted-foreground)); padding-right: 9px; white-space: nowrap; }
 .h2-search .btn { flex: 0 0 auto; border-radius: 7px; }
 
-.h2-tip { margin-top: 10px; font-size: 12.5px; min-height: 18px; color: #6b7a8d; }
-.h2-tip.ok { color: #2e8b57; }
-.h2-tip.warn { color: #b8862b; }
-.h2-tip.err { color: #c2566b; }
-.h2-tip b { font-family: var(--mono); color: #17222f; }
+.h2-tip { margin-top: 10px; font-size: 12.5px; min-height: 18px; color: hsl(var(--muted-foreground)); }
+.h2-tip.ok { color: hsl(142 71% 45%); }
+.h2-tip.warn { color: hsl(38 92% 50%); }
+.h2-tip.err { color: hsl(var(--destructive)); }
+.h2-tip b { font-family: var(--mono); color: hsl(var(--foreground)); }
 
 .h2-actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
 
@@ -1680,11 +1680,11 @@ input:focus, select:focus, textarea:focus {
 
 /* ---------- 功能区 ---------- */
 .home-sec { padding: 40px 20px; }
-.home-sec-alt { background: #fff; border-top: 1px solid #e6edf5; border-bottom: 1px solid #e6edf5; }
+.home-sec-alt { background: #fff; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); }
 .home-sec-in { max-width: 1120px; margin: 0 auto; }
 .sec-title {
   font-family: var(--display); font-size: 20px; font-weight: 700;
-  color: #17222f; text-align: center; margin: 0 0 20px;
+  color: hsl(var(--foreground)); text-align: center; margin: 0 0 20px;
 }
 
 .feat-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -1696,13 +1696,13 @@ input:focus, select:focus, textarea:focus {
   width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 9px;
-  background: #eaf2fb;
+  background: hsl(var(--primary) / .10);
   margin-bottom: 10px;
 }
-.f2-ico svg { width: 18px; height: 18px; fill: #3f86c4; }
-.f2 h3 { font-family: var(--display); font-size: 14.5px; font-weight: 700; margin: 0 0 6px; color: #17222f; }
-.f2 p { font-size: 12.5px; color: #6b7a8d; margin: 0; line-height: 1.7; }
-.f2-list { font-family: var(--mono); font-size: 12.5px; color: #3f86c4; line-height: 1.8; margin-bottom: 6px; }
+.f2-ico svg { width: 18px; height: 18px; fill: hsl(var(--primary)); }
+.f2 h3 { font-family: var(--display); font-size: 14.5px; font-weight: 700; margin: 0 0 6px; color: hsl(var(--foreground)); }
+.f2 p { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin: 0; line-height: 1.7; }
+.f2-list { font-family: var(--mono); font-size: 12.5px; color: hsl(var(--primary)); line-height: 1.8; margin-bottom: 6px; }
 .f2-note { font-size: 11.5px !important; }
 
 .step3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -1712,12 +1712,12 @@ input:focus, select:focus, textarea:focus {
   width: 25px; height: 25px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  background: #3f86c4; color: #fff;
+  background: hsl(var(--primary)); color: #fff;
   font-family: var(--display); font-size: 12.5px; font-weight: 700;
   margin-bottom: 9px;
 }
-.s3 h3 { font-family: var(--display); font-size: 14px; font-weight: 700; margin: 0 0 5px; color: #17222f; }
-.s3 p { font-size: 12.5px; color: #6b7a8d; margin: 0; line-height: 1.7; }
+.s3 h3 { font-family: var(--display); font-size: 14px; font-weight: 700; margin: 0 0 5px; color: hsl(var(--foreground)); }
+.s3 p { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin: 0; line-height: 1.7; }
 
 .home-foot { padding: 24px 20px 32px; }
 
@@ -1765,4 +1765,186 @@ input:focus, select:focus, textarea:focus {
 body:has(.main) .site-foot { margin-left: 208px; }
 @media (max-width: 860px) {
   body:has(.main) .site-foot { margin-left: 0; }
+}
+
+/* 首页壁纸：与登录/控制台同源，但压得更淡以保持 DnsNeko 的清透感 */
+.page-home #bg::after { background: hsl(var(--background) / .93); }
+.page-home #bg::before { opacity: .55; }
+.page-home .home-top { background: hsl(var(--background) / .88); }
+.page-home .home-sec-alt { background: hsl(var(--muted) / .55); }
+
+/* ══════════════════════════════════════════════════════════
+   全站微动效（统一节奏，所有页面通用）
+   原则：只动 transform / opacity（合成器属性），不触发重排；
+        全部在 prefers-reduced-motion 下关闭。
+   缓动统一：--ease = cubic-bezier(.22,.61,.36,1)
+   ══════════════════════════════════════════════════════════ */
+:root {
+  --ease: cubic-bezier(.22, .61, .36, 1);
+  --ease-soft: cubic-bezier(.4, 0, .2, 1);
+  --dur: .2s;
+}
+
+/* ---------- 1. 卡片：hover 轻抬 + 边框染色 ---------- */
+.card,
+.stat-card,
+.quick,
+.s3,
+.f2,
+.pane,
+.modal-card {
+  transition:
+    transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.card:hover,
+.stat-card:hover,
+.quick:hover,
+.s3:hover,
+.f2:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--primary) / .38);
+  box-shadow: 0 6px 18px hsl(var(--primary) / .10);
+}
+.card:active, .stat-card:active, .quick:active { transform: translateY(0) scale(.995); }
+
+/* ---------- 2. 按钮：按下回弹 ---------- */
+.btn {
+  transition:
+    transform .14s var(--ease),
+    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.btn:active { transform: scale(.96); }
+.btn:not(:disabled):hover { box-shadow: 0 4px 14px hsl(var(--primary) / .22); }
+.btn.primary:not(:disabled):hover { filter: brightness(1.06); }
+
+/* ---------- 3. 输入框：聚焦光晕 ---------- */
+input, select, textarea {
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+/* ---------- 4. 列表行：逐条入场 + hover 高亮 ---------- */
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+tbody tr {
+  animation: rowIn .28s var(--ease) backwards;
+  transition: background .16s var(--ease);
+}
+tbody tr:nth-child(1) { animation-delay: .00s; }
+tbody tr:nth-child(2) { animation-delay: .03s; }
+tbody tr:nth-child(3) { animation-delay: .06s; }
+tbody tr:nth-child(4) { animation-delay: .09s; }
+tbody tr:nth-child(5) { animation-delay: .12s; }
+tbody tr:nth-child(6) { animation-delay: .15s; }
+tbody tr:nth-child(n+7) { animation-delay: .18s; }
+tbody tr:hover { background: hsl(var(--primary) / .05); }
+
+/* ---------- 5. 徽章 / 状态：出现时轻弹 ---------- */
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(.86); }
+  60%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.badge, .stat-card .sc-num { animation: popIn .32s var(--ease) backwards; }
+
+/* ---------- 6. 区块标题/卡片入场（首屏） ---------- */
+@keyframes secIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.main-in > * { animation: secIn .3s var(--ease) backwards; }
+.main-in > *:nth-child(1) { animation-delay: .02s; }
+.main-in > *:nth-child(2) { animation-delay: .06s; }
+.main-in > *:nth-child(3) { animation-delay: .10s; }
+.main-in > *:nth-child(n+4) { animation-delay: .14s; }
+
+/* ---------- 7. 弹窗：缩放淡入 ---------- */
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(8px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+.modal.show .modal-card,
+.modal-card { animation: modalIn .24s var(--ease) backwards; }
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+.modal { animation: overlayIn .18s var(--ease); }
+
+/* ---------- 8. Toast：底部滑入 ---------- */
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 14px) scale(.96); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes toastItemIn {
+  from { opacity: 0; transform: translateY(12px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+.toast-item { animation: toastItemIn .26s var(--ease); }
+/* 兼容旧写法 */
+.toast.show { animation: toastIn .26s var(--ease); }
+
+/* ---------- 9. 侧栏项：指示条滑出 ---------- */
+.side-item {
+  transition: background .16s var(--ease), color .16s var(--ease), transform .16s var(--ease);
+}
+.side-item:hover { transform: translateX(2px); }
+.side-item.active::before {
+  content: '';
+  position: absolute; left: 0; top: 50%;
+  width: 3px; height: 0;
+  margin-top: 0;
+  border-radius: 0 3px 3px 0;
+  background: hsl(var(--primary));
+  transform: translateY(-50%);
+  animation: barGrow .26s var(--ease) forwards;
+}
+@keyframes barGrow { from { height: 0; } to { height: 60%; } }
+
+/* ---------- 10. Tab 切换：内容淡入 ---------- */
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.pane:not(.hidden) { animation: tabIn .22s var(--ease); }
+
+/* ---------- 11. 顶栏：滚动后加影 ---------- */
+.topbar { transition: box-shadow var(--dur) var(--ease), background var(--dur) var(--ease); }
+.topbar.is-scrolled { box-shadow: 0 2px 12px hsl(240 10% 3.9% / .10); }
+.home-top.is-scrolled { box-shadow: 0 2px 12px hsl(240 10% 3.9% / .10); }
+
+/* ---------- 12. 图标按钮：旋转反馈 ---------- */
+@keyframes spinOnce { to { transform: rotate(360deg); } }
+.spin-once { animation: spinOnce .5s var(--ease); }
+
+/* ---------- 13. 加载骨架：呼吸 ---------- */
+@keyframes breathe { 0%,100% { opacity: .55; } 50% { opacity: .9; } }
+.empty, .loading { animation: breathe 1.6s ease-in-out infinite; }
+
+/* ---------- 14. 落地页元素入场 ---------- */
+.page-home .h2-tag   { animation: secIn .34s var(--ease) backwards .02s; }
+.page-home .h2-title { animation: secIn .38s var(--ease) backwards .06s; }
+.page-home .h2-sub   { animation: secIn .38s var(--ease) backwards .10s; }
+.page-home .h2-search{ animation: secIn .38s var(--ease) backwards .14s; }
+.page-home .h2-actions{ animation: secIn .38s var(--ease) backwards .18s; }
+.page-home .hero2-art img { animation: secIn .5s var(--ease) backwards .10s; }
+.page-home .feat-grid4 > * { animation: secIn .36s var(--ease) backwards; }
+.page-home .feat-grid4 > *:nth-child(1) { animation-delay: .06s; }
+.page-home .feat-grid4 > *:nth-child(2) { animation-delay: .12s; }
+.page-home .feat-grid4 > *:nth-child(3) { animation-delay: .18s; }
+.page-home .feat-grid4 > *:nth-child(4) { animation-delay: .24s; }
+
+/* ---------- 全部关闭（无障碍） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
 }

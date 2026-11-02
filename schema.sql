@@ -362,3 +362,14 @@ CREATE INDEX IF NOT EXISTS idx_subdomains_user   ON subdomains(user_id);
 CREATE INDEX IF NOT EXISTS idx_subdomains_status ON subdomains(status);
 CREATE INDEX IF NOT EXISTS idx_subdomains_root   ON subdomains(root_domain, label);
 CREATE INDEX IF NOT EXISTS idx_subdomains_fqdn   ON subdomains(fqdn);
+
+-- ══════════════════════════════════════════════════════════
+-- 管理员域名永久化（幂等，可重复执行）
+-- ══════════════════════════════════════════════════════════
+-- 管理员自身持有的域名一律永久有效（新申请时直接写 perpetual=1，
+-- 这里负责回填历史数据）。
+UPDATE subdomains
+   SET perpetual = 1,
+       expires_at = NULL
+ WHERE perpetual = 0
+   AND user_id IN (SELECT id FROM users WHERE role = 'admin');

@@ -341,3 +341,87 @@ else window.addEventListener('load', () => setTimeout(mountSakura, 400), { once:
     inject();
   }
 })();
+
+
+/* ══════════════════════════════════════════════════════════════
+   数字滚动 + 元素入场（全站通用）
+   ══════════════════════════════════════════════════════════════ */
+(function motion() {
+  var reduced = false;
+  try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  /** 数字从 0 滚到目标值，只动 textContent（不触发重排） */
+  function countUp(el) {
+    if (reduced || el.dataset.counted === '1') return;
+    var raw = String(el.textContent || '').trim();
+    var target = parseFloat(raw.replace(/[^\d.]/g, ''));
+    if (!isFinite(target) || target === 0) return;
+    el.dataset.counted = '1';
+    var suffix = raw.replace(/[\d.]/g, '');
+    var decimals = (raw.split('.')[1] || '').length;
+    var start = performance.now();
+    var dur = 620;
+    (function step(t) {
+      var p = Math.min(1, (t - start) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);           // easeOutCubic
+      var v = target * eased;
+      el.textContent = (decimals ? v.toFixed(decimals) : Math.round(v)) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = raw;                     // 收尾精确还原原文本
+    })(start);
+  }
+
+  /** 给统计数字加上滚动效果 */
+  function scanCountUp() {
+    var sels = ['.stat-card .sc-num', '.stat-num', '.point-num', '[data-count]'];
+    sels.forEach(function (s) {
+      document.querySelectorAll(s).forEach(countUp);
+    });
+  }
+
+  /** 观察新插入的行，让它们逐条淡入（配合 CSS 的 rowIn） */
+  function observeRows() {
+    if (reduced || typeof MutationObserver === 'undefined') return;
+    var mo = new MutationObserver(function (muts) {
+      muts.forEach(function (m) {
+        (m.addedNodes || []).forEach(function (n) {
+          if (n.nodeType !== 1) return;
+          var rows = n.matches && n.matches('tr') ? [n] : n.querySelectorAll ? n.querySelectorAll('tbody tr') : [];
+          Array.prototype.forEach.call(rows, function (r, i) {
+            r.style.animation = 'none';
+            // 强制回流后再挂动画，保证每次重新插入都会播放
+            void r.offsetWidth;
+            r.style.animation = '';
+            r.style.animationDelay = Math.min(i * 0.03, 0.24) + 's';
+          });
+        });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('tbody, .tablewrap'), function (t) {
+      mo.observe(t, { childList: true, subtree: true });
+    });
+  }
+
+  /** 顶栏滚动加影 */
+  function topbarShadow() {
+    var bar = document.querySelector('.topbar') || document.querySelector('.home-top');
+    if (!bar) return;
+    var onScroll = function () {
+      bar.classList.toggle('is-scrolled', window.scrollY > 4);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  function boot() {
+    scanCountUp();
+    observeRows();
+    topbarShadow();
+    // 异步渲染的统计卡（等数据回来后再扫一次）
+    setTimeout(scanCountUp, 700);
+    setTimeout(scanCountUp, 1600);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
