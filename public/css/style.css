@@ -59,7 +59,7 @@
 
   /* ── 兼容层：把旧变量名映射到 shadcn 令牌，避免逐处改 CSS ── */
   --ink: hsl(var(--foreground));
-  --ink-2: hsl(240 5% 26%);
+  --ink-2: hsl(var(--foreground) / .88);   /* 跟随主题，避免深色下仍是深灰 */
   --ink-3: hsl(var(--muted-foreground));
   --text: hsl(var(--foreground));
   --text-2: hsl(240 5% 34%);
@@ -288,16 +288,16 @@ input[type="number"] { max-width: 160px; }
   transition: background .14s, color .14s, box-shadow .14s;
   white-space: nowrap;
 }
-.btn:hover { background: rgba(15, 23, 42, .12); box-shadow: var(--glow); text-decoration: none; transform: translateY(-1px); }
+.btn:hover { background: hsl(var(--secondary)); box-shadow: var(--glow); text-decoration: none; transform: translateY(-1px); }
 .btn { transition: transform .12s ease, box-shadow .12s ease, background .12s ease; }
 .btn.primary {
   background: var(--c1);
   border-color: transparent;
   color: #fff;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, .3);
+  box-shadow: var(--float-2);
 }
-.btn.primary:hover { filter: brightness(1.07); color: #fff; box-shadow: 0 8px 22px rgba(15, 23, 42, .45); }
+.btn.primary:hover { filter: brightness(1.07); color: #fff; box-shadow: var(--float-3); }
 .btn.sm { padding: 5px 12px; font-size: 11.5px; border-radius: 999px; }
 .btn.danger { border-color: rgba(242, 84, 91, .5); color: var(--danger); }
 .btn.danger:hover { background: rgba(242, 84, 91, .12); box-shadow: 0 6px 16px rgba(242, 84, 91, .24); }
@@ -831,7 +831,7 @@ tr.rejected td { background: rgba(255, 92, 114, .09); }
               transform .18s cubic-bezier(.4,0,.2,1);
 }
 .side-item:hover {
-  background: rgba(15, 23, 42, .1);
+  background: hsl(var(--secondary));
   color: var(--ink);
   transform: translateX(3px);
 }
@@ -2056,3 +2056,202 @@ html.theme-anim .sidebar {
   pointer-events: none;
 }
 .page-home.has-cloud .nk-hero-art img { position: relative; z-index: 1; }
+
+/* ── 深色下侧栏可读性 ── */
+[data-theme="dark"] .side-item { color: hsl(210 32% 88%); }
+[data-theme="dark"] .side-item:hover { color: #fff; background: hsl(217 33% 22%); }
+[data-theme="dark"] .side-item.on { background: hsl(var(--primary) / .18); color: hsl(var(--primary)); }
+[data-theme="dark"] .side-item.active { color: #fff; }
+
+/* ══════════════════════════════════════════════════════════
+   浮动式界面（Floating UI）
+   要求：界面和按钮都要「浮起来」——
+   1) 卡片脱离背景：白底 + 双层柔和阴影 + 高光边
+   2) 按钮有体积：渐变面 + 内高光 + 投影，hover 抬升，按下沉降
+   3) 顶栏/侧栏半透明毛玻璃，内容在其上「漂浮」
+   4) 只动 transform / box-shadow（合成器属性），不影响滚动性能
+   ══════════════════════════════════════════════════════════ */
+:root {
+  /* 浮动阴影梯度：0=贴地，1=轻浮，2=明显浮起，3=悬停 */
+  --float-0: 0 1px 2px hsl(220 20% 20% / .06);
+  --float-1: 0 2px 6px hsl(220 20% 20% / .08), 0 6px 18px hsl(220 20% 20% / .06);
+  --float-2: 0 4px 12px hsl(220 20% 20% / .10), 0 12px 32px hsl(220 20% 20% / .09);
+  --float-3: 0 8px 20px hsl(220 20% 20% / .13), 0 22px 52px hsl(220 20% 20% / .12);
+  /* 顶部高光边：让卡片看起来「有厚度」 */
+  --bevel: inset 0 1px 0 hsl(0 0% 100% / .9), inset 0 0 0 1px hsl(220 15% 60% / .07);
+}
+
+/* ---------- 卡片：脱离背景浮起 ---------- */
+.card,
+.stat-card,
+.quick,
+.welcome,
+.pane,
+.modal-card,
+.nk-suf,
+.nk-svc-card,
+.nk-res,
+.nk-tool-list .card,
+.nk-dns3 .card,
+.nk-search-box {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / .8);
+  border-radius: var(--radius);
+  box-shadow: var(--float-1), var(--bevel);
+  transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s var(--ease);
+}
+.card:hover,
+.stat-card:hover,
+.quick:hover,
+.nk-suf:hover,
+.nk-svc-card:hover,
+.nk-res:hover,
+.nk-tool-list .card:hover,
+.nk-dns3 .card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--float-3), var(--bevel);
+  border-color: hsl(var(--primary) / .34);
+}
+
+/* ---------- 按钮：有体积的浮动键 ---------- */
+.btn {
+  position: relative;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: var(--float-0), inset 0 1px 0 hsl(0 0% 100% / .8);
+  transition: transform .16s var(--ease), box-shadow .16s var(--ease),
+              filter .16s var(--ease), border-color .16s var(--ease);
+}
+.btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--float-2), inset 0 1px 0 hsl(0 0% 100% / .9);
+  border-color: hsl(var(--primary) / .38);
+}
+.btn:not(:disabled):active {
+  transform: translateY(0) scale(.97);
+  box-shadow: var(--float-0), inset 0 2px 5px hsl(220 20% 20% / .10);
+}
+/* 主按钮：渐变面 + 彩色投影（体积感更强） */
+.btn.primary {
+  background: linear-gradient(180deg,
+    hsl(var(--primary) / .96) 0%,
+    hsl(var(--primary)) 55%,
+    hsl(var(--primary) / .92) 100%);
+  border-color: hsl(var(--primary) / .9);
+  box-shadow:
+    0 1px 2px hsl(220 20% 20% / .10),
+    0 4px 12px hsl(var(--primary) / .32),
+    inset 0 1px 0 hsl(0 0% 100% / .28);
+}
+.btn.primary:not(:disabled):hover {
+  filter: brightness(1.06) saturate(1.05);
+  box-shadow:
+    0 2px 4px hsl(220 20% 20% / .12),
+    0 10px 26px hsl(var(--primary) / .42),
+    inset 0 1px 0 hsl(0 0% 100% / .32);
+}
+.btn.primary:not(:disabled):active {
+  box-shadow:
+    0 1px 2px hsl(220 20% 20% / .14),
+    inset 0 2px 6px hsl(220 30% 20% / .22);
+}
+
+/* ---------- 输入框：轻微内凹，衬托按钮的浮起 ---------- */
+input, select, textarea {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  box-shadow: inset 0 1px 3px hsl(220 20% 20% / .05);
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease), transform .18s var(--ease);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / .15), inset 0 1px 2px hsl(220 20% 20% / .04);
+}
+
+/* ---------- 顶栏 / 侧栏：毛玻璃托盘 ---------- */
+.topbar {
+  background: hsl(var(--background) / .82) !important;
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border-bottom: 1px solid hsl(var(--border) / .7);
+  box-shadow: var(--float-1);
+}
+.home-top {
+  background: hsl(var(--background) / .82);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: var(--float-1);
+}
+.sidebar {
+  background: hsl(var(--background) / .78) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid hsl(var(--border) / .7);
+  box-shadow: var(--float-0);
+}
+/* 导航项选中时像一块浮起的牌子 */
+.side-item.on {
+  background: hsl(var(--card));
+  box-shadow: var(--float-1), var(--bevel);
+}
+.side-item:hover { box-shadow: var(--float-1); }
+
+/* ---------- 用户胶囊 / 下拉菜单 ---------- */
+.user-chip { box-shadow: var(--float-0); }
+.user-menu {
+  box-shadow: var(--float-3);
+  border: 1px solid hsl(var(--border) / .8);
+}
+.theme-btn, .theme-paw { box-shadow: var(--float-0); }
+.theme-btn:hover, .theme-paw:hover { transform: translateY(-1px); box-shadow: var(--float-1); }
+
+/* ---------- 徽章 / 标签：小体积浮起 ---------- */
+.badge, .nk-tag, .nk-hot, .nk-suf-tip, .nk-s-tag {
+  box-shadow: 0 1px 3px hsl(220 20% 20% / .08);
+}
+
+/* ---------- 表格容器：整块浮起 ---------- */
+.tablewrap {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / .8);
+  border-radius: var(--radius);
+  box-shadow: var(--float-1), var(--bevel);
+  overflow: hidden;
+}
+
+/* ---------- Toast：明显浮在页面之上 ---------- */
+.toast-item { box-shadow: var(--float-3); }
+.toast { box-shadow: var(--float-2); }
+
+/* ---------- 弹窗 ---------- */
+.modal-card { box-shadow: var(--float-3), var(--bevel); }
+
+/* ---------- 深色下：投影转成发光，避免死黑 ---------- */
+[data-theme="dark"] {
+  --float-0: 0 1px 2px hsl(220 40% 4% / .40);
+  --float-1: 0 2px 6px hsl(220 40% 4% / .45), 0 8px 22px hsl(220 40% 4% / .40);
+  --float-2: 0 4px 14px hsl(220 40% 4% / .50), 0 14px 36px hsl(220 40% 4% / .45);
+  --float-3: 0 8px 22px hsl(220 40% 4% / .55), 0 26px 58px hsl(220 40% 4% / .50);
+  --bevel: inset 0 1px 0 hsl(0 0% 100% / .07), inset 0 0 0 1px hsl(0 0% 100% / .04);
+}
+[data-theme="dark"] .btn.primary {
+  box-shadow:
+    0 1px 2px hsl(220 40% 4% / .40),
+    0 4px 14px hsl(var(--primary) / .38),
+    inset 0 1px 0 hsl(0 0% 100% / .22);
+}
+
+/* ---------- 插画：白底，浮在云层之上 ---------- */
+.page-home.has-cloud .nk-hero-art img {
+  filter: drop-shadow(0 12px 28px hsl(220 40% 20% / .22));
+  border-radius: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .btn, .stat-card, .quick, .nk-suf, .nk-svc-card, .nk-res,
+  .nk-tool-list .card, .nk-dns3 .card, .nk-search-box {
+    transition-duration: .001ms !important;
+  }
+  .card:hover, .btn:not(:disabled):hover, .stat-card:hover, .quick:hover,
+  .nk-suf:hover, .nk-svc-card:hover, .nk-res:hover { transform: none; }
+}
