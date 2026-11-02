@@ -2007,7 +2007,12 @@ html.theme-anim .sidebar {
   overflow: hidden;
   background: linear-gradient(180deg, #4aa3e8 0%, #79c0f0 45%, #bfe3fb 100%);
 }
-.cloud-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* 关键：canvas 必须留在 z-index:0，内容提到 z-index:1。
+   canvas 是 position:absolute 且由 JS appendChild 到最后，
+   同为 auto 时会盖住普通流内容 —— Hero 文字/插画会被云层吞掉。 */
+.cloud-bg { isolation: isolate; }
+.cloud-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+.cloud-bg > *:not(canvas) { position: relative; z-index: 1; }
 /* 无 WebGL 时的降级：静态天空渐变 + 柔和光斑 */
 .cloud-bg.cloud-fallback {
   background:
@@ -2033,8 +2038,11 @@ html.theme-anim .sidebar {
 /* 云层上的文字加强可读性 */
 .page-home.has-cloud .nk-h1,
 .page-home.has-cloud .nk-lead { text-shadow: 0 1px 10px rgba(12, 48, 90, .35); }
+/* 云层底色是深蓝，次级文字用中灰会看不清，提亮 */
+[data-theme="dark"] .page-home.has-cloud .nk-lead { color: hsl(210 30% 82%); }
+[data-theme="dark"] .page-home.has-cloud .nk-h1 { color: #fff; }
 [data-theme="dark"] .page-home.has-cloud .nk-h1,
-[data-theme="dark"] .page-home.has-cloud .nk-lead { text-shadow: 0 1px 12px rgba(0, 0, 0, .5); }
+[data-theme="dark"] .page-home.has-cloud .nk-lead { text-shadow: 0 1px 12px rgba(0, 0, 0, .55); }
 /* 插画是白底的，给个柔和白色柔光托底，避免直接压在蓝天上显生硬 */
 .page-home.has-cloud .nk-hero-art {
   position: relative;
@@ -2044,5 +2052,7 @@ html.theme-anim .sidebar {
   content: '';
   position: absolute; inset: -6% -4%;
   background: radial-gradient(60% 55% at 50% 50%, rgba(255, 255, 255, .82), rgba(255, 255, 255, 0) 72%);
-  z-index: -1;
+  z-index: 0;                       /* 不要用 -1：会沉到云层下面 */
+  pointer-events: none;
 }
+.page-home.has-cloud .nk-hero-art img { position: relative; z-index: 1; }
