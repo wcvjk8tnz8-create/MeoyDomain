@@ -532,6 +532,14 @@ mountShell('domains').then(async (me) => {
   currentUser = me || null;
   applyBranding(await loadBranding());
   await setupRoots();   // 必须先于 load()，否则查询用的是空 root
+  // 从落地页「立即注册」带过来的名称，自动填入并预查
+  try {
+    const pre = new URLSearchParams(location.search).get('label');
+    if (pre) {
+      const el = document.getElementById('label');
+      if (el) { el.value = pre; runCheck(pre); el.focus(); }
+    }
+  } catch {}
   load();
   loadPoints();
 }).catch(() => {});

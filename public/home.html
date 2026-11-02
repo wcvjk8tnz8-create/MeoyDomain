@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MeoyDomain · 二级域名分发</title>
-<meta name="description" content="MeoyDomain —— 免费、开源的新一代二级域名分发与 DNS 管理系统，支持 12 种 DNS 记录类型，基于 Cloudflare Workers + D1。">
+<title>MeoyDomain · 免费二级域名分发</title>
+<meta name="description" content="MeoyDomain —— 免费二级域名注册与 DNS 解析管理。支持 12 种记录类型、根域名验证、域名托管委派，基于 Cloudflare Workers + D1。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap">
@@ -16,7 +16,7 @@
 <div id="bg" aria-hidden="true"></div>
 <div class="home-grid-bg" aria-hidden="true"></div>
 
-<!-- ── 顶栏：白底细线，无渐变 ── -->
+<!-- ══ 顶栏 ══ -->
 <header class="home-top">
   <div class="home-top-in">
     <a class="home-brand" href="/home.html">
@@ -24,113 +24,180 @@
       <span><b data-site-name>Meoy</b><i>二级域名分发</i></span>
     </a>
     <nav class="home-nav">
-      <a href="/whois.html">WHOIS</a>
-      <a href="/terms.html">条款</a>
-      <a class="btn sm primary" href="/">登录 / 注册</a>
+      <a href="/terms.html">Language</a>
+      <a href="/">登录</a>
+      <a href="/">注册</a>
+      <a class="btn sm primary" href="/whois.html">关于</a>
     </nav>
   </div>
 </header>
 
-<!-- ── Hero：浅色 + 插画 ── -->
-<section class="hero2">
-  <div class="hero2-in">
-    <div class="hero2-txt">
-      <div class="h2-tag">免费 · 开源 · Cloudflare 驱动</div>
-      <h1 class="h2-title">你的子域名<br><span class="h2-em">即刻部署</span></h1>
-      <p class="h2-sub">免费，开源，新一代二级域名分发与 DNS 管理系统</p>
-
-      <form class="h2-search" id="searchForm">
-        <input id="qName" placeholder="yourname" autocomplete="off" spellcheck="false">
-        <span class="h2-suffix">.<span id="qRoot">meoy.top</span></span>
-        <button type="submit" class="btn primary">查询</button>
-      </form>
-      <div class="h2-tip" id="qTip"></div>
-
-      <div class="h2-actions">
-        <a class="btn primary" href="/">立即开始</a>
-        <a class="btn" href="/whois.html">WHOIS 查询</a>
+<!-- ══ Hero ══ -->
+<section class="nk-hero">
+  <div class="nk-wrap">
+    <div class="nk-hero-in">
+      <div class="nk-hero-txt">
+        <h1 class="nk-h1">免费域名注册</h1>
+        <p class="nk-lead">永久免费的二级域名注册与 DNS 解析管理。<br>即刻部署，几分钟即可上线你的服务。</p>
+        <div class="nk-cta">
+          <a class="btn primary" href="/">立即开始</a>
+          <a class="btn" href="#search">查找可用域名</a>
+        </div>
       </div>
-    </div>
-
-    <div class="hero2-art">
-      <img src="/img/neko.png" alt="猫耳少女与黑猫" width="760" height="733">
+      <div class="nk-hero-art">
+        <img src="/img/neko.png" alt="猫耳少女" width="760" height="733">
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ── 功能：白卡片 + 线性图标 ── -->
-<section class="home-sec">
-  <div class="home-sec-in">
-    <div class="feat-grid4">
-      <div class="card f2">
-        <div class="f2-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+<!-- ══ 可选后缀 ══ -->
+<section class="nk-sec">
+  <div class="nk-wrap">
+    <h2 class="nk-h2">域名注册 可选后缀</h2>
+    <div class="nk-suffix" id="suffixGrid">
+      <div class="nk-sk">加载中…</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 域名查询 ══ -->
+<section class="nk-sec nk-sec-search" id="search">
+  <div class="nk-wrap">
+    <div class="nk-search-box">
+      <div class="nk-s-tag">DOMAIN SEARCH</div>
+      <h2 class="nk-h2" style="margin-bottom:6px">查找可用域名</h2>
+      <p class="nk-sub">请输入域名前缀，仅前缀（不需要带后缀）</p>
+      <form class="nk-sbar" id="searchForm">
+        <span class="nk-sbar-pre">https://</span>
+        <input id="qName" placeholder="例如：my-project" autocomplete="off" spellcheck="false">
+        <span class="nk-sbar-suf">.<span id="qRoot">meoy.top</span></span>
+        <button type="submit" class="btn primary">立即查询</button>
+      </form>
+      <div class="nk-results" id="results"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 核心服务 ══ -->
+<section class="nk-sec">
+  <div class="nk-wrap">
+    <h2 class="nk-h2">MeoyDomain 核心服务</h2>
+    <div class="nk-svc">
+      <div class="card nk-svc-card">
+        <div class="nk-svc-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2c1.3 0 2.6 2 3.2 5H8.8C9.4 6 10.7 4 12 4ZM4.3 9h3.1c-.1 1-.2 2.1-.2 3s.1 2 .2 3H4.3a8 8 0 0 1 0-6Z"/></svg>
         </div>
-        <h3>即时生效</h3>
-        <p>通过 Cloudflare API 直写解析，添加后秒级生效，可开启代理加速。</p>
+        <h3>永久免费的域名注册</h3>
+        <p>注册即拥有完整管理权，免费续期，无需任何费用与信用卡。</p>
       </div>
-      <div class="card f2">
-        <div class="f2-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.6 2A3.5 3.5 0 0 0 7 18Z"/></svg>
-        </div>
-        <h3>Cloudflare 驱动</h3>
-        <p>运行在 Workers 上，数据存于 D1，全球边缘加速，无需自备服务器。</p>
-      </div>
-      <div class="card f2">
-        <div class="f2-ico">
+      <div class="card nk-svc-card">
+        <div class="nk-svc-ico">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10v2H4V6Zm14 0h2v2h-2V6ZM4 11h6v2H4v-2Zm10 0h6v2h-6v-2ZM4 16h10v2H4v-2Zm14 0h2v2h-2v-2Z"/></svg>
         </div>
-        <h3>完全控制</h3>
-        <p>自定义 TTL、根域名验证、域名托管委派、有效期与续期，全部自助。</p>
+        <h3>完善的 DNS 管理</h3>
+        <p>12 种记录类型、自定义 TTL、Cloudflare 代理、根域名验证一应俱全。</p>
       </div>
-      <div class="card f2">
-        <div class="f2-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2c1.3 0 2.6 2 3.2 5H8.8C9.4 6 10.7 4 12 4ZM4.3 9h3.1c-.1 1-.2 2.1-.2 3s.1 2 .2 3H4.3a8 8 0 0 1 0-6Zm1.1 8h3.4c.6 3 1.9 5 3.2 5-2.5 0-4.8-2-6.6-5Zm4.6 0h7.9c-1.8 3-4.1 5-6.6 5 1.3 0 2.6-2 3.2-5h-4.5Zm8.6-2c.1-1 .2-2.1.2-3s-.1-2-.2-3h3.1a8 8 0 0 1 0 6h-3.1Z"/></svg>
+      <div class="card nk-svc-card">
+        <div class="nk-svc-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4V6a2 2 0 0 1 2-2Z"/></svg>
         </div>
-        <h3>12 种记录类型</h3>
-        <div class="f2-list" id="rtList">A · AAAA · CNAME · MX · TXT · NS</div>
-        <p class="f2-note">另有 SOA · PTR · SRV · CAA · NAPTR · DS，覆盖网站、邮箱、验证与 DNSSEC。</p>
+        <h3>免费技术支持</h3>
+        <p>内置工单系统与讨论区，遇到问题可随时提交，社区与管理员共同协助。</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── 三步上手 ── -->
-<section class="home-sec home-sec-alt">
-  <div class="home-sec-in">
-    <h2 class="sec-title">几分钟即可上手</h2>
-    <div class="step3">
-      <div class="card s3">
-        <div class="s3-num">1</div>
-        <h3>认领子域名</h3>
-        <p>注册账号后申请你喜欢的名字，审核通过即刻拥有完整管理权。</p>
+<!-- ══ 蓝色特性条 ══ -->
+<section class="nk-bar">
+  <div class="nk-wrap">
+    <div class="nk-bar-in">
+      <span>免费 DNS</span>
+      <span>专业级权威解析</span>
+      <span>12+ 记录类型</span>
+      <span>根域名验证</span>
+      <span>域名托管委派</span>
+      <span>DNSSEC 就绪</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ DNS 解析服务 ══ -->
+<section class="nk-sec">
+  <div class="nk-wrap">
+    <h2 class="nk-h2">DNS 解析服务</h2>
+    <div class="nk-dns3">
+      <div class="card"><h3>12+ 种记录类型</h3><p>覆盖网站、邮箱、验证与 DNSSEC 场景。</p></div>
+      <div class="card"><h3>记录集与智能解析</h3><p>TTL 可低至 1 分钟，支持 Cloudflare 代理加速。</p></div>
+      <div class="card"><h3>大规模承载能力</h3><p>依托 Cloudflare 全球边缘网络，稳定可靠。</p></div>
+    </div>
+    <div class="nk-tags" id="rtTags"></div>
+    <div class="nk-more"><button class="btn sm" id="rtMore">更多…</button></div>
+  </div>
+</section>
+
+<!-- ══ Whois & DNS 工具 ══ -->
+<section class="nk-sec nk-sec-alt">
+  <div class="nk-wrap">
+    <h2 class="nk-h2">Whois 查询 &amp; DNS 工具</h2>
+    <p class="nk-sub">公开查询接口，无需登录即可调用</p>
+    <div class="nk-tools">
+      <div class="nk-term">
+        <div class="nk-term-bar"><i></i><i></i><i></i><span>bash</span></div>
+        <pre class="nk-term-body"><code><span class="c-dim"># 查询子域名状态（公开接口）</span>
+<span class="c-cmd">curl</span> <span class="c-str">"<span id="apiHost">https://meoy.top</span>/api/whois?name=mail"</span>
+
+<span class="c-dim"># 返回示例</span>
+{
+  <span class="c-key">"success"</span>: <span class="c-num">true</span>,
+  <span class="c-key">"state"</span>: <span class="c-str">"registered"</span>,
+  <span class="c-key">"fqdn"</span>: <span class="c-str">"mail.meoy.top"</span>,
+  <span class="c-key">"recordCount"</span>: <span class="c-num">4</span>
+}</code></pre>
       </div>
-      <div class="card s3">
-        <div class="s3-num">2</div>
-        <h3>添加 DNS 记录</h3>
-        <p>按需添加 A / CNAME / MX / TXT 等记录，也可一键托管到 anyns、DNSHE。</p>
-      </div>
-      <div class="card s3">
-        <div class="s3-num">3</div>
-        <h3>上线</h3>
-        <p>解析生效后即可访问。支持根域名验证，方便接入 Vercel、Netlify、EdgeOne。</p>
+      <div class="nk-tool-list">
+        <div class="card">
+          <h3>Web 查询页</h3>
+          <p>访问 <a href="/whois.html">WHOIS 查询</a>，支持查询本站子域名，以及 DNSHE / 任意外部域名。</p>
+        </div>
+        <div class="card">
+          <h3>Whois LookUP</h3>
+          <p>自动识别输入归属：本站走 D1 实时状态，外部域名走 DNSHE 公开 WHOIS 或 RDAP。</p>
+        </div>
+        <div class="card">
+          <h3>DNS 工具</h3>
+          <p>在域名详情页自助添加 A / AAAA / CNAME / MX / TXT 等记录，并支持平台验证一键写入。</p>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<footer class="home-foot">
-  <div class="home-sec-in">
-    <div class="row between" style="flex-wrap:wrap;gap:10px">
-      <div class="sub" style="margin:0">
-        <b>MeoyDomain</b> — 二级域名分发与 DNS 管理
-        <a class="sf-link" href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer" style="margin-left:8px">GitHub</a>
+<!-- ══ 深色页脚 ══ -->
+<footer class="nk-foot">
+  <div class="nk-wrap">
+    <div class="nk-foot-in">
+      <div class="nk-fcol">
+        <div class="nk-fbrand"><img data-logo-img src="/img/logo.jpg" alt=""><span data-site-name>Meoy</span></div>
+        <p class="nk-fdesc">免费、开源的二级域名分发与 DNS 管理系统。<br>基于 Cloudflare Workers + D1。</p>
       </div>
-      <nav class="home-nav">
+      <div class="nk-fcol">
+        <h4>服务</h4>
         <a href="/whois.html">WHOIS 查询</a>
+        <a href="/">域名管理</a>
         <a href="/terms.html">服务条款</a>
-        <a href="/">控制台</a>
-      </nav>
+      </div>
+      <div class="nk-fcol">
+        <h4>开源</h4>
+        <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        <span class="nk-fdim">MIT License</span>
+      </div>
+    </div>
+    <div class="nk-fbottom">
+      <span>© <span id="yr">2026</span> <b>MeoyDomain</b> · 二级域名分发</span>
+      <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer">GitHub</a>
     </div>
   </div>
 </footer>
@@ -139,44 +206,94 @@
 
 <script src="/js/api.js"></script>
 <script>
-/* ---------- 品牌信息 ---------- */
 loadBranding().then(applyBranding).catch(() => {});
+document.getElementById('yr').textContent = new Date().getFullYear();
 
-/* ---------- 根域名与记录类型 ---------- */
+let ROOTS = [];
+let RT = [];
+
+/* ---------- 可选后缀卡片 ---------- */
+function renderSuffix(list) {
+  const box = document.getElementById('suffixGrid');
+  if (!list.length) { box.innerHTML = '<div class="nk-sk">暂未配置根域名</div>'; return; }
+  box.innerHTML = list.map((d, i) => `
+    <div class="card nk-suf">
+      ${i === 0 ? '<span class="nk-hot">HOT</span>' : ''}
+      <div class="nk-suf-name">.${esc(d.toUpperCase())}</div>
+      <div class="nk-suf-desc">${esc(d)}</div>
+      <div class="nk-suf-tip">单次注册 365 天，到期前 180 天可续期</div>
+    </div>`).join('');
+}
+
+/* ---------- 记录类型标签 ---------- */
+function renderTags() {
+  const box = document.getElementById('rtTags');
+  if (!RT.length) return;
+  const show = RT.slice(0, 13).map((t) => `<span class="nk-tag mono">${esc(t.key)}</span>`).join('');
+  const rest = RT.slice(13).map((t) => `<span class="nk-tag mono">${esc(t.key)}</span>`).join('');
+  box.innerHTML = show + (rest ? `<span class="nk-tag-hidden" id="rtRest">${rest}</span>` : '');
+  const more = document.getElementById('rtMore');
+  if (!rest) { more.style.display = 'none'; return; }
+  more.onclick = () => {
+    const el = document.getElementById('rtRest');
+    const on = el.classList.toggle('show');
+    more.textContent = on ? '收起' : '更多…';
+  };
+}
+
+/* ---------- 初始化配置 ---------- */
 (async () => {
   try {
     const cfg = await api.get('/api/config');
-    if (cfg.rootDomain) document.getElementById('qRoot').textContent = cfg.rootDomain;
-    if (Array.isArray(cfg.recordTypes) && cfg.recordTypes.length) {
-      document.getElementById('rtList').textContent = cfg.recordTypes.slice(0, 6).map((t) => t.key).join(' · ');
-    }
+    ROOTS = Array.isArray(cfg.rootDomains) && cfg.rootDomains.length
+      ? cfg.rootDomains
+      : (cfg.rootDomain ? [cfg.rootDomain] : []);
+    RT = Array.isArray(cfg.recordTypes) ? cfg.recordTypes : [];
+    if (ROOTS[0]) document.getElementById('qRoot').textContent = ROOTS[0];
+    renderSuffix(ROOTS);
+    renderTags();
+    try {
+      const h = location.origin;
+      if (h && h !== 'null') {
+        document.getElementById('apiHost').textContent = h;
+        document.querySelectorAll('.c-str').forEach(() => {});
+      }
+    } catch {}
   } catch {}
 })();
 
-/* ---------- 域名查询（公开 WHOIS） ---------- */
-const STATE_CN = {
-  free: '可注册', available: '可注册',
+/* ---------- 域名查询：一次查全部后缀 ---------- */
+const STATE = {
+  free: '可用', available: '可用',
   pending: '审核中', registered: '已注册', taken: '已注册',
   rejected: '已驳回', suspended: '已停用', reserved: '系统保留',
 };
 document.getElementById('searchForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = document.getElementById('qName').value.trim();
-  const tip = document.getElementById('qTip');
-  if (!name) { tip.textContent = '请输入想查询的名称'; tip.className = 'h2-tip err'; return; }
-  tip.textContent = '查询中…'; tip.className = 'h2-tip';
-  try {
-    const d = await api.get('/api/whois?name=' + encodeURIComponent(name));
-    const r = d.result || d;
-    const state = r.state || r.status || '';
-    const txt = STATE_CN[state] || state || '未知';
-    const free = ['free', 'available'].includes(state);
-    tip.innerHTML = `<b>${esc(r.fqdn || r.name || name)}</b> — ${esc(txt)}`;
-    tip.className = 'h2-tip ' + (free ? 'ok' : 'warn');
-  } catch (err) {
-    tip.textContent = err.message || '查询失败';
-    tip.className = 'h2-tip err';
-  }
+  const label = document.getElementById('qName').value.trim();
+  const box = document.getElementById('results');
+  if (!label) { box.innerHTML = '<div class="nk-res-empty">请输入域名前缀</div>'; return; }
+  box.innerHTML = '<div class="nk-res-empty">查询中…</div>';
+
+  const jobs = ROOTS.map((root) =>
+    api.get('/api/whois?name=' + encodeURIComponent(label + '.' + root))
+      .then((d) => ({ root, data: d.result || d, err: null }))
+      .catch((err) => ({ root, data: null, err: err.message || '查询失败' }))
+  );
+  const rs = await Promise.all(jobs);
+  box.innerHTML = rs.map(({ root, data, err }) => {
+    if (err) return `<div class="card nk-res err"><div class="nk-res-name mono">${esc(label + '.' + root)}</div><div class="nk-res-state">${esc(err)}</div></div>`;
+    const st = data.state || data.status || '';
+    const txt = STATE[st] || st || '未知';
+    const free = ['free', 'available'].includes(st);
+    return `<div class="card nk-res ${free ? 'ok' : 'no'}">
+      <div class="nk-res-name mono">${esc((data.fqdn || (label + '.' + root)).toUpperCase())}</div>
+      <div class="nk-res-state">${esc(txt)}</div>
+      <div class="nk-res-act">${free
+        ? `<a class="btn sm primary" href="/dashboard.html?label=${encodeURIComponent(label)}">立即注册</a>`
+        : `<span class="nk-res-dim">域名不可用</span>`}</div>
+    </div>`;
+  }).join('');
 });
 </script>
 </body>
