@@ -1720,3 +1720,49 @@ input:focus, select:focus, textarea:focus {
 .s3 p { font-size: 12.5px; color: #6b7a8d; margin: 0; line-height: 1.7; }
 
 .home-foot { padding: 24px 20px 32px; }
+
+/* ══════════════════════════════════════════════════════════
+   全站底部署名 .site-foot（由 js/api.js 自动注入）
+   静态流布局，不用 fixed —— 避免遮挡页面内容
+   ══════════════════════════════════════════════════════════ */
+.site-foot {
+  margin-top: 40px;
+  padding: 16px 20px 22px;
+  border-top: 1px solid hsl(var(--border));
+  background: transparent;
+}
+.site-foot-in {
+  max-width: 1060px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sf-brand { font-family: var(--display); color: var(--ink-2); }
+.sf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  transition: color .16s, border-color .16s, background .16s;
+}
+.sf-link:hover {
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary) / .4);
+  background: hsl(var(--primary) / .07);
+}
+.sf-link svg { width: 13px; height: 13px; fill: currentColor; }
+
+/* 控制台页：底部署名跟随主内容区，避开左侧栏 */
+body:has(.main) .site-foot { margin-left: 208px; }
+@media (max-width: 860px) {
+  body:has(.main) .site-foot { margin-left: 0; }
+}
