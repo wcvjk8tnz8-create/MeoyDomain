@@ -6,6 +6,7 @@
 
 const SHELL_NAV = [
   { key: 'domains', name: '域名管理', icon: 'globe', href: '/dashboard.html', group: '控制台' },
+  { key: 'register', name: '注册域名', icon: 'plus', href: '/register.html', group: '控制台' },
   { key: 'whois', name: 'WHOIS 查询', icon: 'search', href: '/whois.html', group: '资源管理' },
   { key: 'transfer', name: '域名转移', icon: 'swap', href: '/transfer.html', group: '资源管理' },
   { key: 'checkin', name: '签到地', icon: 'calendar', href: '/checkin.html', group: '用户中心' },
@@ -30,6 +31,7 @@ const SHELL_ICON = {
   terms: '<path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',
   logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
   bell: '<path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
 };
 
 
@@ -52,25 +54,7 @@ const NEKO_SPRITE = `
     <path d="M12 62 L22 64 M12 70 L22 69 M88 62 L78 64 M88 70 L78 69" stroke="var(--line,#5a6aa0)" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
     <path d="M50 28 q-3 -6 0 -10 q3 4 0 10z" fill="var(--accent,#ff8fbf)"/>
   </symbol>
-  <symbol id="neko" viewBox="0 0 140 150">
-    <path d="M100 118 Q138 112 128 82 Q124 70 116 78" fill="none" stroke="#5a6aa0" stroke-width="3" stroke-linecap="round"/>
-    <ellipse cx="68" cy="116" rx="38" ry="28" fill="#fff" stroke="#5a6aa0" stroke-width="3"/>
-    <path d="M52 112 q6 8 0 16 M84 112 q-6 8 0 16" fill="none" stroke="#cfe0ff" stroke-width="3" stroke-linecap="round"/>
-    <ellipse cx="48" cy="138" rx="13" ry="8" fill="#fff" stroke="#5a6aa0" stroke-width="3"/><ellipse cx="88" cy="138" rx="13" ry="8" fill="#fff" stroke="#5a6aa0" stroke-width="3"/>
-    <circle cx="44" cy="139" r="2" fill="#ffb6d1"/><circle cx="52" cy="139" r="2" fill="#ffb6d1"/><circle cx="84" cy="139" r="2" fill="#ffb6d1"/><circle cx="92" cy="139" r="2" fill="#ffb6d1"/>
-    <path d="M20 62 L24 18 Q25 12 31 15 L56 34 Z" fill="#fff" stroke="#5a6aa0" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M116 62 L112 18 Q111 12 105 15 L80 34 Z" fill="#fff" stroke="#5a6aa0" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M28 52 L30 26 L47 39 Z" fill="#ffb6d1"/><path d="M108 52 L106 26 L89 39 Z" fill="#ffb6d1"/>
-    <ellipse cx="68" cy="72" rx="48" ry="38" fill="#fff" stroke="#5a6aa0" stroke-width="3"/>
-    <path d="M68 36 q-4 -9 0 -14 q4 5 0 14z" fill="#7cb8ff"/>
-    <path d="M44 40 q-6 8 -2 14 M92 40 q6 8 2 14" fill="none" stroke="#cfe0ff" stroke-width="3" stroke-linecap="round"/>
-    <ellipse cx="48" cy="74" rx="8" ry="10" fill="#3b4a7a"/><ellipse cx="88" cy="74" rx="8" ry="10" fill="#3b4a7a"/>
-    <circle cx="51" cy="70" r="3.4" fill="#fff"/><circle cx="91" cy="70" r="3.4" fill="#fff"/>
-    <circle cx="46" cy="78" r="1.8" fill="#fff"/><circle cx="86" cy="78" r="1.8" fill="#fff"/>
-    <ellipse cx="34" cy="88" rx="8" ry="4.5" fill="#ff9ab8" opacity=".6"/><ellipse cx="102" cy="88" rx="8" ry="4.5" fill="#ff9ab8" opacity=".6"/>
-    <path d="M61 88 Q65 94 68 88 Q71 94 75 88" fill="none" stroke="#5a6aa0" stroke-width="2.6" stroke-linecap="round"/>
-    <path d="M16 76 L30 79 M16 86 L30 85 M120 76 L106 79 M120 86 L106 85" stroke="#5a6aa0" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-  </symbol>
+
 </svg>`;
 
 /* 闪光装饰（位置固定，纯装饰） */
@@ -87,24 +71,9 @@ function mountDecor() {
   if (document.getElementById('nekoSprite')) return;
   const wrap = document.createElement('div');
   wrap.innerHTML = NEKO_SPRITE +
-    SPARKS.map((p) => `<span class="spark" style="left:${p.l};top:${p.t};font-size:${p.fs}px;animation-delay:${p.d}s">✦</span>`).join('') +
-    `<div class="bubble" id="nekoBubble"></div>` +
-    `<svg class="mascot" id="nekoMascot" viewBox="0 0 140 150" aria-label="吉祥物"><use href="#neko"/></svg>`;
+    SPARKS.map((p) => `<span class="spark" style="left:${p.l};top:${p.t};font-size:${p.fs}px;animation-delay:${p.d}s">✦</span>`).join('');
   while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
 
-  const m = document.getElementById('nekoMascot');
-  const b = document.getElementById('nekoBubble');
-  const TALK = ['喵～', '摸摸头～', '今天也辛苦啦', '要不要喝杯奶茶？', '喵呜 ♪', '(๑•̀ㅂ•́)و✧'];
-  let timer = 0;
-  function say(t) {
-    if (!b) return;
-    b.textContent = t;
-    b.classList.add('show');
-    clearTimeout(timer);
-    timer = setTimeout(() => b.classList.remove('show'), 2200);
-  }
-  if (m) m.onclick = () => say(TALK[Math.floor(Math.random() * TALK.length)]);
-  window.MeoyNekoSay = say;
 }
 
 /* ---------- 品牌信息缓存（避免每次切页都等一个网络往返） ---------- */
@@ -263,7 +232,7 @@ async function mountShell(active, opt = {}) {
   const catStyle = `--bg:${_av.bg};--fur:${_av.fur};--eye:${_av.eye};--accent:${_av.accent}`;
 
   // 面包屑当前页名
-  const EXTRA_NAME = { admin: '管理后台', terms: '服务条款', domain: '域名详情' };
+  const EXTRA_NAME = { admin: '管理后台', terms: '服务条款', domain: '域名详情', register: '注册域名' };
   const _all = [...SHELL_NAV, { key: 'admin', name: '管理后台' }];
   const _cur = _all.find((x) => x.key === active);
   const curName = (opt.title || (_cur && _cur.name) || EXTRA_NAME[active] || '控制台');

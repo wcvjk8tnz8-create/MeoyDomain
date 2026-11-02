@@ -80,29 +80,8 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
   </div>
 
   <div class="card" id="applyCard">
-    <h2>申请子域名</h2>
-    <div class="row" style="align-items:flex-end">
-      <div style="flex:1;min-width:190px">
-        <label>子域名</label>
-        <div class="row" style="gap:0;flex-wrap:nowrap">
-          <input id="label" placeholder="mail" style="border-radius:var(--radius-s) 0 0 var(--radius-s);border-right:none" autocomplete="off">
-          <span class="mono" id="rootWrap" style="padding:0 11px;background:rgba(90,169,230,.12);border:1px solid var(--line);border-radius:0 var(--radius-s) var(--radius-s) 0;display:flex;align-items:center;white-space:nowrap;color:var(--c1);font-size:12px">.<span id="rootDomain"></span></span>
-        </div>
-        <div class="hint" id="checkTip"></div>
-      </div>
-      <div style="flex:2;min-width:220px">
-        <label>用途说明（选填，供管理员审核参考）</label>
-        <input id="note" placeholder="例如：个人博客 / 邮件服务">
-      </div>
-      <button class="btn primary" id="btnApply">申请</button>
-    </div>
-    <label class="check" style="margin-top:11px">
-      <input type="checkbox" id="agreeUse">
-      <span id="agreeUseLabel">我承诺不将域名用于钓鱼、恶意程序、垃圾邮件等违规用途，并已阅读<a href="/terms.html" target="_blank">《服务条款与免责声明》</a>：服务按「现状」提供，不对可用性、数据损失及第三方行为承担责任。</span>
-    </label>
-    <div class="alert info" style="margin:12px 0 0" id="applyTip">
-      创建子域名不会自动写入任何 DNS 记录，审核通过后到「DNS 记录」页按需添加。
-    </div>
+    <div class="head-row"><h3>注册域名</h3><a class="btn sm" href="/register.html">前往注册 →</a></div>
+    <div class="hint">注册入口已独立为单独页面：可先检查名称是否可用、查看积分消耗，再提交申请。</div>
   </div>
 
   <div class="card" id="listAnchor">
@@ -150,30 +129,19 @@ async function load() {
   if (d.rejected > 0) tip += ` · 另有 ${d.rejected} 个被驳回（不占配额）`;
   document.getElementById('quotaTip').innerHTML = `已使用 ${d.used} / ${quotaHtml}` + tip;
 
-  // 单域名队列：已有待审申请则锁住申请入口
-  const applyBtn = document.getElementById('btnApply');
-  const labelEl = document.getElementById('label');
-  const noteEl = document.getElementById('note');
-  if (d.pendingApplication && !isAdmin) {
-    applyBtn.disabled = true;
-    labelEl.disabled = true;
-    noteEl.disabled = true;
-    applyBtn.textContent = '待审核中';
-    document.getElementById('applyTip').innerHTML =
-      `<b style="color:var(--warn)">你已有一个待审核的申请：${esc(d.pendingApplication.fqdn)}</b><br>
-       同一时间只能申请一个域名，请等待审核结果（或被驳回）后再申请。`;
-  } else {
-    applyBtn.disabled = false;
-    labelEl.disabled = false;
-    noteEl.disabled = false;
-    applyBtn.textContent = '申请';
-  }
-  if (isAdmin) {
-    document.getElementById('applyTip').innerHTML =
-      '创建子域名不会自动写入任何 DNS 记录。<b>管理员特权</b>：申请即时开通、不限数量、可使用 www / mail / admin 等保留域名。';
-  } else if (!cfg.requireApproval) {
-    document.getElementById('applyTip').innerHTML =
-      '创建子域名不会自动写入任何 DNS 记录，开通后到「DNS 记录」页按需添加。';
+  // 单域名队列提示（申请表单已移至 /register.html，这里只做提示）
+  const applyTip = document.getElementById('applyTip');
+  if (applyTip) {
+    if (d.pendingApplication && !isAdmin) {
+      applyTip.className = 'alert a-warn';
+      applyTip.innerHTML = `你已有一个待审核的申请：<b>${esc(d.pendingApplication.fqdn)}</b><br>同一时间只能申请一个域名，请等待审核结果（或被驳回）后再提交。`;
+    } else if (isAdmin) {
+      applyTip.className = 'alert a-info';
+      applyTip.innerHTML = '创建子域名不会自动写入任何 DNS 记录。<b>管理员特权</b>：申请即时开通、不限数量、可使用 www / mail / admin 等保留域名。';
+    } else if (!cfg.requireApproval) {
+      applyTip.className = 'alert a-info';
+      applyTip.innerHTML = '创建子域名不会自动写入任何 DNS 记录，开通后到「DNS 记录」页按需添加。';
+    }
   }
 
   allItems = d.items || [];
@@ -337,67 +305,7 @@ function currentRoot() {
   return ROOTS[0] || '';
 }
 
-/* 单个根域名：保持原来的静态后缀；多个：换成下拉选择 */
-async function setupRoots() {
-  try {
-    const cfg = await api.get('/api/config');
-    const list = Array.isArray(cfg.rootDomains) && cfg.rootDomains.length
-      ? cfg.rootDomains
-      : (cfg.rootDomain ? [cfg.rootDomain] : []);
-    ROOTS = list;
-    const wrap = document.getElementById('rootWrap');
-    const span = document.getElementById('rootDomain');
-    if (!wrap) return;
-    if (list.length <= 1) {
-      if (span) span.textContent = list[0] || '';
-      return;
-    }
-    // 多根：把静态后缀换成下拉
-    wrap.innerHTML = '<span style="opacity:.5">.</span><select id="rootDomainSel" style="border:none;background:transparent;color:var(--c1);font-family:var(--mono);font-size:12px;padding:0 2px;outline:none;cursor:pointer">'
-      + list.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join('')
-      + '</select>';
-    const sel = document.getElementById('rootDomainSel');
-    sel.onchange = () => {
-      const v = document.getElementById('label').value.trim();
-      if (v) runCheck(v);
-    };
-  } catch {}
-}
 
-async function runCheck(v) {
-  const tip = document.getElementById('checkTip');
-  if (!v) { tip.innerHTML = ''; return; }
-  try {
-    const r = await api.get('/api/subdomains/check?label=' + encodeURIComponent(v) + rootQuery());
-    const link = `<a href="/whois.html?name=${encodeURIComponent(v)}" target="_blank" style="font-size:11.5px;margin-left:6px">whois 详情</a>`;
-    let costHtml = '';
-    if (r.available && r.cost > 0) {
-      const okPt = r.enough;
-      costHtml = `<div style="margin-top:3px;font-family:var(--mono);font-size:11.5px;color:${okPt ? 'var(--muted)' : 'var(--danger)'}">
-        ${r.short ? '<b style="color:var(--warn)">单字域名</b> ' : ''}消耗 ${r.cost} 分 · 余额 ${r.points} 分${okPt ? '' : '（不足，可每日签到积累）'}
-      </div>`;
-    }
-    tip.innerHTML = (r.available
-      ? `<span style="color:var(--ok)">${esc(r.fqdn)} 可以注册</span>`
-      : `<span style="color:var(--danger)">${esc(r.message)}</span>`) + link + costHtml;
-  } catch (err) { tip.innerHTML = ''; }
-}
-
-// 本机已同意过免责条款则自动勾选（换设备/清缓存后需重新确认）
-try {
-  if (localStorage.getItem('meoy_agree_use') === '1') {
-    const ag = document.getElementById('agreeUse');
-    if (ag) ag.checked = true;
-  }
-} catch (e) {}
-
-document.getElementById('label').addEventListener('input', (e) => {
-  const v = e.target.value.trim();
-  const tip = document.getElementById('checkTip');
-  if (!v) { tip.innerHTML = ''; return; }
-  clearTimeout(checkTimer);
-  checkTimer = setTimeout(() => runCheck(v), 350);
-});
 
 document.querySelectorAll('[data-quick]').forEach((a) => {
   a.onclick = (e) => {
@@ -405,10 +313,6 @@ document.querySelectorAll('[data-quick]').forEach((a) => {
     if (t === 'list') {
       e.preventDefault();
       document.getElementById('listAnchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (t === 'apply') {
-      e.preventDefault();
-      document.getElementById('applyCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setTimeout(() => document.getElementById('label')?.focus(), 420);
     }
   };
 });
@@ -418,32 +322,6 @@ document.getElementById('kw').addEventListener('input', () => { curPage = 1; ren
 document.getElementById('btnPrev').onclick = () => { if (curPage > 1) { curPage--; renderPage(); } };
 document.getElementById('btnNext').onclick = () => { curPage++; renderPage(); };
 
-document.getElementById('btnApply').onclick = async () => {
-  const label = document.getElementById('label').value.trim();
-  const note = document.getElementById('note').value.trim();
-  if (!label) return toast('请输入子域名', 'err');
-  // 免责确认：勾选后记在本机，下次免勾
-  const agree = document.getElementById('agreeUse');
-  if (agree && !agree.checked) {
-    return toast('请先勾选免责与使用承诺', 'err');
-  }
-  try {
-    localStorage.setItem('meoy_agree_use', '1');
-    const r = await api.post('/api/subdomains', { label, note, root: currentRoot() });
-    toast(r.status === 'approved' ? '申请成功，已开通' : '已提交，等待管理员审核');
-    document.getElementById('label').value = '';
-    document.getElementById('note').value = '';
-    document.getElementById('checkTip').innerHTML = '';
-    load();
-    loadPoints();
-  } catch (e) {
-    toast(e.message, 'err');
-    // 名称可能刚被他人抢注，刷新列表并重新检查
-    load();
-    loadPoints();
-    runCheck(label);
-  }
-};
 
 /* ---------------- 积分 ---------------- */
 let ptData = null;
@@ -514,13 +392,13 @@ document.getElementById('btnLogs').onclick = () => {
     </table></div>` : '<div class="empty">暂无记录</div>');
 };
 
-// 支持从 WHOIS 页带名称跳转过来：/dashboard?apply=xxx
-const preApply = new URLSearchParams(location.search).get('apply');
-if (preApply) {
-  document.getElementById('label').value = preApply;
-  runCheck(preApply);
-  document.getElementById('note').focus();
-}
+// 从 WHOIS / 落地页带名称过来：/dashboard?apply=xxx 或 ?label=xxx
+// 申请表单已独立成页，这里直接带名称跳过去
+(function () {
+  const ps = new URLSearchParams(location.search);
+  const pre = ps.get('apply') || ps.get('label');
+  if (pre) location.replace('/register.html?label=' + encodeURIComponent(pre));
+})();
 
 document.getElementById('btnPwd').onclick = () => {
   openModal('修改密码', `
@@ -538,15 +416,7 @@ document.getElementById('btnPwd').onclick = () => {
 mountShell('domains').then(async (me) => {
   currentUser = me || null;
   applyBranding(await loadBranding());
-  await setupRoots();   // 必须先于 load()，否则查询用的是空 root
-  // 从落地页「立即注册」带过来的名称，自动填入并预查
-  try {
-    const pre = new URLSearchParams(location.search).get('label');
-    if (pre) {
-      const el = document.getElementById('label');
-      if (el) { el.value = pre; runCheck(pre); el.focus(); }
-    }
-  } catch {}
+  await setupRoots();   // 保留：多根域名时列表查询需要知道当前根
   load();
   loadPoints();
 }).catch(() => {});

@@ -2604,7 +2604,12 @@ body { background: hsl(var(--background)); }
 .notice .n-ico svg { width: 15px; height: 15px; fill: hsl(var(--primary)); }
 
 /* ---------- 内容区 ---------- */
-.main { margin-left: 204px; padding: 0; display: flex; flex-direction: column; min-height: 100vh; }
+.main {
+  margin-left: 224px;
+  /* 顶栏是 fixed（脱离文档流），必须手动让开 64px，否则内容顶部会被顶栏压住 / 整体下移错位 */
+  padding: 64px 0 0;
+  display: flex; flex-direction: column; min-height: 100vh;
+}
 .main-in { max-width: 1120px; margin: 0 auto; padding: 16px 20px; width: 100%; }
 .content { padding: 16px 20px; flex: 1; }
 
@@ -2994,7 +2999,7 @@ body::before {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420' fill='none' stroke='%239cc3ff' stroke-opacity='.35' stroke-width='1.2'><path d='M-10 80c60-40 110 30 170 0s90-70 150-30 90 20 130-10'/><path d='M-10 130c60-40 110 30 170 0s90-70 150-30 90 20 130-10'/><path d='M-10 180c60-40 110 30 170 0s90-70 150-30 90 20 130-10'/><path d='M-10 260c70 40 120-30 180 10s100 50 160 0 70-30 100-10'/><path d='M-10 310c70 40 120-30 180 10s100 50 160 0 70-30 100-10'/><path d='M-10 360c70 40 120-30 180 10s100 50 160 0 70-30 100-10'/></svg>");
 }
 /* 内容层必须高于装饰层 */
-.topbar, .sidebar, .main, .footer, .site-foot, .mascot, .bubble { position: relative; z-index: 1; }
+.topbar, .sidebar, .main, .footer, .site-foot { position: relative; z-index: 1; }
 .sidebar { z-index: 250; }
 .topbar { z-index: 300; }
 .main { z-index: 1; }
@@ -3284,29 +3289,7 @@ tbody tr:hover td { background: #f2f7ff; }
 .empty { color: var(--ink-muted); padding: 50px 0; }
 .empty svg { width: 130px; height: 130px; }
 
-/* ---------- 吉祥物 + 气泡 ---------- */
-.mascot {
-  position: fixed; right: 26px; bottom: 20px; z-index: 20;
-  width: 110px; cursor: pointer;
-  animation: bob 3s ease-in-out infinite;
-  filter: drop-shadow(0 10px 14px rgba(79, 155, 255, .35));
-}
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-.mascot:hover { transform: scale(1.06) rotate(-3deg); }
-.bubble {
-  position: fixed; right: 136px; bottom: 84px; z-index: 21;
-  background: #fff; border-radius: 18px; padding: 10px 16px;
-  box-shadow: var(--shadow); font-weight: 700; font-size: 14px;
-  opacity: 0; transform: translateY(6px) scale(.9);
-  transition: .25s; pointer-events: none; max-width: 210px;
-  color: var(--ink);
-}
-.bubble::after {
-  content: ""; position: absolute; right: -7px; bottom: 16px;
-  width: 14px; height: 14px; background: #fff;
-  transform: rotate(45deg); border-radius: 3px;
-}
-.bubble.show { opacity: 1; transform: none; }
 
 /* ---------- 个人资料：封面 + 大头像 ---------- */
 .profile-grid { grid-template-columns: 340px minmax(0, 1fr); gap: 22px; }
@@ -3361,8 +3344,6 @@ body .site-foot { margin-left: 224px; }
   body .site-foot { margin-left: 68px; }
   .profile-grid, .msg-grid, .two { grid-template-columns: 1fr; }
   .top-search { display: none; }
-  .mascot { width: 80px; }
-  .bubble { right: 100px; }
   .steps { padding: 20px 12px; }
 }
 @media (max-width: 1000px) { .main { margin-left: 68px; } }
@@ -3435,9 +3416,6 @@ body .site-foot { margin-left: 224px; }
 [data-theme="dark"] .empty { color: hsl(215 20% 62%); }
 [data-theme="dark"] .pill { background: hsl(222 44% 14%); border-color: hsl(217 25% 26%); color: hsl(215 20% 70%); }
 [data-theme="dark"] .seg { background: hsl(217 33% 15%); }
-[data-theme="dark"] .mascot { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .5)); opacity: .9; }
-[data-theme="dark"] .bubble { background: hsl(222 47% 14%); color: hsl(210 40% 92%); }
-[data-theme="dark"] .bubble::after { background: hsl(222 47% 14%); }
 [data-theme="dark"] .quote { background: linear-gradient(135deg, hsl(217 33% 16%), hsl(338 30% 17%)); color: hsl(210 30% 84%); }
 [data-theme="dark"] .sec-item:hover { background: hsl(222 44% 15%); }
 [data-theme="dark"] .info-row { border-top-color: hsl(217 25% 26%); }

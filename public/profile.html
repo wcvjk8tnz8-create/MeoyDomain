@@ -74,9 +74,9 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
           <div class="row" style="gap:9px;align-items:center">
             <img id="fAvPreview" src="/img/avatar/_default.svg" style="width:44px;height:44px;border-radius:50%;border:1px solid var(--line);object-fit:cover">
             <button class="btn sm" id="btnPickAv2">选择头像</button>
-            <button class="btn sm" id="btnUploadAv">上传本地图片</button>
+            <button class="btn sm" id="btnUploadAv" style="display:none">上传本地图片</button>
             <input type="file" id="fAvFile" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
-            <span class="hint" style="margin:0">也可在下方填外链图片地址</span>
+            <span class="hint" style="margin:0">可从内置头像库选择，或在下方填写图片外链</span>
           </div>
           <input id="fAvUrl" placeholder="/img/avatar/pink.svg 或 https://...">
           <div class="hint" id="upTip"></div>
@@ -169,7 +169,7 @@ function openAvatarPicker(afterPick) {
   const list = (data && data.avatars) || [];
   openModal('选择头像', `
     <div class="row" style="justify-content:flex-end;margin-bottom:11px">
-      <button class="btn sm" id="btnUploadAv2">上传本地图片</button>
+      <button class="btn sm" id="btnUploadAv2" style="display:none">上传本地图片</button>
     </div>
     <div class="av-grid">
       ${list.map((a) => `<button class="av-item${a.url === curAvatar ? ' on' : ''}" data-av="${esc(a.url)}">
@@ -213,8 +213,17 @@ const fileInput = document.getElementById('fAvFile');
 const upTip = document.getElementById('upTip');
 
 function pickFile() { fileInput.click(); }
+/* 自定义上传默认关闭（当前不绑定 R2）。
+   后台在 /api/config 里返回 avatarUpload: true 时才显示并启用。 */
 const btnUp = document.getElementById('btnUploadAv');
 if (btnUp) btnUp.onclick = pickFile;
+try {
+  api.get('/api/config').then((cfg) => {
+    if (cfg && cfg.avatarUpload === true) {
+      [btnUp, document.getElementById('btnUploadAv2')].forEach((b) => { if (b) b.style.display = ''; });
+    }
+  }).catch(() => {});
+} catch (e) {}
 
 fileInput.addEventListener('change', async () => {
   const f = fileInput.files && fileInput.files[0];

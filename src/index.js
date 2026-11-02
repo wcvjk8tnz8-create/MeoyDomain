@@ -79,7 +79,10 @@ app.get('/api/health', (c) =>
 app.get('/api/avatar/:key', async (c) => {
   const key = String(c.req.param('key') || '');
   if (!/^[A-Za-z0-9._-]{1,120}$/.test(key)) return c.text('bad key', 400);
-  if (!c.env.AVATARS) return c.text('avatar storage not configured', 404);
+  // 与上传一致：未显式启用（AVATAR_ENABLED=1）时一律当作未配置
+  if (!c.env.AVATARS || String(c.env.AVATAR_ENABLED || '').trim() !== '1') {
+    return c.text('avatar storage not configured', 404);
+  }
   const obj = await c.env.AVATARS.get(key);
   if (!obj) return c.text('not found', 404);
   const headers = new Headers();

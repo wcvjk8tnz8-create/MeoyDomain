@@ -123,7 +123,12 @@ app.put('/', async (c) => {
 app.post('/avatar', async (c) => {
   const u = c.get('user');
   if (!u) return fail(c, '请先登录', 401, { needLogin: true });
-  if (!c.env.AVATARS) return fail(c, '未启用头像存储（R2），请联系管理员配置', 501);
+  // 头像上传一律按「未启用」处理：项目当前不绑定 R2（wrangler.toml 无 [[r2_buckets]]），
+  // 即使账号里存在桶也不启用 —— 避免因 R2 未就绪导致部署失败或上传报错。
+  // 用户仍可使用内置头像库或填写外链头像。
+  if (!c.env.AVATARS || String(c.env.AVATAR_ENABLED || '').trim() !== '1') {
+    return fail(c, '当前未开放自定义头像上传，可从内置头像库中选择或填写头像链接', 501);
+  }
 
   let form;
   try { form = await c.req.formData(); } catch { return fail(c, '上传格式不正确'); }

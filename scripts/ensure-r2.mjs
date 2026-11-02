@@ -6,7 +6,9 @@
  *  - 桶已存在 → 复用
  *  - 桶不存在 → 通过 Cloudflare API 自动创建
  *  - 任何失败（权限不足 / Authentication error / 网络问题）
- *      → 从 wrangler.toml 移除 [[r2_buckets]] 绑定，让部署在无 R2 的情况下继续。
+ * 注意：无论是否找到/创建成功，都不会往 wrangler.toml 写 [[r2_buckets]]。
+ *   头像上传目前一律当作「未启用 R2」处理（见 src/routes/profile.js）。
+ *   桶只是预先备好，将来要启用时手动加回绑定即可。
  *        站点全部功能正常，仅「上传自定义头像」不可用；内置头像库与外链头像不受影响。
  *
  * 关于「公网地址」：
