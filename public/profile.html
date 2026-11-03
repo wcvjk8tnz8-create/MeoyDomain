@@ -37,7 +37,7 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
       </div>
       <div class="pc-body">
         <div class="pc-av-wrap">
-          <img class="pc-av" id="pcAv" src="/img/avatar/_default.svg" alt="">
+          <img class="pc-av" id="pcAv" src="/img/avatar/miku-headset.webp" alt="">
           <button class="pc-av-btn" id="btnPickAv" title="更换头像">更换</button>
         </div>
         <div class="pc-name" id="pcName">—</div>
@@ -73,13 +73,13 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
         <div class="field">
           <label>头像</label>
           <div class="row" style="gap:9px;align-items:center">
-            <img id="fAvPreview" src="/img/avatar/_default.svg" style="width:44px;height:44px;border-radius:50%;border:1px solid var(--line);object-fit:cover">
+            <img id="fAvPreview" src="/img/avatar/miku-headset.webp" style="width:44px;height:44px;border-radius:50%;border:1px solid var(--line);object-fit:cover">
             <button class="btn sm" id="btnPickAv2">选择头像</button>
             <button class="btn sm" id="btnUploadAv" style="display:none">上传本地图片</button>
             <input type="file" id="fAvFile" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
             <span class="hint" style="margin:0">可从内置头像库选择，或在下方填写图片外链</span>
           </div>
-          <input id="fAvUrl" placeholder="/img/avatar/pink.svg 或 https://...">
+          <input id="fAvUrl" placeholder="/img/avatar/miku-headset.webp 或 https://...">
           <div class="hint" id="upTip"></div>
         </div>
         <div class="field">
@@ -119,7 +119,7 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
 <script src="/js/api.js"></script>
 <script src="/js/shell.js"></script>
 <script>
-let me = null, data = null, curAvatar = '/img/avatar/_default.svg';
+let me = null, data = null, curAvatar = '/img/avatar/miku-headset.webp';
 
 mountShell('profile').then(async () => {
   applyBranding(await loadBranding());
@@ -131,7 +131,7 @@ async function load() {
     data = await api.get('/api/profile');
   } catch (e) { toast(e.message, 'err'); return; }
   const p = data.profile || {};
-  curAvatar = p.avatar || '/img/avatar/_default.svg';
+  curAvatar = p.avatar || '/img/avatar/miku-headset.webp';
   const nick = p.nickname || String(data.email || '').split('@')[0];
 
   document.getElementById('pcName').textContent = nick;
@@ -158,7 +158,7 @@ async function load() {
 function setAvatar(url) {
   // 顶栏头像必须跟着变（同一个用户，两处不能不一致）
   try { window.MeoyRenderAvatars && window.MeoyRenderAvatars(url); } catch (e) {}
-  curAvatar = url || '/img/avatar/_default.svg';
+  curAvatar = url || '/img/avatar/miku-headset.webp';
   const av = document.getElementById('pcAv');
   const pv = document.getElementById('fAvPreview');
   if (av) av.src = curAvatar;
@@ -167,30 +167,57 @@ function setAvatar(url) {
   if (u) u.value = curAvatar;
 }
 
-/* ---------- 头像选择弹窗（参考 DnsNeko 的头像库） ---------- */
+/* ---------- 头像选择弹窗（内置角色库：Miku / GUMI / VOCALOID / Ave Mujica） ---------- */
 function openAvatarPicker(afterPick) {
   const list = (data && data.avatars) || [];
+  const groups = ['all', ...new Set(list.map((a) => a.group || '其它'))];
+  const countOf = (g) => g === 'all' ? list.length : list.filter((a) => (a.group || '其它') === g).length;
+  const gname = (g) => g === 'all' ? '全部' : (g === 'Ave Mujica' ? 'Mujica' : g);
+  let picked = curAvatar;
+  let group = 'all';
+
   openModal('选择头像', `
-    <div class="row" style="justify-content:flex-end;margin-bottom:11px">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:11px;gap:8px;flex-wrap:wrap">
+      <div class="av-filters" id="avFilters">
+        ${groups.map((g) => `<button type="button" class="av-flt${g === group ? ' on' : ''}" data-g="${esc(g)}">${esc(gname(g))} <b>${countOf(g)}</b></button>`).join('')}
+      </div>
       <button class="btn sm" id="btnUploadAv2" style="display:none">上传本地图片</button>
     </div>
-    <div class="av-grid">
-      ${list.map((a) => `<button class="av-item${a.url === curAvatar ? ' on' : ''}" data-av="${esc(a.url)}">
-        <img src="${esc(a.url)}" alt="">
-      </button>`).join('')}
-    </div>
+    <div class="av-grid" id="avGrid"></div>
     <div class="row end" style="margin-top:14px">
       <button class="btn" onclick="closeModal()">取消</button>
       <button class="btn primary" id="okAv">保存修改</button>
     </div>`);
-  let picked = curAvatar;
-  document.querySelectorAll('.av-item').forEach((b) => {
+
+  const grid = document.getElementById('avGrid');
+  const draw = () => {
+    const arr = group === 'all' ? list : list.filter((a) => (a.group || '其它') === group);
+    grid.innerHTML = arr.map((a) => `
+      <div class="av-cell${a.url === picked ? ' on' : ''}" data-av="${esc(a.url)}" title="${esc(a.label)}">
+        <button class="av-item${a.url === picked ? ' on' : ''}" type="button"><img src="${esc(a.url)}" alt="${esc(a.label)}" loading="lazy"></button>
+        <span class="av-label">${esc(a.label)}</span>
+      </div>`).join('') || '<div class="hint" style="grid-column:1/-1">暂无头像</div>';
+    grid.querySelectorAll('.av-cell').forEach((b) => {
+      b.onclick = () => {
+        picked = b.dataset.av;
+        grid.querySelectorAll('.av-cell, .av-item').forEach((x) => x.classList.remove('on'));
+        b.classList.add('on');
+        const inner = b.querySelector('.av-item');
+        if (inner) inner.classList.add('on');
+      };
+    });
+  };
+  draw();
+
+  document.querySelectorAll('#avFilters .av-flt').forEach((b) => {
     b.onclick = () => {
-      document.querySelectorAll('.av-item').forEach((x) => x.classList.remove('on'));
+      document.querySelectorAll('#avFilters .av-flt').forEach((x) => x.classList.remove('on'));
       b.classList.add('on');
-      picked = b.dataset.av;
+      group = b.dataset.g;
+      draw();
     };
   });
+
   const b2 = document.getElementById('btnUploadAv2');
   if (b2) b2.onclick = () => { closeModal(); pickFile(); };
 

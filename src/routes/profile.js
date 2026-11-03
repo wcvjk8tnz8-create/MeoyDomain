@@ -4,11 +4,18 @@
  */
 import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
-import { AVATARS } from '../lib/avatars.js';
+import { AVATARS, DEFAULT_AVATAR, LEGACY_AVATAR } from '../lib/avatars.js';
 
 const app = new Hono();
 
-const DEFAULT_AVATAR = '/img/avatar/_default.svg';
+/**
+ * 老用户资料里可能存着旧版猫脸 SVG 的路径。
+ * 统一归一化成新默认头像，保证顶栏与资料页永远一致。
+ */
+function normAvatar(v) {
+  const s = String(v || '').trim();
+  return !s || s === LEGACY_AVATAR ? DEFAULT_AVATAR : s;
+}
 
 /** 生成对外展示的 UID：不暴露自增 id */
 function makeUid(userId) {
@@ -24,9 +31,10 @@ function makeUid(userId) {
 
 /** 头像合法性：只接受站内头像库或 http(s) 外链 */
 function safeAvatar(v) {
-  const s = String(v || '').trim();
-  if (!s) return DEFAULT_AVATAR;
+  const s = normAvatar(v);
   if (AVATARS.some((a) => a.url === s)) return s;
+  // 旧版 12 张自绘猫脸 SVG：仍允许已保存的旧值继续读写
+  if (/^\/img\/avatar\/[a-z0-9._-]+\.svg$/i.test(s)) return s;
   // 本站 R2 上传的头像：/api/avatar/<key>（key 限制为安全字符）
   if (/^\/api\/avatar\/[A-Za-z0-9._-]{1,120}$/.test(s)) return s;
   if (/^https:\/\/[^\s"']+\.(png|jpe?g|gif|webp|svg)(\?[^\s"']*)?$/i.test(s)) return s.slice(0, 500);
@@ -70,7 +78,7 @@ app.get('/', async (c) => {
   return ok(c, {
     profile: {
       uid: p.uid,
-      avatar: p.avatar || DEFAULT_AVATAR,
+      avatar: normAvatar(p.avatar),
       nickname: p.nickname || '',
       bio: p.bio || '',
     },
@@ -114,7 +122,7 @@ app.put('/', async (c) => {
   await audit(c, u.id, 'user.profile', u.email, sets.filter((s) => !s.startsWith('updated_at')).join(','));
   const p = await loadProfile(c.env, u.id);
   return ok(c, {
-    profile: { uid: p.uid, avatar: p.avatar || DEFAULT_AVATAR, nickname: p.nickname || '', bio: p.bio || '' },
+    profile: { uid: p.uid, avatar: normAvatar(p.avatar), nickname: p.nickname || '', bio: p.bio || '' },
   });
 });
 

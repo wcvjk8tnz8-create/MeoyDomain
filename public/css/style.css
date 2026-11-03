@@ -3330,6 +3330,31 @@ tbody tr:hover td { background: #f2f7ff; }
 .sec-item:hover { background: #f5f9ff; }
 .av-grid { gap: 18px; }
 
+/* ---------- 内置角色头像库：分组筛选 + 角色名 ---------- */
+.av-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.av-flt {
+  padding: 5px 11px; font-size: 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line, #e6edf9); background: transparent; color: inherit;
+  white-space: nowrap; transition: background .15s, color .15s;
+}
+.av-flt:hover { border-color: hsl(var(--primary)); }
+.av-flt.on {
+  background: hsl(var(--primary)); border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground, 0 0% 100%)); font-weight: 700;
+}
+.av-flt b { opacity: .75; font-weight: 600; margin-left: 2px; }
+.av-cell { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+.av-cell .av-item { width: 100%; }
+.av-label {
+  display: block; width: 100%; font-size: 11px; line-height: 1.3; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink-muted, #8b97b5);
+}
+.av-cell.on .av-label { color: hsl(var(--primary)); font-weight: 700; }
+@media (max-width: 560px) {
+  .av-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 /* ---------- 页脚 ---------- */
 .main-foot { border-top: none; color: var(--ink-muted); padding: 16px 24px; background: transparent; }
 body .site-foot { margin-left: 224px; }

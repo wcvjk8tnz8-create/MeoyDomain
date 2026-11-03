@@ -143,20 +143,27 @@ function mountMotion() {
 /* ---------- 头像：顶栏与个人资料页必须一致 ----------
    优先级：用户自定义头像（URL） > 猫脸 SVG（按邮箱哈希，同一账号恒定）
    customUrl 从 /api/profile 读取，与个人资料页同源。 */
-function renderAvatars(customUrl) {
-  const safe = (u) => (/^(https?:\/\/|\/|data:image\/)/i.test(String(u || '')) ? String(u) : '');
-  const url = safe(customUrl);
+/* 未选择头像时默认用初音未来（Q版）。内置头像库见 /api/profile 返回的 avatars。 */
+const DEFAULT_AVATAR = '/img/avatar/miku-headset.webp';
+
+/* 图片加载失败时的兜底：自绘猫脸 SVG，避免头像位置空白 */
+function catFaceFallback() {
   document.querySelectorAll('.top-av-wrap').forEach((el) => {
     const size = el.dataset.size ? `width:${el.dataset.size}px;height:${el.dataset.size}px;` : '';
-    if (url) {
-      el.innerHTML = `<img class="top-av" src="${url.replace(/"/g, '&quot;')}" alt="头像" style="${size}" onerror="this.style.display='none';this.parentNode.dataset.failed='1';MeoyRenderCatFaces(1)">`;
-    } else {
-      el.innerHTML = `<svg class="top-av" viewBox="0 0 100 100" style="${size}${el.dataset.catstyle || ''}"><use href="#catface"/></svg>`;
-    }
+    el.innerHTML = `<svg class="top-av" viewBox="0 0 100 100" style="${size}${el.dataset.catstyle || ''}"><use href="#catface"/></svg>`;
+  });
+}
+
+function renderAvatars(customUrl) {
+  const safe = (u) => (/^(https?:\/\/|\/|data:image\/)/i.test(String(u || '')) ? String(u) : '');
+  const url = safe(customUrl) || DEFAULT_AVATAR;
+  document.querySelectorAll('.top-av-wrap').forEach((el) => {
+    const size = el.dataset.size ? `width:${el.dataset.size}px;height:${el.dataset.size}px;` : '';
+    el.innerHTML = `<img class="top-av" src="${url.replace(/"/g, '&quot;')}" alt="头像" style="${size}" onerror="window.MeoyRenderCatFaces&&window.MeoyRenderCatFaces()">`;
   });
 }
 window.MeoyRenderAvatars = renderAvatars;
-window.MeoyRenderCatFaces = () => renderAvatars('');
+window.MeoyRenderCatFaces = catFaceFallback;
 
 /* ---------- 品牌信息缓存（避免每次切页都等一个网络往返） ---------- */
 const BRAND_KEY = 'meoy_brand';
@@ -296,7 +303,7 @@ async function mountShell(active, opt = {}) {
   }).catch(() => {});
 
   const isAdmin = me && me.role === 'admin';
-  // 猫脸头像配色：按邮箱稳定取一套（同一账号永远同一只猫）
+  // 兜底猫脸配色：仅当角色头像图片加载失败时才用到，按邮箱稳定取一套
   const AV_SETS = [
     { bg: '#ffd3e6', fur: '#fff', eye: '#3b4a7a', accent: '#ff8fbf' },
     { bg: '#fff0b8', fur: '#fffdf3', eye: '#7a5a2b', accent: '#ffb148' },
@@ -566,11 +573,11 @@ async function mountShell(active, opt = {}) {
   mountDecor();
   mountMotion();
 
-  // 顶栏头像与个人资料页保持同源：拉取已保存的自定义头像，没有则回落猫脸
+  // 顶栏头像与个人资料页保持同源：先显示默认 Miku，拿到已保存头像后再就地替换
   renderAvatars('');
   api.get('/api/profile').then((d) => {
     const av = (d && d.profile && d.profile.avatar) || '';
-    if (av && !/^\/img\/avatar\/_default\.svg$/.test(av)) renderAvatars(av);
+    if (av) renderAvatars(av);
   }).catch(() => {});
 
   bindPrefetch(side);
