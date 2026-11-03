@@ -589,7 +589,7 @@ mountShell('admin').then(async (u) => {
     return;
   }
   load();
-}).catch(() => {});
+}).catch((e) => console.error("初始化失败", e));
 </script>
 </body>
 </html>

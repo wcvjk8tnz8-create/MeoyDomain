@@ -123,7 +123,7 @@ let me = null, data = null, curAvatar = '/img/avatar/_default.svg';
 mountShell('profile').then(async () => {
   applyBranding(await loadBranding());
   await load();
-}).catch(() => {});
+}).catch((e) => console.error("初始化失败", e));
 
 async function load() {
   try {
@@ -224,7 +224,7 @@ try {
     if (cfg && cfg.avatarUpload === true) {
       [btnUp, document.getElementById('btnUploadAv2')].forEach((b) => { if (b) b.style.display = ''; });
     }
-  }).catch(() => {});
+  }).catch((e) => console.error("初始化失败", e));
 } catch (e) {}
 
 fileInput.addEventListener('change', async () => {

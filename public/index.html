@@ -366,7 +366,7 @@ api.get('/api/rules').then((r) => {
     `同一网络最多注册 ${r.maxAccountsPerIp} 个账号，超限账号一经发现将被全部封禁。`;
   document.getElementById('agreeLabel').innerHTML =
     `我已阅读并同意<a href="/terms.html" target="_blank">《服务条款与免责声明》</a>，了解并接受禁止滥用与免责条款`;
-}).catch(() => {});
+}).catch((e) => console.error("初始化失败", e));
 
 // 后台开启「注册需要验证码」时才显示验证码输入框
 api.get('/api/config').then((cfg) => {
@@ -374,7 +374,7 @@ api.get('/api/config').then((cfg) => {
     const f = document.getElementById('rCodeField');
     if (f) f.style.display = '';
   }
-}).catch(() => {});
+}).catch((e) => console.error("初始化失败", e));
 
 // 登录态探测已由 head 脚本完成（命中则直接跳控制台），这里不再重复请求
 

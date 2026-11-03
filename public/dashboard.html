@@ -117,10 +117,14 @@ let rootDomain = '';
 let checkTimer = null;
 
 async function load() {
-  const d = await api.get('/api/subdomains');
-  const cfg = await api.get('/api/config');
-  rootDomain = cfg.rootDomain;
-  document.getElementById('rootDomain').textContent = rootDomain;
+  // 列表是主体，config 只用于展示根域名 —— 并行取，且 config 失败不影响列表渲染
+  const [d, cfg] = await Promise.all([
+    api.get('/api/subdomains'),
+    api.get('/api/config').catch(() => ({})),
+  ]);
+  rootDomain = cfg.rootDomain || '';
+  const rdEl = document.getElementById('rootDomain');
+  if (rdEl) rdEl.textContent = rootDomain;
   const quotaHtml = d.quotaUnlimited ? '<span class="badge inf">∞ 不限</span>' : `${d.quota} 个`;
   const isAdmin = document.querySelector('.navlink[href="/admin"]') !== null;
   let tip = isAdmin
@@ -145,9 +149,9 @@ async function load() {
   }
 
   allItems = d.items || [];
-  renderPage();
-  renderStats(d);
-  fillWelcome(d);
+  renderPage();                       // 先出列表：下面任何一步出错都不该让用户看不到域名
+  try { renderStats(d); } catch (e) {}
+  try { fillWelcome(d); } catch (e) {}
 }
 
 /* ---------- 控制台统计与欢迎条 ---------- */
@@ -416,10 +420,17 @@ document.getElementById('btnPwd').onclick = () => {
 mountShell('domains').then(async (me) => {
   currentUser = me || null;
   applyBranding(await loadBranding());
-  await setupRoots();   // 保留：多根域名时列表查询需要知道当前根
-  load();
-  loadPoints();
-}).catch(() => {});
+  /* 注意：这里曾调用 setupRoots()，但该函数只定义在 register.html，
+     dashboard 里是未定义引用 → ReferenceError 被下面的 catch 静默吞掉，
+     load() 永远不执行，列表就一直停在「加载中…」。
+     dashboard 的根域名由 load() 内自己的 /api/config 取得，无需 setupRoots。 */
+  load().catch((e) => {
+    const tb = document.getElementById('list');
+    if (tb) tb.innerHTML = `<tr><td colspan="7" class="empty" style="color:var(--danger)">加载失败：${esc(e && e.message || e)}</td></tr>`;
+    toast('域名列表加载失败：' + ((e && e.message) || e), 'err');
+  });
+  loadPoints().catch(() => {});
+}).catch((e) => { console.error('shell 初始化失败', e); });
 </script>
 </body>
 </html>

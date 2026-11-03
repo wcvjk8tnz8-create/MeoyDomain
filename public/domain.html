@@ -698,7 +698,10 @@ document.querySelectorAll('.op-btn').forEach((b) => {
   };
 });
 
-mountShell('domains').then(async () => { applyBranding(await loadBranding()); loadAll(); }).catch(() => {});
+mountShell('domains').then(async () => {
+  try { applyBranding(await loadBranding()); } catch (e) {}
+  loadAll().catch((e) => console.error('域名详情加载失败', e));
+}).catch((e) => console.error('初始化失败', e));
 </script>
 </body>
 </html>

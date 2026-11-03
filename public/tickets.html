@@ -71,7 +71,7 @@ let curStatus = '', curPage = 1, curPages = 1, isAdmin = false;
 mountShell('tickets').then(async () => {
   applyBranding(await loadBranding());
   load();
-}).catch(() => {});
+}).catch((e) => console.error("初始化失败", e));
 
 async function load() {
   try {

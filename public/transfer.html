@@ -119,7 +119,7 @@ let step = 1, myDomains = [], preview = null;
 mountShell('transfer').then(async () => {
   applyBranding(await loadBranding());
   await Promise.all([loadNotice(), loadDomains(), loadHistory()]);
-}).catch(() => {});
+}).catch((e) => console.error("初始化失败", e));
 
 function goto(n) {
   step = n;

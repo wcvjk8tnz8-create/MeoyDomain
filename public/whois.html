@@ -299,7 +299,7 @@ mountShell('whois', { optional: true }).then(async (u) => {
   // 登录态变化后再刷一次结果，让「申请」按钮状态正确
   const pre = document.getElementById('q').value.trim();
   if (pre) doQuery();
-}).catch(() => {});
+}).catch((e) => console.error("初始化失败", e));
 </script>
 </body>
 </html>
