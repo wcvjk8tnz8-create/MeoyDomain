@@ -286,6 +286,36 @@ async function load() {
             <div class="hint" id="dnsProvHint"></div>
           </div>
           <div class="field">
+            <label>邮件服务与验证码（Resend / Brevo）</label>
+            <div class="grid2">
+              <div>
+                <span class="dim">服务商</span>
+                <select id="sMailProvider">
+                  <option value="">未启用</option>
+                  <option value="resend">Resend</option>
+                  <option value="brevo">Brevo</option>
+                </select>
+              </div>
+              <div><span class="dim">发件人邮箱</span><input id="sMailFrom" placeholder="verify@meoy.top"></div>
+            </div>
+            <div class="field" style="margin:8px 0 0">
+              <span class="dim">API Key</span>
+              <input id="sMailKey" type="password" autocomplete="new-password" placeholder="留空则不修改">
+              <div class="hint" id="mailHint">发件人需先在服务商处完成域名验证（SPF / DKIM）。</div>
+            </div>
+            <label class="check" style="margin:8px 0 0">
+              <input type="checkbox" id="sMailVerifyRequired">
+              <span>注册账号需要邮箱验证码</span>
+            </label>
+            <div class="hint">未配置邮件服务时，忘记密码验证码功能不可用（会提示联系管理员）。</div>
+          </div>
+          <div class="field">
+            <label>R2 头像公网地址（可选）</label>
+            <input id="sR2PublicUrl" placeholder="https://img.meoy.top">
+            <div class="hint">留空则头像通过 <span class="mono">/api/avatar/&lt;key&gt;</span> 由 Worker 代理读取（桶无需公开）。
+              填写后上传的头像直接外链到该地址，可省 Worker 流量。当前状态：<span id="r2Hint" class="dim">读取中…</span></div>
+          </div>
+          <div class="field">
             <label>滥用举报渠道（外部域名 WHOIS 展示）</label>
             <div class="grid2">
               <div><span class="dim">投诉邮箱</span><input id="sAbuseEmail" placeholder="abuse@meoy.top"></div>
@@ -398,6 +428,11 @@ async function load() {
           dnsheApiSecret: document.getElementById('sDnsheSecret').value,
           fontBody: document.getElementById('sFontBody').value,
           fontDisplay: document.getElementById('sFontDisplay').value,
+          mailProvider: document.getElementById('sMailProvider').value,
+          mailFrom: document.getElementById('sMailFrom').value,
+          mailApiKey: document.getElementById('sMailKey').value,
+          mailVerifyRequired: document.getElementById('sMailVerifyRequired').checked,
+          r2PublicUrl: document.getElementById('sR2PublicUrl').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo
@@ -425,6 +460,44 @@ async function load() {
       set('sAbuseUrl', (d.items || {}).abuse_report_url);
       set('sPanelDomain', (d.items || {}).hosting_panel_domain);
       set('sPanelName', (d.items || {}).hosting_panel_name);
+    }
+
+    // 邮件服务与验证码
+    {
+      const m = d.mail || {};
+      const pv = document.getElementById('sMailProvider');
+      const fm = document.getElementById('sMailFrom');
+      const ky = document.getElementById('sMailKey');
+      const rq = document.getElementById('sMailVerifyRequired');
+      const hint = document.getElementById('mailHint');
+      if (pv) pv.value = m.provider || '';
+      if (fm) fm.value = m.from || '';
+      if (rq) rq.checked = !!m.verifyRequired;
+      if (m.fromEnv) {
+        [pv, fm, ky, rq].forEach((el) => { if (el) el.disabled = true; });
+        if (ky) ky.value = m.keyMasked || '';
+        hint.innerHTML = '<span class="badge ok">已由环境变量配置</span> 后台不可修改。';
+      } else if (m.enabled) {
+        if (ky) { ky.placeholder = m.keyMasked || '已配置，留空不修改'; ky.value = ''; }
+        hint.innerHTML = '<span class="badge ok">已启用</span> 服务商 <b>' + esc(m.provider) + '</b>，发件人 <span class="mono">' + esc(m.from) + '</span>。需修改时填入新 Key，留空保持原值。';
+      } else {
+        hint.innerHTML = '未配置。发件人建议填 <span class="mono">verify@你的域名</span>，并先在服务商完成域名验证。';
+      }
+    }
+
+    // R2 头像公网地址
+    {
+      const el = document.getElementById('sR2PublicUrl');
+      const hint = document.getElementById('r2Hint');
+      if (el) el.value = d.r2PublicUrl || '';
+      if (d.r2FromEnv) {
+        if (el) el.disabled = true;
+        if (hint) hint.innerHTML = '<span class="badge ok">已由环境变量配置</span> 后台不可修改';
+      } else if (hint) {
+        hint.textContent = d.r2PublicUrl
+          ? '已配置：' + d.r2PublicUrl
+          : '未配置，头像走 /api/avatar/<key> 代理读取（桶无需公开）';
+      }
     }
 
     // 自定义 DNS 提供商：URL 可回显，Key/Secret 只显示掩码；留空表示不修改

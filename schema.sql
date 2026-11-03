@@ -373,3 +373,46 @@ UPDATE subdomains
        expires_at = NULL
  WHERE perpetual = 0
    AND user_id IN (SELECT id FROM users WHERE role = 'admin');
+
+-- ══════════════════════════════════════════════════════════
+--  站内通知（铃铛）
+--  类型：domain_approved 域名审核通过 / login_ip 账号登录提醒 / system 系统通知
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS notifications (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL,
+  type       TEXT NOT NULL,                -- domain_approved / login_ip / system
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  tag        TEXT NOT NULL DEFAULT '系统通知',
+  link       TEXT,                          -- 可选：点击跳转
+  read       INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, read, created_at DESC);
+
+-- ══════════════════════════════════════════════════════════
+--  邮箱验证码（注册 / 忘记密码）
+--  场景：register / reset
+--  发送渠道由 mail_provider 决定（resend / brevo）
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS email_verifications (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  email      TEXT NOT NULL,
+  scene      TEXT NOT NULL,                -- register / reset
+  code_hash  TEXT NOT NULL,                -- 验证码只存哈希，不存明文
+  ip         TEXT,
+  expires_at TEXT NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0,
+  tries      INTEGER NOT NULL DEFAULT 0,   -- 错误尝试次数，超过即作废
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ev_email ON email_verifications(email, scene, used);
+
+-- 邮件服务配置（后台「站点设置 → 邮件与验证码」）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('mail_provider', '');      -- resend / brevo（留空=不启用验证码）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('mail_from', '');          -- 例：verify@meoy.top
+INSERT OR IGNORE INTO settings(key, value) VALUES ('mail_api_key', '');       -- 敏感：后台只回显掩码
+INSERT OR IGNORE INTO settings(key, value) VALUES ('mail_verify_required', '0'); -- 注册是否需要验证码（1=需要）
+-- R2 头像公网地址（留空则用 Worker 代理 /api/avatar/<key>）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('r2_public_url', '');

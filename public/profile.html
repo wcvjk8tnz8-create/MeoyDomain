@@ -155,6 +155,8 @@ async function load() {
 }
 
 function setAvatar(url) {
+  // 顶栏头像必须跟着变（同一个用户，两处不能不一致）
+  try { window.MeoyRenderAvatars && window.MeoyRenderAvatars(url); } catch (e) {}
   curAvatar = url || '/img/avatar/_default.svg';
   const av = document.getElementById('pcAv');
   const pv = document.getElementById('fAvPreview');

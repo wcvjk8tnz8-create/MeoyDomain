@@ -1,6 +1,7 @@
 import { listRoots } from '../lib/roots.js';
 import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
+import { notify } from '../lib/notify.js';
 import { cfDelete, cfErrorMessage } from '../lib/cf.js';
 import { UNLIMITED } from '../middleware/auth.js';
 import { ensurePoints, addPoints } from '../lib/points.js';
@@ -66,6 +67,16 @@ async function review(c, id, status, reason) {
       .run();
     if (exp) extra = `有效期 ${rules.validDays} 天`;
 
+    /* 通知申请人：审核通过（铃铛） */
+    await notify(
+      c.env,
+      sub.user_id,
+      'domain_approved',
+      '域名审核已通过',
+      `你的域名 ${sub.fqdn} 已审核通过并开通${exp ? `，有效期 ${rules.validDays} 天` : '（永久有效）'}。快去添加 DNS 记录吧。`,
+      '/domain.html?id=' + id
+    );
+
     /* 单域名队列：同一用户短时间内提交多个申请时，只批准这一个，
        其余 pending 自动驳回（防止并发/绕过导致一人占多个待审名额）。 */
     const others = await c.env.DB
@@ -91,6 +102,16 @@ async function review(c, id, status, reason) {
     )
       .bind(status, reason || null, now(), u.id, now(), id)
       .run();
+
+    // 驳回 / 停用 → 通知申请人并说明原因
+    await notify(
+      c.env,
+      sub.user_id,
+      'domain_approved',
+      status === 'rejected' ? '域名申请被驳回' : '域名已被停用',
+      `你的域名 ${sub.fqdn} ${status === 'rejected' ? '未通过审核' : '已被管理员停用'}。${reason ? '原因：' + reason : ''}如有疑问可提交工单。`,
+      '/dashboard.html'
+    );
   }
 
   await audit(c, u.id, `subdomain.${status}`, sub.fqdn, [reason, extra].filter(Boolean).join(' · '));
@@ -392,7 +413,7 @@ app.get('/settings', async (c) => {
   const raw = Object.fromEntries(results.map((r) => [r.key, r.value]));
 
   // 敏感项：不回传明文，只回传「是否已配置 + 尾号」，前端显示为占位符
-  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret', 'dns_api_key', 'dns_api_secret'];
+  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret', 'dns_api_key', 'dns_api_secret', 'mail_api_key'];
   const items = { ...raw };
   for (const k of SENSITIVE) delete items[k];
 
@@ -420,6 +441,21 @@ app.get('/settings', async (c) => {
       keyMasked: mask(raw.dns_api_key || envDnsKey),
       secretMasked: mask(raw.dns_api_secret || envDnsSecret),
     },
+    // 邮件与验证码配置（API Key 只回掩码）
+    mail: {
+      provider: String(raw.mail_provider || c.env.MAIL_PROVIDER || '').trim(),
+      from: String(raw.mail_from || c.env.MAIL_FROM || '').trim(),
+      keySet: !!(raw.mail_api_key || String(c.env.MAIL_API_KEY || '').trim()),
+      keyMasked: mask(raw.mail_api_key || String(c.env.MAIL_API_KEY || '').trim()),
+      fromEnv: !!(String(c.env.MAIL_PROVIDER || '').trim() && String(c.env.MAIL_API_KEY || '').trim()),
+      verifyRequired: String(raw.mail_verify_required || c.env.MAIL_VERIFY_REQUIRED || '0').trim() === '1',
+      enabled: !!(String(raw.mail_provider || c.env.MAIL_PROVIDER || '').trim()
+        && (raw.mail_api_key || String(c.env.MAIL_API_KEY || '').trim())
+        && String(raw.mail_from || c.env.MAIL_FROM || '').trim()),
+    },
+    // R2 头像公网地址（留空则用 Worker 代理 /api/avatar/<key>）
+    r2PublicUrl: String(raw.r2_public_url || c.env.R2_PUBLIC_URL || '').trim(),
+    r2FromEnv: !!String(c.env.R2_PUBLIC_URL || '').trim(),
     secrets: {
       dnsheApiKeySet: !!(raw.dnshe_api_key || envKey),
       dnsheApiSecretSet: !!(raw.dnshe_api_secret || envSecret),
@@ -462,6 +498,33 @@ app.post('/settings', async (c) => {
   // 域名有效期规则
   if (body.domainValidDays !== undefined) await set('domain_valid_days', String(body.domainValidDays || '').trim());
   if (body.renewWindowDays !== undefined) await set('renew_window_days', String(body.renewWindowDays || '').trim());
+
+  // 邮件与验证码（Resend / Brevo）
+  if (body.mailProvider !== undefined) {
+    const p = String(body.mailProvider || '').trim().toLowerCase();
+    if (p && !['resend', 'brevo'].includes(p)) return fail(c, '邮件服务商仅支持 resend / brevo');
+    await set('mail_provider', p);
+  }
+  if (body.mailFrom !== undefined) {
+    const f = String(body.mailFrom || '').trim().slice(0, 120);
+    if (f && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f)) return fail(c, '发件人邮箱格式不正确');
+    await set('mail_from', f);
+  }
+  if (body.mailApiKey !== undefined) {
+    const k = String(body.mailApiKey || '').trim();
+    // 空字符串或掩码占位 = 不修改
+    if (k && !k.startsWith('••')) await set('mail_api_key', k.slice(0, 200));
+  }
+  if (body.mailVerifyRequired !== undefined) {
+    await set('mail_verify_required', body.mailVerifyRequired ? '1' : '0');
+  }
+
+  // R2 头像公网地址（形如 https://img.meoy.top，留空则用 /api/avatar/<key> 代理）
+  if (body.r2PublicUrl !== undefined) {
+    const u = String(body.r2PublicUrl || '').trim().slice(0, 300);
+    if (u && !/^https?:\/\//i.test(u)) return fail(c, 'R2 公网地址需以 http:// 或 https:// 开头');
+    await set('r2_public_url', u.replace(/\/$/, ''));
+  }
 
   // 滥用举报渠道（外部域名 WHOIS 的「举报通道」区块展示）
   if (body.abuseEmail !== undefined) await set('abuse_email', String(body.abuseEmail || '').trim());

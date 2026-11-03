@@ -76,6 +76,25 @@ function mountDecor() {
 
 }
 
+
+/* ---------- 头像：顶栏与个人资料页必须一致 ----------
+   优先级：用户自定义头像（URL） > 猫脸 SVG（按邮箱哈希，同一账号恒定）
+   customUrl 从 /api/profile 读取，与个人资料页同源。 */
+function renderAvatars(customUrl) {
+  const safe = (u) => (/^(https?:\/\/|\/|data:image\/)/i.test(String(u || '')) ? String(u) : '');
+  const url = safe(customUrl);
+  document.querySelectorAll('.top-av-wrap').forEach((el) => {
+    const size = el.dataset.size ? `width:${el.dataset.size}px;height:${el.dataset.size}px;` : '';
+    if (url) {
+      el.innerHTML = `<img class="top-av" src="${url.replace(/"/g, '&quot;')}" alt="头像" style="${size}" onerror="this.style.display='none';this.parentNode.dataset.failed='1';MeoyRenderCatFaces(1)">`;
+    } else {
+      el.innerHTML = `<svg class="top-av" viewBox="0 0 100 100" style="${size}${el.dataset.catstyle || ''}"><use href="#catface"/></svg>`;
+    }
+  });
+}
+window.MeoyRenderAvatars = renderAvatars;
+window.MeoyRenderCatFaces = () => renderAvatars('');
+
 /* ---------- 品牌信息缓存（避免每次切页都等一个网络往返） ---------- */
 const BRAND_KEY = 'meoy_brand';
 const BRAND_TTL = 5 * 60 * 1000;   // 5 分钟
@@ -261,11 +280,11 @@ async function mountShell(active, opt = {}) {
           <b id="bellCount" hidden></b>
         </button>
         <div class="user-chip" id="userChip" title="${esc(me.email)}" style="display:flex;align-items:center;gap:0;background:none;border:none;padding:0;box-shadow:none">
-          <svg class="top-av" viewBox="0 0 100 100" style="${catStyle}"><use href="#catface"/></svg>
+          <span class="top-av-wrap" id="topAvWrap" data-catstyle="${catStyle}"></span>
         </div>
         <div class="user-menu" id="userMenu">
           <div class="um-head">
-            <svg class="top-av" viewBox="0 0 100 100" style="width:38px;height:38px;${catStyle}"><use href="#catface"/></svg>
+            <span class="top-av-wrap" data-size="38" data-catstyle="${catStyle}"></span>
             <div>
               <div class="um-name">${esc(shortName)}</div>
               <div class="um-mail">${esc(me.email)}</div>
@@ -360,15 +379,82 @@ async function mountShell(active, opt = {}) {
   const sl = document.getElementById('sideLogout');
   if (sl) sl.onclick = (e) => { e.preventDefault(); out(); };
 
-  /* 铃铛：未读消息数（失败静默） */
+  /* 铃铛：站内通知（域名审核结果 / 登录 IP 提醒），点击展开下拉面板 */
   const bellCount = document.getElementById('bellCount');
   const bellBtn = document.getElementById('bellBtn');
+
+  function setBell(n) {
+    if (!bellCount) return;
+    if (n > 0) { bellCount.textContent = n > 99 ? '99+' : String(n); bellCount.hidden = false; }
+    else bellCount.hidden = true;
+  }
+
+  async function loadBell() {
+    try {
+      const r = await api.get('/api/notifications/unread');
+      setBell((r && r.unread) | 0);
+    } catch (e) {}
+  }
+
   if (bellBtn) {
-    bellBtn.onclick = () => { location.href = '/tickets.html'; };
-    api.get('/api/tickets/unread').then((r) => {
-      const n = (r && (r.count ?? r.unread)) | 0;
-      if (bellCount && n > 0) { bellCount.textContent = n > 99 ? '99+' : n; bellCount.hidden = false; }
-    }).catch(() => {});
+    bellBtn.onclick = async (e) => {
+      e.stopPropagation();
+      let panel = document.getElementById('notifPanel');
+      if (panel) { panel.remove(); return; }
+
+      panel = document.createElement('div');
+      panel.id = 'notifPanel';
+      panel.className = 'notif-panel';
+      panel.innerHTML = '<div class="np-head">通知</div><div class="np-body"><div class="np-empty">加载中…</div></div>';
+      document.body.appendChild(panel);
+      // 定位到铃铛下方
+      const r = bellBtn.getBoundingClientRect();
+      panel.style.top = (r.bottom + 8) + 'px';
+      panel.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+      panel.onclick = (ev) => ev.stopPropagation();
+      document.addEventListener('click', function close(ev) {
+        if (!panel.isConnected) return document.removeEventListener('click', close);
+        if (!panel.contains(ev.target)) { panel.remove(); document.removeEventListener('click', close); }
+      });
+
+      try {
+        const d = await api.get('/api/notifications?filter=all');
+        const items = (d && d.items) || [];
+        panel.querySelector('.np-body').innerHTML = items.length
+          ? items.map((n) => `
+            <div class="np-item ${n.read ? '' : 'unread'}" data-id="${n.id}">
+              <div class="np-t"><b>${esc(n.title)}</b><span class="np-tag">${esc(n.tag || '系统通知')}</span></div>
+              <div class="np-b">${esc(n.body)}</div>
+            </div>`).join('')
+          : '<div class="np-empty">暂无通知</div>';
+
+        panel.querySelectorAll('.np-item').forEach((it) => {
+          it.onclick = async () => {
+            const id = Number(it.dataset.id);
+            try { await api.post('/api/notifications/read', { id }); } catch (e) {}
+            it.classList.remove('unread');
+            loadBell();
+            const link = (items.find((x) => x.id === id) || {}).link;
+            if (link) location.href = link;
+          };
+        });
+
+        const head = panel.querySelector('.np-head');
+        const btn = document.createElement('button');
+        btn.className = 'np-readall';
+        btn.textContent = '全部已读';
+        btn.onclick = async () => {
+          try { await api.post('/api/notifications/read-all', {}); } catch (e) {}
+          panel.querySelectorAll('.np-item').forEach((x) => x.classList.remove('unread'));
+          setBell(0);
+        };
+        head.appendChild(btn);
+      } catch (err) {
+        const b = panel.querySelector('.np-body');
+        if (b) b.innerHTML = '<div class="np-empty">加载失败</div>';
+      }
+    };
+    loadBell();
   }
   /* 搜索框：Ctrl+K 聚焦页面内的域名搜索，聚焦不到就跳域名管理页 */
   const ts = document.getElementById('topSearch');
@@ -415,6 +501,13 @@ async function mountShell(active, opt = {}) {
   } catch {}
 
   mountDecor();
+
+  // 顶栏头像与个人资料页保持同源：拉取已保存的自定义头像，没有则回落猫脸
+  renderAvatars('');
+  api.get('/api/profile').then((d) => {
+    const av = (d && d.profile && d.profile.avatar) || '';
+    if (av && !/^\/img\/avatar\/_default\.svg$/.test(av)) renderAvatars(av);
+  }).catch(() => {});
 
   bindPrefetch(side);
   // 空闲时预取其余常用页（不抢占当前页资源）

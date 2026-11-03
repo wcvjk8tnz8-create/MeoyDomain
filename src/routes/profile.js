@@ -163,7 +163,9 @@ app.post('/avatar', async (c) => {
     httpMetadata: { contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}` },
   });
 
-  const publicBase = String(c.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, '');
+  // 公网地址：后台设置优先，其次环境变量；都没有就用 Worker 代理
+  const row = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'r2_public_url'").first();
+  const publicBase = (String(row?.value || '').trim() || String(c.env.R2_PUBLIC_URL || '').trim()).replace(/\/$/, '');
   const url = publicBase ? `${publicBase}/${key}` : `/api/avatar/${key}`;
 
   await loadProfile(c.env, u.id);

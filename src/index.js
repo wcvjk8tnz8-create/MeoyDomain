@@ -13,6 +13,7 @@ import recordRoutes from './routes/records.js';
 import adminRoutes from './routes/admin.js';
 import redeemRoutes from './routes/redeem.js';
 import chatRoutes from './routes/chat.js';
+import notificationRoutes from './routes/notifications.js';
 import profileRoutes from './routes/profile.js';
 import ticketRoutes from './routes/tickets.js';
 import transferRoutes from './routes/transfer.js';
@@ -96,9 +97,14 @@ app.get('/api/avatar/:key', async (c) => {
 // 公开配置（含站点品牌，登录页也要用）
 app.get('/api/config', async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display')"
+    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from')"
   ).all();
   const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
+  // 注册是否需要邮箱验证码（后台开启且邮件服务已配置时才真正启用）
+  const mailOk = !!(String(s.mail_provider || c.env.MAIL_PROVIDER || '').trim()
+    && String(c.env.MAIL_API_KEY || '').trim());
+  const verifyRequired =
+    String(c.env.MAIL_VERIFY_REQUIRED || s.mail_verify_required || '0').trim() === '1';
   return ok(c, {
     rootDomain: c.env.ROOT_DOMAIN,
     rootDomains: listRoots(c.env).map((r) => r.domain),
@@ -112,11 +118,16 @@ app.get('/api/config', async (c) => {
     faviconUrl: s.favicon_url || '/favicon.ico',
     fontBody: s.font_body || 'zcool',
     fontDisplay: s.font_display || 'zcool',
+    // 邮箱验证码：mailOk 表示邮件服务已配置（可发送），verifyRequired 表示后台开了注册验证
+    mailOk,
+    mailVerifyRequired: verifyRequired,
+    verifyRequired: verifyRequired && mailOk,
   });
 });
 
 // 认证
 app.route('/api/auth', authRoutes);
+app.route('/api/notifications', notificationRoutes);
 app.route('/api', termsRoutes);
 // WHOIS 公开查询（无需登录）
 app.route('/api', whoisRoutes);

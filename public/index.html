@@ -145,10 +145,38 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
           <input type="checkbox" id="lRemember" checked>
           <span>记住我（90 天免登录）</span>
         </label>
-        <a href="/terms.html" target="_blank" style="font-size:12px">服务条款</a>
+        <a href="#" id="forgotLink" style="font-size:12px">忘记密码？</a>
       </div>
 
       <button class="btn primary block" id="btnLogin">登录账户</button>
+    </div>
+
+    <!-- 忘记密码：邮箱验证码重置 -->
+    <div id="paneReset" class="hidden">
+      <h2 class="auth-title">重置密码</h2>
+      <p class="auth-sub">通过邮箱验证码重置，验证通过后即可设置新密码</p>
+
+      <div class="field">
+        <label>邮箱</label>
+        <input id="fEmail" type="email" placeholder="yourname@gmail.com" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>验证码</label>
+        <div class="row" style="gap:8px;flex-wrap:nowrap">
+          <input id="fCode" placeholder="6 位数字" inputmode="numeric" maxlength="6" style="flex:1;min-width:0">
+          <button class="btn sm" id="btnSendReset" style="white-space:nowrap">发送验证码</button>
+        </div>
+        <div class="hint" id="fCodeHint">验证码 10 分钟内有效</div>
+      </div>
+      <div class="field">
+        <label>新密码</label>
+        <input id="fPass" type="password" placeholder="至少 8 位" autocomplete="new-password">
+      </div>
+
+      <button class="btn primary block" id="btnReset">确认重置</button>
+      <div style="text-align:center;margin-top:12px">
+        <a href="#" id="backLogin" style="font-size:12.5px">返回登录</a>
+      </div>
     </div>
 
     <!-- 注册 -->
@@ -164,7 +192,14 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
       <div class="field">
         <label>密码</label>
         <input id="rPass" type="password" placeholder="至少 8 位" autocomplete="new-password">
-        <div class="hint">无需邮箱验证，注册后直接登录。</div>
+      </div>
+      <div class="field" id="rCodeField" style="display:none">
+        <label>邮箱验证码</label>
+        <div class="row" style="gap:8px;flex-wrap:nowrap">
+          <input id="rCode" placeholder="6 位数字" inputmode="numeric" maxlength="6" style="flex:1;min-width:0">
+          <button class="btn sm" id="btnSendReg" style="white-space:nowrap">发送验证码</button>
+        </div>
+        <div class="hint" id="rCodeHint">注册前需先验证邮箱</div>
       </div>
 
       <div class="alert warn" style="margin-bottom:10px" id="ipRule">
@@ -228,12 +263,16 @@ loadBranding().then((b) => {
 
 const tabLogin = document.getElementById('tabLogin'), tabReg = document.getElementById('tabReg');
 const paneLogin = document.getElementById('paneLogin'), paneReg = document.getElementById('paneReg');
+const paneReset = document.getElementById('paneReset');
+/* 三个面板：login / reg / reset（忘记密码）。
+   重置面板没有顶部 tab，显示时两个 tab 都取消高亮。 */
 function switchTo(which) {
-  const login = which === 'login';
+  const login = which === 'login', reg = which === 'reg', reset = which === 'reset';
   tabLogin.classList.toggle('active', login);
-  tabReg.classList.toggle('active', !login);
+  tabReg.classList.toggle('active', reg);
   paneLogin.classList.toggle('hidden', !login);
-  paneReg.classList.toggle('hidden', login);
+  paneReg.classList.toggle('hidden', !reg);
+  if (paneReset) paneReset.classList.toggle('hidden', !reset);
 }
 tabLogin.onclick = () => switchTo('login');
 tabReg.onclick = () => switchTo('reg');
@@ -258,9 +297,64 @@ document.getElementById('btnReg').onclick = async () => {
   if (password.length < 8) return toast('密码至少 8 位', 'err');
   if (!document.getElementById('rAgree').checked) return toast('请先勾选同意《服务条款与免责声明》', 'err');
   try {
-    const d = await api.post('/api/auth/register', { email, password, agreeTerms: true });
+    const body = { email, password, agreeTerms: true };
+    const codeEl = document.getElementById('rCode');
+    if (codeEl && codeEl.offsetParent !== null) {
+      if (!codeEl.value.trim()) return toast('请填写邮箱验证码', 'err');
+      body.code = codeEl.value.trim();
+    }
+    const d = await api.post('/api/auth/register', body);
     toast(d.isFirstAdmin ? '注册成功，已设为管理员（不限配额）' : '注册成功');
     setTimeout(() => location.href = '/dashboard', 400);
+  } catch (e) { toast(e.message, 'err'); }
+};
+
+/* ---------- 忘记密码 ---------- */
+
+document.getElementById('forgotLink').onclick = (e) => { e.preventDefault(); switchTo('reset'); };
+document.getElementById('backLogin').onclick = (e) => { e.preventDefault(); switchTo('login'); };
+
+/* 发送验证码（register / reset） */
+async function sendCode(scene, emailInput, btn, hint) {
+  const email = document.getElementById(emailInput).value.trim();
+  if (!email) return toast('请先填写邮箱', 'err');
+  const old = btn.textContent;
+  btn.disabled = true;
+  let left = 60;
+  btn.textContent = left + 's';
+  const t = setInterval(() => {
+    left--;
+    if (left <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = old; }
+    else btn.textContent = left + 's';
+  }, 1000);
+  try {
+    await api.post('/api/auth/verify/send', { email, scene });
+    toast('验证码已发送，请查收邮件');
+    if (hint) hint.textContent = '验证码已发送，10 分钟内有效';
+  } catch (e) {
+    clearInterval(t);
+    btn.disabled = false;
+    btn.textContent = old;
+    toast(e.message, 'err');
+    if (hint) hint.textContent = e.message;
+  }
+}
+document.getElementById('btnSendReset').onclick = () =>
+  sendCode('reset', 'fEmail', document.getElementById('btnSendReset'), document.getElementById('fCodeHint'));
+document.getElementById('btnSendReg').onclick = () =>
+  sendCode('register', 'rEmail', document.getElementById('btnSendReg'), document.getElementById('rCodeHint'));
+
+document.getElementById('btnReset').onclick = async () => {
+  const email = document.getElementById('fEmail').value.trim();
+  const code = document.getElementById('fCode').value.trim();
+  const password = document.getElementById('fPass').value;
+  if (!email || !code) return toast('请填写邮箱与验证码', 'err');
+  if (!password || password.length < 8) return toast('新密码至少 8 位', 'err');
+  try {
+    await api.post('/api/auth/reset', { email, code, password });
+    toast('密码已重置，请使用新密码登录');
+    document.getElementById('lEmail').value = email;
+    switchTo('login');
   } catch (e) { toast(e.message, 'err'); }
 };
 
@@ -272,6 +366,14 @@ api.get('/api/rules').then((r) => {
     `同一网络最多注册 ${r.maxAccountsPerIp} 个账号，超限账号一经发现将被全部封禁。`;
   document.getElementById('agreeLabel').innerHTML =
     `我已阅读并同意<a href="/terms.html" target="_blank">《服务条款与免责声明》</a>，了解并接受禁止滥用与免责条款`;
+}).catch(() => {});
+
+// 后台开启「注册需要验证码」时才显示验证码输入框
+api.get('/api/config').then((cfg) => {
+  if (cfg && (cfg.mailVerifyRequired || cfg.verifyRequired)) {
+    const f = document.getElementById('rCodeField');
+    if (f) f.style.display = '';
+  }
 }).catch(() => {});
 
 // 登录态探测已由 head 脚本完成（命中则直接跳控制台），这里不再重复请求

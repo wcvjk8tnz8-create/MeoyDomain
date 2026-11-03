@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 /**
- * 确保 R2 存储桶存在（用于用户自定义头像上传）。
+ * 确保 R2 存储桶存在，并**自动绑定到 wrangler.toml**。
  *
  * 设计原则：**绝不阻断部署**。
- *  - 桶已存在 → 复用
- *  - 桶不存在 → 通过 Cloudflare API 自动创建
+ *  - 桶已存在 → 复用 → 自动写入 [[r2_buckets]] 绑定
+ *  - 桶不存在 → 通过 Cloudflare API 自动创建 → 自动写入绑定
  *  - 任何失败（权限不足 / Authentication error / 网络问题）
- * 注意：无论是否找到/创建成功，都不会往 wrangler.toml 写 [[r2_buckets]]。
- *   头像上传目前一律当作「未启用 R2」处理（见 src/routes/profile.js）。
- *   桶只是预先备好，将来要启用时手动加回绑定即可。
- *        站点全部功能正常，仅「上传自定义头像」不可用；内置头像库与外链头像不受影响。
+ *        移除绑定并降级：站点全部功能正常，仅「上传自定义头像」不可用；
+ *        内置 12 款头像与外链头像不受影响。
+ *
+ * 注意「绑定」与「开放上传」是两件事：
+ *   · 本脚本只负责把桶备好并绑上（binding = AVATARS）
+ *   · 头像**上传**功能是否开放，由 AVATAR_ENABLED 决定（见 src/routes/profile.js）
+ *     未显式设为 "1" 时，即使已绑定 R2，上传接口仍按「未启用」返回 —— 这是刻意的。
+ *     这样桶随时可用，又不会因为 R2 临时不可用而让站点报错。
  *
  * 关于「公网地址」：
  *   头像默认由 Worker 的 /api/avatar/<key> 代理读取，该 URL 本身即公网可访问，
@@ -59,6 +63,38 @@ async function disableR2(reason) {
   process.exit(0); // 不阻断部署
 }
 
+/** 把 [[r2_buckets]] 绑定写入 wrangler.toml（已存在则更新 bucket_name） */
+async function enableR2(bucketName) {
+  const { readFileSync, writeFileSync } = await import('node:fs');
+  let t = readFileSync(TOML, 'utf8');
+  const block = `[[r2_buckets]]\nbinding = "AVATARS"\nbucket_name = "${bucketName}"`;
+
+  if (/^\s*\[\[r2_buckets\]\]/m.test(t)) {
+    // 已存在：只更新 bucket_name，保留其余字段
+    t = t.replace(
+      /^\s*\[\[r2_buckets\]\][\s\S]*?(?=^\s*\[(?:\[|[a-z_]))|^\s*\[\[r2_buckets\]\][\s\S]*$/m,
+      block + '\n\n'
+    );
+    writeFileSync(TOML, t);
+    console.log(`✔ 已更新 wrangler.toml 的 R2 绑定：AVATARS → ${bucketName}`);
+  } else {
+    // 不存在：追加到 [[d1_databases]] 之前（与其他绑定放一起）
+    const marker = '\n[[d1_databases]]';
+    if (t.includes(marker)) {
+      t = t.replace(marker, '\n' + block + '\n\n[[d1_databases]]');
+    } else {
+      t = t.replace(/\n\[vars\]/, '\n' + block + '\n\n[vars]');
+    }
+    writeFileSync(TOML, t);
+    console.log(`✔ 已自动绑定 R2 到 wrangler.toml：AVATARS → ${bucketName}`);
+  }
+
+  if (process.env.GITHUB_ENV) {
+    const { appendFileSync } = await import('node:fs');
+    appendFileSync(process.env.GITHUB_ENV, 'R2_ENABLED=true\n');
+  }
+}
+
 if (!ACCOUNT || !TOKEN) {
   await disableR2('缺少 CLOUDFLARE_ACCOUNT_ID 或 CLOUDFLARE_API_TOKEN');
 }
@@ -98,10 +134,12 @@ try {
 
 if (bucket) {
   console.log(`✔ 复用已存在的 R2 存储桶「${NAME}」`);
+  await enableR2(NAME);
 } else {
   try {
     bucket = await cf(`/accounts/${ACCOUNT}/r2/buckets`, 'POST', { name: NAME });
     console.log(`✔ 已创建 R2 存储桶「${NAME}」`);
+    await enableR2(NAME);
   } catch (e) {
     // 创建失败（多为 Token 缺 R2:Edit 权限）→ 降级，不阻断
     await disableR2('创建存储桶失败：' + e.message);

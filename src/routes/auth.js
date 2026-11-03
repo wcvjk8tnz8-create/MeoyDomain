@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { hashPassword, verifyPassword, randomToken } from '../lib/crypto.js';
 import { ok, fail, now, audit, clientIp } from '../lib/util.js';
 import { createSession, setSessionCookie, clearSessionCookie, destroySession, UNLIMITED } from '../middleware/auth.js';
+import { notifyLoginIp, notify } from '../lib/notify.js';
+import { issueCode, checkCode, mailConfig, mailEnabled } from '../lib/mail.js';
 
 const app = new Hono();
 
@@ -30,7 +32,8 @@ function publicUser(u) {
 app.post('/register', async (c) => {
   const env = c.env;
   if (env.ALLOW_SIGNUP === '0') return fail(c, '当前未开放注册', 403);
-  const { email, password, agreeTerms } = await c.req.json().catch(() => ({}));
+  const body0 = await c.req.json().catch(() => ({}));
+  const { email, password, agreeTerms } = body0;
   const mail = String(email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(mail)) return fail(c, '请填写有效的邮箱地址');
   if (!password || String(password).length < 8) return fail(c, '密码至少 8 位');
@@ -64,6 +67,14 @@ app.post('/register', async (c) => {
         403,
         { limit, current: cnt.n }
       );
+  }
+
+  // 验证码（后台开启「注册需要验证码」时必填）
+  const cfg = await mailConfig(env);
+  if (cfg.verifyRequired) {
+    const code = String(body0?.code || '');
+    const v = await checkCode(env, mail, 'register', code);
+    if (!v.ok) return fail(c, v.reason || '验证码不正确', 400, { needCode: true });
   }
 
   const exist = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
@@ -138,6 +149,8 @@ app.post('/login', async (c) => {
   const { token, maxAge } = await createSession(c, user.id, remember !== false);
   setSessionCookie(c, token, maxAge);
   await audit(c, user.id, 'user.login', mail, remember === false ? '未记住登录（1 天）' : '记住登录（90 天）');
+  // 登录 IP 提醒（同一 IP 不重复发）。用 waitUntil 异步执行，不拖慢登录响应
+  if (ip) c.executionCtx?.waitUntil?.(notifyLoginIp(c.env, user.id, mail, ip));
   return ok(c, { user: publicUser(user) });
 });
 
@@ -192,3 +205,80 @@ app.post('/reset-token', async (c) => {
 });
 
 export default app;
+
+// ============ 邮箱验证码 ============
+
+/** POST /api/auth/verify/send —— 发送验证码（scene: register / reset） */
+app.post('/verify/send', async (c) => {
+  const { email, scene } = await c.req.json().catch(() => ({}));
+  const mail = String(email || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(mail)) return fail(c, '请填写有效的邮箱地址');
+  if (!['register', 'reset'].includes(String(scene))) return fail(c, '场景不合法');
+
+  const cfg = await mailConfig(c.env);
+  if (!mailEnabled(cfg)) {
+    // 未配置邮件服务：明确提示，而不是假装发送成功
+    return fail(
+      c,
+      '站点未配置邮件服务，无法发送验证码。请联系管理员在「站点设置 → 邮件与验证码」中配置 Resend 或 Brevo。',
+      503,
+      { mailNotConfigured: true }
+    );
+  }
+
+  // 注册场景：邮箱不能已注册；重置场景：邮箱必须已注册
+  const exist = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(mail).first();
+  if (scene === 'register' && exist) return fail(c, '该邮箱已注册');
+  if (scene === 'reset' && !exist) return fail(c, '该邮箱未注册');
+
+  // 简单节流：60 秒内不重复发送
+  const recent = await c.env.DB.prepare(
+    "SELECT created_at FROM email_verifications WHERE email = ? AND scene = ? ORDER BY id DESC LIMIT 1"
+  )
+    .bind(mail, scene)
+    .first();
+  if (recent?.created_at && Date.now() - Number(recent.created_at) < 60_000) {
+    return fail(c, '发送过于频繁，请 60 秒后再试');
+  }
+
+  const r = await issueCode(c.env, mail, scene, clientIp(c));
+  if (!r.sent) return fail(c, r.warning || '验证码发送失败', 502);
+
+  // 返回体不暴露验证码；devCode 仅在未配置服务商时出现（此时上面已 return fail）
+  return ok(c, { sent: true, expiresIn: 600 });
+});
+
+/** POST /api/auth/verify/check —— 仅校验验证码是否正确（不消耗） */
+app.post('/verify/check', async (c) => {
+  const { email, scene, code } = await c.req.json().catch(() => ({}));
+  const mail = String(email || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(mail)) return fail(c, '请填写有效的邮箱地址');
+  const v = await checkCode(c.env, mail, String(scene || 'register'), String(code || ''));
+  if (!v.ok) return fail(c, v.reason || '验证码不正确');
+  return ok(c, {});
+});
+
+/** POST /api/auth/reset —— 用验证码重置密码（忘记密码） */
+app.post('/reset', async (c) => {
+  const { email, code, password } = await c.req.json().catch(() => ({}));
+  const mail = String(email || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(mail)) return fail(c, '请填写有效的邮箱地址');
+  if (!password || String(password).length < 8) return fail(c, '新密码至少 8 位');
+  if (String(password).length > 128) return fail(c, '密码过长');
+
+  const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(mail).first();
+  if (!user) return fail(c, '该邮箱未注册');
+  if (user.status === 'banned') return fail(c, `账号已被封禁：${user.ban_reason || '违规使用'}`, 403);
+
+  const v = await checkCode(c.env, mail, 'reset', String(code || ''));
+  if (!v.ok) return fail(c, v.reason || '验证码不正确', 400, { needCode: true });
+
+  await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+    .bind(await hashPassword(String(password)), user.id)
+    .run();
+  // 重置密码后踢掉所有会话（强制重新登录）
+  await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
+  await audit(c, user.id, 'user.reset_password', mail, '通过邮箱验证码重置');
+  await notify(c.env, user.id, 'system', '密码已重置', `你的账号密码已通过邮箱验证码重置。登录 IP：${clientIp(c) || '未知'}。若非本人操作请立即联系管理员。`, '/profile.html');
+  return ok(c, {});
+});
