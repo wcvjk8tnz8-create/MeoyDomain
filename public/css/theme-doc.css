@@ -111,7 +111,9 @@ html[data-theme="dark"] {
 }
 
 /* ══════════ 1. 背景：全部装饰清零 ══════════
-   壁纸 / 光晕 / 遮罩 / 等高线 / 樱花 / 云层 / 网格 —— 一律隐藏 */
+   壁纸 / 光晕 / 遮罩 / 等高线 / 樱花 / 网格 —— 一律隐藏。
+   注意：不能隐藏 .cloud-bg！它是落地页 Hero 的 section 本身（云层只是它
+   内部的 canvas 子元素），隐藏它会把「免费域名注册」标题和插画整块吞掉。 */
 #bg,
 #bg::before,
 #bg::after,
@@ -119,12 +121,22 @@ body::before,
 body::after,
 #sakura,
 .sakura-layer,
-.cloud-bg,
 .home-grid-bg,
 .spark,
 .mascot,
 .bubble,
 .paw-deco { display: none !important; }
+
+/* 云层：只隐藏 canvas，容器保留；同时清掉深/浅色的天空渐变 */
+.cloud-bg canvas { display: none !important; }
+.cloud-bg,
+.cloud-bg.cloud-fallback,
+[data-theme="dark"] .cloud-bg,
+[data-theme="dark"] .cloud-bg.cloud-fallback {
+  background: hsl(var(--background)) !important;
+  display: block !important;
+}
+.nk-hero.cloud-bg { display: block !important; }
 
 body {
   background: hsl(var(--background)) !important;

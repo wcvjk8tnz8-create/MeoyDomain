@@ -47,24 +47,29 @@
       tb.classList.add('in');
     });
 
-    /* 主要区块：若页面没标 .reveal，就用主容器的一级子元素当入场单元 */
+    /* 主要区块：落地页 / 登录页按「顶层 section + footer」逐个入场。
+       之前误取了 Hero 内部的 .nk-wrap，结果只有 Hero 一块有动效，
+       且整块 opacity:0 依赖 IO —— 一旦 IO 未回调就会永久隐藏。 */
     var reveal = document.querySelectorAll('.reveal');
     if (!reveal.length) {
-      var host = document.querySelector('main') || document.querySelector('.nk-wrap') || document.body;
-      reveal = Array.prototype.filter.call(host.children, function (el) {
-        return el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
-      });
-      Array.prototype.forEach.call(reveal, function (el) { el.classList.add('reveal'); });
+      var nodes = Array.prototype.slice.call(
+        document.querySelectorAll('body > section, body > footer, .auth-wrap > *')
+      );
+      nodes.forEach(function (el) { el.classList.add('reveal'); });
+      reveal = document.querySelectorAll('.reveal');
     }
 
-    if (!io) {
-      Array.prototype.forEach.call(reveal, function (el) { el.classList.add('in'); });
-      return;
-    }
+    /* 首屏元素直接显示，不依赖 IntersectionObserver 回调 —— 防止标题整块消失 */
     Array.prototype.forEach.call(reveal, function (el, i) {
       if (el.classList.contains('in')) return;
+      var r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight * .95) {
+        el.classList.add('in');
+        return;
+      }
       el.style.transitionDelay = (i * 45) + 'ms';
-      io.observe(el);
+      if (io) io.observe(el);
+      else el.classList.add('in');
     });
   }
 
