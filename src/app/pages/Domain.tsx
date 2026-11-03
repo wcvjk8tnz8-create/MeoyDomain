@@ -155,7 +155,7 @@ export default function DomainPage() {
             </div>
           </aside>
         </div>
-      </div></main>
+      </div></div></main>
       
       <div className="modal" id="modal"><div className="box"></div></div>
       <div id="toast"></div>

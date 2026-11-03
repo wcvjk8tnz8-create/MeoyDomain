@@ -30,7 +30,7 @@ export default function TermsPage() {
         <div className="sub" id="meta"></div>
       
         <div className="card" id="body">加载中…</div>
-      </div></main>
+      </div></div></main>
       
       <div id="toast"></div>
     </div>

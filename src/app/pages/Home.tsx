@@ -154,12 +154,12 @@ export default function HomePage() {
       <span className="c-cmd">curl</span> <span className="c-str">"<span id="apiHost">https://meoy.top</span>/api/whois?name=mail"</span>
       
       <span className="c-dim"># 返回示例</span>
-      {
+      <span className="c-punc">{'{'}</span>
         <span className="c-key">"success"</span>: <span className="c-num">true</span>,
         <span className="c-key">"state"</span>: <span className="c-str">"registered"</span>,
         <span className="c-key">"fqdn"</span>: <span className="c-str">"mail.meoy.top"</span>,
         <span className="c-key">"recordCount"</span>: <span className="c-num">4</span>
-      }</code></pre>
+      <span className="c-punc">{'}'}</span></code></pre>
             </div>
             <div className="nk-tool-list">
               <div className="card">

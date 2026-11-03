@@ -60,7 +60,7 @@ export default function WhoisPage() {
             · 外部查询结果缓存 6 小时，避免触发上游限流。
           </div>
         </div>
-      </div></main>
+      </div></div></main>
       
       <div id="toast"></div>
     </div>

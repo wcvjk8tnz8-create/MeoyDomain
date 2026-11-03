@@ -104,7 +104,7 @@ export default function DashboardPage() {
             <button className="btn sm" id="btnNext">下一页</button>
           </div>
         </div>
-      </div></main>
+      </div></div></main>
       
       <div className="modal" id="modal"><div className="box"></div></div>
       <div id="toast"></div>

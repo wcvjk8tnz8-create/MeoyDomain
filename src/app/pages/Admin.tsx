@@ -44,7 +44,7 @@ export default function AdminPage() {
             <tbody id="tbody"><tr><td className="empty">加载中…</td></tr></tbody>
           </table></div>
         </div>
-      </div></main>
+      </div></div></main>
       
       <div className="modal" id="modal"><div className="box"></div></div>
       <div id="toast"></div>
