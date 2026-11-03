@@ -1,5 +1,6 @@
 import { listRoots } from './lib/roots.js';
 import { mergeRootEnv } from './lib/rootStore.js';
+import { DEFAULT_MESSAGE } from './lib/applyGate.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -111,7 +112,7 @@ app.get('/api/avatar/:key', async (c) => {
 // 公开配置（含站点品牌，登录页也要用）
 app.get('/api/config', async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from')"
+    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from','apply_paused','apply_paused_message')"
   ).all();
   const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
   // 注册是否需要邮箱验证码（后台开启且邮件服务已配置时才真正启用）
@@ -124,6 +125,8 @@ app.get('/api/config', async (c) => {
     rootDomains: listRoots(c.env).map((r) => r.domain),
     allowSignup: c.env.ALLOW_SIGNUP !== '0',
     requireApproval: c.env.REQUIRE_APPROVAL === '1',
+    applyPaused: String(c.env.APPLY_PAUSED || s.apply_paused || '').trim() === '1',
+    applyPausedMessage: String(s.apply_paused_message || '').trim() || DEFAULT_MESSAGE,
     recordTypes: TYPE_NAMES.map((k) => ({ key: k, ...RECORD_TYPES[k] })),
     ttlChoices: TTL_CHOICES,
     verifyPresets: VERIFY_PRESETS,

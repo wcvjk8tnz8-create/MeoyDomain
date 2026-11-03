@@ -463,6 +463,17 @@ async function load() {
             </div>
             <div class="hint" id="spRoots" style="margin-top:8px">当前根域名：读取中…</div>
           </div>
+          <div class="field">
+            <label>新域名申请开关</label>
+            <label class="check"><input type="checkbox" id="sApplyPaused"${d.applyPaused ? ' checked' : ''}${d.applyPausedFromEnv ? ' disabled' : ''}><span>暂停新域名申请</span></label>
+            <div class="hint">暂停后普通用户无法提交新的子域名申请（注册页会锁定并展示下方提示语）；<b>已注册域名的 DNS 记录、续期、转移等全部不受影响</b>，管理员仍可自建域名。${d.applyPausedFromEnv ? '<br><span class="badge warn">已由环境变量 APPLY_PAUSED 强制开启，后台不可修改。</span>' : ''}</div>
+            <div style="margin-top:8px"><span class="dim">暂停提示语（留空用默认文案）</span><input id="sApplyPausedMsg" maxlength="200" placeholder="站点已暂停新域名申请，请稍后再试。" value="${esc(d.applyPausedMessage || '')}"></div>
+          </div>
+          <div class="field">
+            <label>根域名管理</label>
+            <div id="rootAdmin" style="margin:2px 0 8px">读取中…</div>
+            <div class="hint">「移除」后该后缀立即从注册页、WHOIS 与 DNS 中消失，<b>无需重新部署</b>：后台导入的直接删除，环境变量配置的写入屏蔽名单，可随时点「恢复」。已注册在该根域名下的子域名不会被删除。至少要保留一个根域名。</div>
+          </div>
           <div class="alert info" style="margin-bottom:12px">
             Logo 可以是站内路径（<span class="mono">/img/logo.jpg</span>）或外链图片地址（<span class="mono">https://…</span>）。
             想换成本地图，把图片放进仓库的 <span class="mono">public/img/</span> 再推一次即可。<br>
@@ -515,6 +526,8 @@ async function load() {
           spaceshipApiUrl: document.getElementById('sSpUrl').value,
           spaceshipApiKey: document.getElementById('sSpKey').value,
           spaceshipApiSecret: document.getElementById('sSpSecret').value,
+          applyPaused: document.getElementById('sApplyPaused').checked,
+          applyPausedMessage: document.getElementById('sApplyPausedMsg').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo
@@ -646,6 +659,54 @@ async function load() {
         if (rootsEl) rootsEl.textContent = '当前根域名：' + ((list && list.length) ? list.join('、') : '（未配置）');
       };
       showRoots(d.rootDomains);
+
+      /* 根域名管理：列出来源、移除、恢复 */
+      const renderRoots = async () => {
+        const box = document.getElementById('rootAdmin');
+        if (!box) return;
+        try {
+          const r = await api.get('/api/admin/roots');
+          const items = r.items || [];
+          const removed = r.disabled || [];
+          const line = (x, gone) => `<div class="row" style="gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
+            <span class="mono" style="min-width:150px">${esc(gone ? x : x.domain)}</span>
+            ${gone
+              ? '<span class="badge warn">已移除</span>'
+              : `<span class="badge ${x.source === 'dynamic' ? 'ok' : ''}">${x.source === 'dynamic' ? '后台导入' : '环境变量'}</span><span class="dim" style="font-size:12px">${x.hasZone ? '已配 Zone' : '未配 Zone'}</span>`}
+            <span style="flex:1"></span>
+            ${gone
+              ? `<button class="btn sm" data-restore="${esc(x)}">恢复</button>`
+              : `<button class="btn sm ghost" data-rm="${esc(x.domain)}">移除</button>`}
+          </div>`;
+          box.innerHTML = (items.map((x) => line(x, false)).join('') || '<div class="dim">（无生效的根域名）</div>')
+            + (removed.length
+                ? '<div style="margin-top:10px"><b style="font-size:13px">已移除（可恢复）</b></div>' + removed.map((x) => line(x, true)).join('')
+                : '');
+          box.querySelectorAll('[data-rm]').forEach((b) => {
+            b.onclick = async () => {
+              const dmn = b.dataset.rm;
+              if (!confirm('确定移除根域名 ' + dmn + ' 吗？\n\n该后缀将不再可选；已注册在该根域名下的子域名不会被删除。')) return;
+              b.disabled = true;
+              try {
+                const q = await api.del('/api/admin/roots/' + encodeURIComponent(dmn));
+                toast('已移除 ' + dmn); showRoots(q.rootDomains); renderRoots();
+              } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+            };
+          });
+          box.querySelectorAll('[data-restore]').forEach((b) => {
+            b.onclick = async () => {
+              b.disabled = true;
+              try {
+                const q = await api.post('/api/admin/roots/' + encodeURIComponent(b.dataset.restore) + '/restore', {});
+                toast('已恢复 ' + b.dataset.restore); showRoots(q.rootDomains); renderRoots();
+              } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+            };
+          });
+        } catch (e) {
+          box.innerHTML = '<span style="color:var(--danger)">读取失败：' + esc(e.message) + '</span>';
+        }
+      };
+      renderRoots();
 
       const testBtn = document.getElementById('spTest');
       if (testBtn) testBtn.onclick = async () => {

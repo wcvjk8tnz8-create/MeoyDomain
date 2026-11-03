@@ -6,6 +6,7 @@ import { UNLIMITED_POINTS, ensurePoints, addPoints, domainCost } from '../lib/po
 import { pointRules } from './points.js';
 import { expiryRules, computeExpiry, expiryState, renewExpiry, migrateLegacyPerpetual, ensureExpiryColumns } from '../lib/expiry.js';
 import { defaultRoot, isAllowedRoot, listRoots } from '../lib/roots.js';
+import { applyGate } from '../lib/applyGate.js';
 
 const app = new Hono();
 
@@ -97,8 +98,11 @@ app.get('/check', async (c) => {
   );
   let points = UNLIMITED_POINTS;
   if (u && !isAdmin) points = await ensurePoints(c.env.DB, u.id, rules);
+  const gate = await applyGate(c.env);
   return ok(c, {
     available: r.available,
+    applyPaused: gate.paused && !isAdmin,
+    applyPausedMessage: gate.message,
     message: r.message,
     fqdn: r.fqdn,
     status: r.status,
@@ -159,6 +163,12 @@ app.get('/', listMine);
 const createMine = async (c) => {
   const u = c.get('user');
   await ensureExpiryColumns(c.env);
+
+  /* 后台可暂停新申请（维护 / 防滥用）。管理员自建不受限：
+     管理员是「开通」而非「申请」，停掉它会连后台都无法补发域名。 */
+  const gate = await applyGate(c.env);
+  if (gate.paused && u.role !== 'admin') return fail(c, gate.message, 403, { applyPaused: true });
+
   const { label, note, root: rootReq } = await c.req.json().catch(() => ({}));
   const v = validateLabel(label);
   if (!v.ok) return fail(c, v.error);

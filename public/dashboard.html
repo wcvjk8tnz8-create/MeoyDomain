@@ -81,8 +81,8 @@ if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(
   </div>
 
   <div class="card" id="applyCard">
-    <div class="head-row"><h3>注册域名</h3><a class="btn sm" href="/register.html">前往注册 →</a></div>
-    <div class="hint">注册入口已独立为单独页面：可先检查名称是否可用、查看积分消耗，再提交申请。</div>
+    <div class="head-row"><h3>注册域名</h3><a class="btn sm" id="goRegister" href="/register.html">前往注册 →</a></div>
+    <div class="hint" id="applyCardHint">注册入口已独立为单独页面：可先检查名称是否可用、查看积分消耗，再提交申请。</div>
   </div>
 
   <div class="card" id="listAnchor">
@@ -124,6 +124,17 @@ async function load() {
     api.get('/api/config').catch(() => ({})),
   ]);
   rootDomain = cfg.rootDomain || '';
+
+  /* 后台暂停新申请：引导卡直接说明，普通用户不再往注册页跳 */
+  const cardHint = document.getElementById('applyCardHint');
+  const goReg = document.getElementById('goRegister');
+  if (cardHint && cfg.applyPaused) {
+    cardHint.className = 'alert a-warn';
+    cardHint.innerHTML = '<b>新域名申请已暂停</b><br>' + esc(cfg.applyPausedMessage || '请稍后再试。')
+      + '<br><span style="opacity:.8;font-size:12px">已注册的域名、DNS 记录与续期不受影响。</span>';
+    const admin = document.querySelector('.navlink[href="/admin"]') !== null;
+    if (goReg && !admin) { goReg.textContent = '申请已暂停'; goReg.removeAttribute('href'); goReg.style.opacity = '.5'; goReg.style.pointerEvents = 'none'; }
+  }
   const rdEl = document.getElementById('rootDomain');
   if (rdEl) rdEl.textContent = rootDomain;
   const quotaHtml = d.quotaUnlimited ? '<span class="badge inf">∞ 不限</span>' : `${d.quota} 个`;

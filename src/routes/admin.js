@@ -9,7 +9,7 @@ import { pointRules } from './points.js';
 import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColumns, migrateLegacyPerpetual } from '../lib/expiry.js';
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
-import { addExtraRoots, removeExtraRoot, effectiveRootList, loadExtra } from '../lib/rootStore.js';
+import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList } from '../lib/rootStore.js';
 
 const app = new Hono();
 
@@ -470,6 +470,11 @@ app.get('/settings', async (c) => {
     // 当前生效的根域名（含后台导入的）
     rootDomains: listRoots(c.env).map((r) => r.domain),
 
+    // 新域名申请开关
+    applyPaused: String(raw.apply_paused || c.env.APPLY_PAUSED || '').trim() === '1',
+    applyPausedFromEnv: String(c.env.APPLY_PAUSED || '').trim() === '1',
+    applyPausedMessage: String(raw.apply_paused_message || '').trim(),
+
     // R2 头像公网地址（留空则用 Worker 代理 /api/avatar/<key>）
     r2PublicUrl: String(raw.r2_public_url || c.env.R2_PUBLIC_URL || '').trim(),
     r2FromEnv: !!String(c.env.R2_PUBLIC_URL || '').trim(),
@@ -504,6 +509,14 @@ app.post('/settings', async (c) => {
   await set('logo_url', logo || '/img/logo.jpg');
   await set('favicon_url', favicon || '/favicon.ico');
   if (body.announcement !== undefined) await set('announcement', anno);
+
+  // 新域名申请开关（暂停后普通用户无法提交申请，管理员仍可自建）
+  if (body.applyPaused !== undefined && String(c.env.APPLY_PAUSED || '').trim() !== '1') {
+    await set('apply_paused', body.applyPaused ? '1' : '0');
+  }
+  if (body.applyPausedMessage !== undefined) {
+    await set('apply_paused_message', String(body.applyPausedMessage || '').trim().slice(0, 200));
+  }
 
   // 同 IP 账号上限
   if (body.maxAccountsPerIp !== undefined && body.maxAccountsPerIp !== '') {
@@ -696,20 +709,40 @@ app.post('/spaceship/add', async (c) => {
   });
 });
 
-/** 移除一个后台导入的根域名（环境变量里的不受影响） */
+/** 移除一个根域名：后台导入的直接删，环境变量的写入屏蔽名单（无需重新部署） */
+app.delete('/roots/:domain', async (c) => {
+  const d = String(c.req.param('domain') || '').toLowerCase();
+  const r = await removeRoot(c.env, d);
+  if (!r.removed) return fail(c, r.reason || '移除失败', 400);
+  await audit(c, c.get('user').id, 'admin.root.remove', 'root', `移除根域名：${d}（${r.mode}）`);
+  return ok(c, { rootDomains: r.roots, mode: r.mode });
+});
+
+/** 兼容旧前端路径 */
 app.delete('/spaceship/roots/:domain', async (c) => {
-  const r = await removeExtraRoot(c.env, c.req.param('domain'));
-  if (!r.removed) return fail(c, '该域名不是通过 Spaceship 导入的，或已不存在', 404);
-  await audit(c, c.get('user').id, 'admin.spaceship.remove', 'spaceship', '移除根域名：' + c.req.param('domain'));
+  const d = String(c.req.param('domain') || '').toLowerCase();
+  const r = await removeRoot(c.env, d);
+  if (!r.removed) return fail(c, r.reason || '移除失败', 400);
+  await audit(c, c.get('user').id, 'admin.root.remove', 'root', `移除根域名：${d}（${r.mode}）`);
+  return ok(c, { rootDomains: r.roots, mode: r.mode });
+});
+
+/** 恢复一个被屏蔽的根域名 */
+app.post('/roots/:domain/restore', async (c) => {
+  const d = String(c.req.param('domain') || '').toLowerCase();
+  const r = await restoreRoot(c.env, d);
+  if (!r.restored) return fail(c, '该域名不在已移除列表中', 404);
+  await audit(c, c.get('user').id, 'admin.root.restore', 'root', '恢复根域名：' + d);
   return ok(c, { rootDomains: r.roots });
 });
 
-/** 当前根域名列表（含来源，便于后台展示） */
+/** 当前根域名列表（含来源与已移除项，便于后台展示） */
 app.get('/roots', async (c) => {
-  const extra = await loadExtra(c.env);
-  const roots = await effectiveRootList(c.env);
+  const s = await rootSources(c.env);
   return ok(c, {
-    items: roots.map((r) => ({ ...r, dynamic: extra.domains.includes(r.domain) })),
+    items: s.items,
+    disabled: s.disabled,
+    rootDomains: s.items.map((r) => r.domain),
   });
 });
 
