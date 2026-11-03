@@ -1187,6 +1187,11 @@ const R: Record<string, any> = {
   mountDecor, mountMotion, applyBrand, pawBurst, shellItem, refreshRuntime, cleanupPage, navigate,
 };
 (window as any).MeoyRuntime = R;
+/* 旧内联脚本（profile 等）既从本模块 import，也通过 window 调用这两个名字。
+   以前这里只写进 Object.assign 却从未定义，Rollup 报 "is not exported by" /
+   "is not defined"，导致 Vite 构建失败。用已有函数显式定义并导出。 */
+export const MeoyRenderAvatars = renderAvatars;
+export const MeoyRenderCatFaces = catFaceFallback;
 Object.assign(window, {
   api, esc, fmtTime, fmtDate, toast, openModal, closeModal, loadBranding, applyBranding,
   STATUS_MAP, statusBadge, copyText, quotaText, mountShell, mountNav, mountSiteFooter,
