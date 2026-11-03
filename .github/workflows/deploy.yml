@@ -29,11 +29,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          # 不启用 npm 缓存选项：该选项要求仓库里存在 package-lock.json；
+          # 本项目不提交 lock（沙盒镜像无法生成），改用 npm install。
 
-      # 用 npm ci 保证与 package-lock.json 完全一致（本机无需手动 install）
+      # 仓库不跟踪 package-lock.json，因此不能用 npm ci（会因缺 lock 直接失败）。
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       # 校验必需配置是否齐全，缺什么直接说清楚
       - name: 检查配置
@@ -61,6 +62,10 @@ jobs:
       - name: 类型检查（TypeScript）
         continue-on-error: true
         run: npm run typecheck
+
+      # 构建 React 前端（产物 dist/client，由 wrangler [assets] 托管）
+      - name: 构建前端（Vite）
+        run: npm run build
 
       # D1 数据库：存在就复用，不存在自动创建，并把 uuid 传给下一步
       - name: 准备 D1 数据库

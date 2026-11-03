@@ -1,12 +1,15 @@
 {
-  "name": "subdomain-hub",
+  "name": "meoydomain",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "二级域名分发系统 · Cloudflare Workers + D1 + Cloudflare DNS API",
+  "description": "二级域名分发系统 · React + TypeScript + Cloudflare Workers / D1",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "worker:dev": "wrangler dev",
     "tail": "wrangler tail",
     "db:create": "wrangler d1 create subdomain-hub-db",
     "db:init": "wrangler d1 execute subdomain-hub-db --remote --file=./schema.sql",
@@ -15,11 +18,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.6.14"
+    "hono": "^4.6.14",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260702.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.9.3",
+    "vite": "^5.4.11",
     "wrangler": "^3.90.0"
   }
 }

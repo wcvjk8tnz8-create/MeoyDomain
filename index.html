@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MeoyDomain · 二级域名分发</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Redaction+35:ital,wght@0,400;0,700;1,400&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&family=LXGW+WenKai+TC:wght@400&display=swap"></noscript>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/theme-doc.css">
+  <script>
+    /* 主题预置：必须在 React 渲染前同步执行，避免深色模式刷新时白屏闪烁 */
+    (function(){try{var k='meoy_theme',v=localStorage.getItem(k);
+    if(v!=='dark'&&v!=='light'){v=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+    if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+  </script>
+</head>
+<body>
+  <!-- 唯一的 HTML 壳：所有页面均为 React TSX 组件，由此挂载 -->
+  <div id="root"></div>
+  <script type="module" src="/src/app/main.tsx"></script>
+</body>
+</html>

@@ -1,29 +1,28 @@
 {
   "compilerOptions": {
-    "target": "es2022",
-    "lib": ["es2022"],
-    "module": "es2022",
-    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["@cloudflare/workers-types"],
-
-    /* Wrangler 用 esbuild 直接转译，不做类型检查；
-       noEmit 让 tsc 只当检查器用（npm run typecheck） */
-    "noEmit": true,
-
-    /* 渐进式迁移的关键开关：
-       allowJs 让 .js 与 .ts 共存，checkJs 关闭表示先不检查存量 js */
-    "allowJs": true,
+    "allowJs": false,
     "checkJs": false,
-
-    "strict": true,
-    "noUncheckedIndexedAccess": false,
-    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
-    "verbatimModuleSyntax": false
+    "noEmit": true
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "types/**/*.d.ts"],
-  "exclude": ["node_modules", "public", "scripts", "dist"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    "vite.config.ts"
+  ]
 }

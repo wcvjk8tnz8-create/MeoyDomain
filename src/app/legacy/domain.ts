@@ -1,0 +1,550 @@
+/**
+ * Domain 页面控制器（由 domain.html 内联脚本平移）
+ * 外部符号由 runtime 提供；DOM 查询作用于当前挂载的页面。
+ */
+import { api, esc, fmtTime, fmtDate, toast, openModal, closeModal, loadBranding, applyBranding, statusBadge, copyText, mountShell } from '../lib/runtime';
+
+import type { LegacyCtx } from '../lib/types';
+
+export async function mountDomain(_root: HTMLElement | null): Promise<void> {
+  
+  const params = new URLSearchParams(location.search);
+  const subId = params.get('id');
+  let cfg = null, sub = null, records = [], presets = [];
+  let verifyScope = 'root'; // root = 根域名（_vercel.meoy.top），sub = 当前子域名
+  let verifyTargetId = null;  // 自助验证的目标域名（默认当前，可切换）
+  let myDomains = [];         // 我名下的域名，供下拉切换
+  
+  const TEMPLATES = [
+    { n: 'Vercel CNAME', type: 'CNAME', host: '', content: 'cname.vercel-dns.com', proxied: false },
+    { n: 'Netlify CNAME', type: 'CNAME', host: '', content: 'your-site.netlify.app', proxied: false },
+    { n: 'Cloudflare Pages', type: 'CNAME', host: '', content: 'your-project.pages.dev', proxied: false },
+    { n: 'GitHub Pages A', type: 'A', host: '', content: '185.199.108.153', proxied: false },
+    { n: 'www 别名', type: 'CNAME', host: 'www', content: '@target', proxied: false },
+    { n: 'SPF 拒绝全部', type: 'TXT', host: '', content: 'v=spf1 -all', proxied: false },
+    { n: 'DMARC 拒绝', type: 'TXT', host: '_dmarc', content: 'v=DMARC1; p=reject; adkim=s; aspf=s', proxied: false },
+  ];
+  
+  async function loadAll() {
+    cfg = await api.get('/api/config');
+    presets = cfg.verifyPresets;
+    await loadMyDomains();
+    const d = await api.get('/api/subdomains/' + subId);
+    sub = d.subdomain;
+    records = d.records;
+    document.getElementById('fqdn').textContent = sub.fqdn;
+    document.getElementById('rootLbl').textContent = cfg.rootDomain;
+    document.getElementById('subLbl').textContent = sub.fqdn;
+    document.getElementById('statusBadge').innerHTML = statusBadge(sub.status);
+    renderPresets();
+    renderTpl();
+    renderRecords();
+    renderStatusAlert();
+    renderOverview();
+    updatePreview();
+    await loadDelegation();
+  }
+  
+  /* ---------------- NS 委派（域名托管） ---------------- */
+  let providers = [];
+  let deleg = null;
+  
+  async function loadDelegation() {
+    const box = document.getElementById('delegationBox');
+    if (!providers.length) {
+      try { providers = (await api.get('/api/delegation/providers')).items; } catch { providers = []; }
+    }
+    try {
+      const d = await api.get('/api/subdomains/' + subId + '/delegation');
+      deleg = d.delegation;
+    } catch { deleg = null; }
+  
+    if (deleg) {
+      box.innerHTML = `
+        <div class="row between" style="margin-bottom:10px">
+          <div>
+            <span class="badge inf">已托管</span>
+            <b style="margin-left:8px">${esc(deleg.providerName)}</b>
+          </div>
+          <button class="btn sm danger" id="btnUnDelegate">取消托管</button>
+        </div>
+        <div class="kv" style="margin-bottom:10px">
+          <div class="k">委派区域</div><div class="mono">${esc(deleg.zone_name)}</div>
+          <div class="k">NS 服务器</div><div class="mono">${deleg.ns.map((n) => esc(n)).join('<br>')}</div>
+          ${deleg.provider_zone ? `<div class="k">服务商 ID</div><div class="mono">${esc(deleg.provider_zone)}</div>` : ''}
+        </div>
+        <div class="alert info">
+          已把 <span class="mono">${esc(deleg.zone_name)}</span> 的解析权交给 ${esc(deleg.providerName)}。
+          请到其控制台添加并管理该域名的解析记录；本站 DNS 记录页不再对它生效。
+        </div>
+        ${deleg.provider === 'dnshe' ? `
+          <div class="row" style="margin-top:10px;align-items:flex-end">
+            <div style="flex:1;min-width:180px">
+              <label>DNSHE API Token（用于检查委派状态）</label>
+              <input id="chkToken" type="password" placeholder="留空则不检查">
+            </div>
+            <button class="btn sm" id="btnChkDel">检查委派</button>
+          </div>
+          <div class="hint" id="chkOut"></div>` : ''}
+      `;
+      document.getElementById('btnUnDelegate').onclick = async () => {
+        if (!confirm(`确定取消托管？将删除父区域的 ${deleg.ns.length} 条 NS 记录，解析权回到本站。\n\n注意：目标服务商上该域名的解析记录不会自动删除，请自行清理。`)) return;
+        try {
+          await api.del('/api/subdomains/' + subId + '/delegation');
+          toast('已取消托管');
+          await loadDelegation();
+        } catch (e) { toast(e.message, 'err'); }
+      };
+      const chk = document.getElementById('btnChkDel');
+      if (chk) chk.onclick = async () => {
+        const t = document.getElementById('chkToken').value.trim();
+        const out = document.getElementById('chkOut');
+        if (!t) return toast('请填写 API Token', 'err');
+        out.textContent = '检查中…';
+        try {
+          const r = await api.post('/api/subdomains/' + subId + '/delegation/check', { apiToken: t });
+          out.innerHTML = r.supported
+            ? `<span style="color:var(--ok)">已查询</span> <span class="mono">${esc(JSON.stringify(r.raw).slice(0, 220))}</span>`
+            : esc(r.message);
+        } catch (e) { out.textContent = '检查失败：' + e.message; }
+      };
+      return;
+    }
+  
+    // 未托管：选择服务商
+    box.innerHTML = `
+      <div class="preset-grid" id="dlgProviders"></div>
+      <div id="dlgForm"></div>`;
+    const grid = document.getElementById('dlgProviders');
+    grid.innerHTML = providers.map((p, i) => `
+      <div class="preset ${p.key === 'anyns' ? 'on' : ''}" data-p="${esc(p.key)}">
+        <b>${esc(p.name)}</b>
+        <span>${esc(p.desc)}</span>
+      </div>`).join('');
+  
+    let current = 'anyns';
+    const renderForm = () => {
+      const p = providers.find((x) => x.key === current) || providers[0];
+      const needNs = p.requireCustomNs || !p.ns.length;
+      document.getElementById('dlgForm').innerHTML = `
+        <div class="alert info" style="margin-bottom:12px">${esc(p.note || p.desc)}</div>
+        ${needNs ? `
+          <div class="field">
+            <label>NS 服务器（每行一个，至少 2 个）</label>
+            <textarea id="dlgNs" placeholder="ns1.example.com&#10;ns2.example.com"></textarea>
+          </div>` : `
+          <div class="field">
+            <label>将写入的 NS</label>
+            <div class="mono" style="font-size:12.5px">${(p.ns || []).map((n) => esc(n)).join('<br>')}</div>
+            ${p.nsAlt ? `<div class="hint">备用：${p.nsAlt.map((n) => esc(n)).join(' / ')}</div>` : ''}
+          </div>`}
+        ${p.api ? `
+          <div class="field">
+            <label>${esc(p.name)} API Token（选填）</label>
+            <input id="dlgToken" type="password" placeholder="填了会自动在服务商创建解析区域并取回官方 NS">
+            <div class="hint">Token 只在本次请求中使用，不会保存到服务器。</div>
+          </div>` : ''}
+        <div class="row end">
+          ${p.panel ? `<a class="btn sm ghost" href="${esc(p.panel)}" target="_blank">打开 ${esc(p.name)} 控制台</a>` : ''}
+          <button class="btn primary" id="btnDelegate">托管到 ${esc(p.name)}</button>
+        </div>
+        <div class="hint" id="dlgOut"></div>`;
+  
+      document.getElementById('btnDelegate').onclick = async () => {
+        const nsRaw = needNs ? document.getElementById('dlgNs').value : '';
+        const token = p.api && document.getElementById('dlgToken') ? document.getElementById('dlgToken').value.trim() : '';
+        const out = document.getElementById('dlgOut');
+        try {
+          out.textContent = '处理中…';
+          const r = await api.post('/api/subdomains/' + subId + '/delegation', {
+            provider: p.key,
+            customNs: nsRaw,
+            apiToken: token,
+          });
+          toast('已托管到 ' + p.name);
+          if (r.needManualAdd) {
+            out.innerHTML = `<span style="color:var(--warn)">NS 已写入。</span> 还需到 ${esc(p.name)} 控制台添加域名 <span class="mono">${esc(r.delegation.zone_name)}</span> 才能生效。`;
+          } else if (r.apiNote) {
+            out.textContent = r.apiNote;
+          } else {
+            out.textContent = '';
+          }
+          await loadDelegation();
+          renderRecords();
+        } catch (e) { out.textContent = e.message; toast(e.message, 'err'); }
+      };
+    };
+    grid.querySelectorAll('[data-p]').forEach((el) => {
+      el.onclick = () => {
+        grid.querySelectorAll('.preset').forEach((x) => x.classList.remove('on'));
+        el.classList.add('on');
+        current = el.dataset.p;
+        renderForm();
+      };
+    });
+    renderForm();
+  }
+  
+  function renderStatusAlert() {
+    const el = document.getElementById('statusAlert');
+    if (sub.status === 'pending') el.innerHTML = `<div class="alert warn">该子域名仍在审核中，审核通过后才能添加 DNS 记录。</div>`;
+    else if (sub.status === 'rejected') el.innerHTML = `<div class="alert danger">申请已被驳回：${esc(sub.reason || '')}</div>`;
+    else if (sub.status === 'suspended') el.innerHTML = `<div class="alert danger">已停用：${esc(sub.reason || '')}，无法操作 DNS 记录。</div>`;
+    else el.innerHTML = '';
+  }
+  
+  function renderPresets() {
+    document.getElementById('presets').innerHTML = presets.map((p, i) => `
+      <div class="preset ${i === 0 ? 'active' : ''}" data-key="${p.key}" data-host="${esc(p.host)}" title="${esc(p.hint)}">
+        <div class="n">${esc(p.label)}</div><div class="h">${esc(p.host || '自定义')}</div>
+      </div>`).join('');
+    document.querySelectorAll('.preset').forEach((el) => {
+      el.onclick = () => {
+        document.querySelectorAll('.preset').forEach((x) => x.classList.remove('active'));
+        el.classList.add('active');
+        if (el.dataset.host) document.getElementById('vHost').value = el.dataset.host;
+        // 提示该平台的值长什么样，并给输入框占位
+        const p = presets.find((x) => x.key === el.dataset.key);
+        const hintEl = document.getElementById('presetHint');
+        if (hintEl && p) hintEl.textContent = p.hint ? `${p.hint}｜值形如：${p.valueHint || '平台给出的字符串'}` : '';
+        const vv = document.getElementById('vValue');
+        if (vv && p && p.valueHint) vv.placeholder = '例如：' + p.valueHint;
+        updatePreview();
+      };
+    });
+  }
+  
+  
+  /* ---------- 自助验证：域名下拉 ---------- */
+  async function loadMyDomains() {
+    try {
+      const d = await api.get('/api/subdomains');
+      myDomains = (d.items || []).filter((x) => x.status === 'approved' || x.status === 'pending');
+    } catch { myDomains = []; }
+  
+    const sel = document.getElementById('vDomain');
+    if (!sel) return;
+    if (!myDomains.length) {
+      sel.innerHTML = '<option value="">（暂无可用域名）</option>';
+      return;
+    }
+    // 默认选当前正在查看的域名
+    if (!verifyTargetId || !myDomains.some((x) => String(x.id) === String(verifyTargetId))) {
+      verifyTargetId = myDomains.some((x) => String(x.id) === String(subId)) ? subId : myDomains[0].id;
+    }
+    sel.innerHTML = myDomains
+      .map((x) => `<option value="${x.id}"${String(x.id) === String(verifyTargetId) ? ' selected' : ''}>${esc(x.fqdn)}</option>`)
+      .join('');
+    sel.onchange = () => { verifyTargetId = Number(sel.value); updatePreview(); };
+    updatePreview();
+  }
+  
+  function updatePreview() {
+    const h = document.getElementById('vHost').value.trim();
+    const base = !sub ? '' : verifyScope === 'root' ? cfg.rootDomain : sub.fqdn;
+    document.getElementById('vPreview').textContent = (h && h !== '@' ? h + '.' : '') + base;
+  }
+  document.getElementById('vHost').addEventListener('input', updatePreview);
+  
+  document.getElementById('scopeRoot').onclick = () => setVerifyScope('root');
+  document.getElementById('scopeSub').onclick = () => setVerifyScope('sub');
+  function setVerifyScope(s) {
+    verifyScope = s;
+    document.getElementById('scopeRoot').classList.toggle('primary', s === 'root');
+    document.getElementById('scopeSub').classList.toggle('primary', s === 'sub');
+    updatePreview();
+  }
+  
+  function renderTpl() {
+    document.getElementById('tpls').innerHTML = TEMPLATES
+      .map((t, i) => `<button class="btn sm" data-tpl="${i}">${esc(t.n)}</button>`).join('');
+    document.querySelectorAll('[data-tpl]').forEach((b) => {
+      b.onclick = () => {
+        const t = TEMPLATES[b.dataset.tpl];
+        const body = { type: t.type, host: t.host, content: t.content, ttl: 1, proxied: t.proxied };
+        if (t.content === '@target') { body.content = sub.fqdn; }
+        openRecordForm(null, body);
+      };
+    });
+  }
+  
+  function renderRecords() {
+    const tb = document.getElementById('recList');
+    if (!records.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="empty">暂无 DNS 记录。创建子域名不会自动添加记录，点右上角手动添加。</td></tr>`;
+      return;
+    }
+    tb.innerHTML = records.map((r) => {
+      const val = r.display || r.content;
+      const short = val.length > 60 ? val.slice(0, 60) + '…' : val;
+      const lock = r.verify_lock;
+      return `
+      <tr class="${lock ? 'locked' : ''}">
+        <td><span class="badge type">${esc(r.type)}</span></td>
+        <td class="mono">${esc(r.name)}</td>
+        <td class="mono" title="${esc(val)}">${esc(short)}</td>
+        <td class="nowrap" style="color:var(--muted)">${r.ttl === 1 ? '自动' : r.ttl}</td>
+        <td class="nowrap">
+          ${r.proxied ? '<span class="badge proxy">代理</span> ' : ''}
+          ${lock ? `<span class="badge lock">验证锁定</span>` : '<span class="badge ok">正常</span>'}
+          ${lock && r.verify_preset ? `<div class="hint">${esc(presetLabel(r.verify_preset))} · ${fmtTime(r.locked_at)}</div>` : ''}
+        </td>
+        <td class="right nowrap">
+          ${lock
+            ? `<button class="btn sm ok" data-confirm="${r.id}">确认认证完成</button>`
+            : `<button class="btn sm" data-edit="${r.id}">编辑</button>
+               <button class="btn sm danger" data-del="${r.id}">删除</button>`}
+        </td>
+      </tr>`;
+    }).join('');
+  
+    tb.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
+      if (!confirm('删除该记录？Cloudflare 上的记录会同步删除。')) return;
+      try { await api.del('/api/records/' + b.dataset.del); toast('已删除'); loadAll(); } catch (e) { toast(e.message, 'err'); }
+    });
+    tb.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => {
+      const r = records.find((x) => x.id === Number(b.dataset.edit));
+      openRecordForm(r);
+    });
+    tb.querySelectorAll('[data-confirm]').forEach((b) => b.onclick = () => {
+      const r = records.find((x) => x.id === Number(b.dataset.confirm));
+      openModal('确认认证完成', `
+        <div class="alert ok">验证记录 <span class="mono">${esc(r.name)}</span> 即将解锁。</div>
+        <p style="color:var(--text-2);font-size:12.5px;margin:0 0 12px">验证完成后这条 TXT 通常不再需要。默认<b>移除该验证记录</b>并释放主机名；若平台要求长期保留（如 Google 站点验证），请取消勾选。</p>
+        <label class="check" style="margin:0 0 14px"><input type="checkbox" id="removeRec" checked> 移除这条验证 TXT 记录（推荐）</label>
+        <div class="row end">
+          <button class="btn" onclick="closeModal()">取消</button>
+          <button class="btn primary" id="okConfirm">确认认证完成</button>
+        </div>`);
+      document.getElementById('okConfirm').onclick = async () => {
+        try {
+          const keep = !document.getElementById('removeRec').checked;
+          await api.post('/api/records/' + r.id + '/verify-confirm', { keep });
+          toast(keep ? '已解锁（记录保留）' : '已完成并移除验证记录'); closeModal(); loadAll();
+        } catch (e) { toast(e.message, 'err'); }
+      };
+    });
+  }
+  
+  function presetLabel(key) {
+    const p = presets.find((x) => x.key === key);
+    return p ? p.label : key;
+  }
+  
+  function openRecordForm(rec, presetBody) {
+    const types = cfg.recordTypes;
+    const cur = rec ? rec.type : (presetBody ? presetBody.type : 'A');
+    const spec = types.find((t) => t.key === cur);
+  
+    const typeOptions = types.map((t) =>
+      `<option value="${t.key}" ${t.key === cur ? 'selected' : ''}>${t.key}${t.readonly ? '（只读）' : ''} — ${esc(t.desc)}</option>`).join('');
+    const ttlOptions = cfg.ttlChoices.map((t) => `<option value="${t.value}">${esc(t.label)}</option>`).join('');
+  
+    openModal(rec ? '编辑记录' : '添加记录', `
+      <div class="field">
+        <label>记录类型</label>
+        <select id="fType">${typeOptions}</select>
+        <div class="hint" id="fDesc">${esc(spec.desc)}</div>
+        ${spec.note ? `<div class="alert warn" style="margin-top:8px">${esc(spec.note)}</div>` : ''}
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>主机名</label>
+          <input id="fHost" placeholder="留空或 @ 表示 ${esc(sub.fqdn)}">
+          <div class="hint">生成 <span class="mono" id="fPreview"></span></div>
+        </div>
+        <div class="field">
+          <label>TTL</label>
+          <select id="fTtl">${ttlOptions}</select>
+        </div>
+      </div>
+      <div id="fExtra"></div>
+      <div class="field">
+        <label>${esc(spec.valueLabel || '记录值')}</label>
+        ${spec.multiline
+          ? `<textarea id="fContent" placeholder="${esc(spec.placeholder || '')}"></textarea>`
+          : `<input id="fContent" placeholder="${esc(spec.placeholder || '')}">`}
+      </div>
+      <div id="fProxyWrap" class="field ${spec.canProxy ? '' : 'hidden'}">
+        <label class="check"><input type="checkbox" id="fProxied"> 开启 Cloudflare 代理（仅 TTL 为自动时可用）</label>
+      </div>
+      <div class="field">
+        <label>备注（选填）</label>
+        <input id="fComment" placeholder="给自己看的说明">
+      </div>
+      <div class="row end">
+        <button class="btn" onclick="closeModal()">取消</button>
+        <button class="btn primary" id="fSave">保存</button>
+      </div>`);
+  
+    const typeSel = document.getElementById('fType');
+    typeSel.onchange = () => {
+      const saved = { host: document.getElementById('fHost').value, content: document.getElementById('fContent').value };
+      openRecordForm(rec, { ...presetBody, type: typeSel.value, ...saved });
+      const h = document.getElementById('fHost'); if (h) h.value = saved.host;
+      const c = document.getElementById('fContent'); if (c) c.value = saved.content;
+    };
+  
+    function updatePreview2() {
+      const h = document.getElementById('fHost').value.trim();
+      document.getElementById('fPreview').textContent = (h && h !== '@' ? h + '.' : '') + sub.fqdn;
+    }
+    const fillExtra = () => {
+      const sp = types.find((t) => t.key === typeSel.value);
+      document.getElementById('fExtra').innerHTML = (sp.fields || []).map((f) => {
+        const v = rec && rec.data ? rec.data[f.key] : (presetBody && presetBody[f.key] !== undefined ? presetBody[f.key] : f.default);
+        if (f.type === 'select') {
+          return `<div class="field"><label>${esc(f.label)}</label><select data-f="${f.key}">${
+            f.options.map((o) => `<option value="${o}" ${String(o) === String(v) ? 'selected' : ''}>${o}</option>`).join('')
+          }</select></div>`;
+        }
+        return `<div class="field"><label>${esc(f.label)}</label><input data-f="${f.key}" type="${f.type}" value="${esc(v ?? '')}" placeholder="${esc(f.placeholder || '')}">${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
+      }).join('');
+      updatePreview2();
+    };
+    document.getElementById('fHost').addEventListener('input', updatePreview2);
+    fillExtra();
+  
+    const init = rec || presetBody || {};
+    document.getElementById('fHost').value = init.host ?? '';
+    document.getElementById('fContent').value = init.content ?? '';
+    document.getElementById('fTtl').value = String(init.ttl ?? 1);
+    document.getElementById('fProxied').checked = !!init.proxied;
+    document.getElementById('fComment').value = init.comment ?? '';
+    updatePreview2();
+  
+    document.getElementById('fSave').onclick = async () => {
+      const type = document.getElementById('fType').value;
+      const body = {
+        type,
+        host: document.getElementById('fHost').value.trim(),
+        content: document.getElementById('fContent').value.trim(),
+        ttl: Number(document.getElementById('fTtl').value),
+        proxied: document.getElementById('fProxied').checked,
+        comment: document.getElementById('fComment').value.trim(),
+      };
+      document.querySelectorAll('#fExtra [data-f]').forEach((el) => {
+        body[el.dataset.f] = el.type === 'number' ? Number(el.value) : el.value;
+      });
+      try {
+        if (rec) await api.patch('/api/records/' + rec.id, body);
+        else await api.post('/api/subdomains/' + subId + '/records', body);
+        toast(rec ? '已更新' : '已添加'); closeModal(); loadAll();
+      } catch (e) { toast(e.message, 'err'); }
+    };
+  }
+  
+  document.getElementById('btnAdd').onclick = () => openRecordForm(null);
+  
+  document.getElementById('btnVerify').onclick = async () => {
+    const active = document.querySelector('.preset.active');
+    const host = document.getElementById('vHost').value.trim();
+    const value = document.getElementById('vValue').value.trim();
+    if (!host) return toast('请填写验证主机名，如 _vercel', 'err');
+    if (!value) return toast('请粘贴平台给出的验证值', 'err');
+    try {
+      const tid = verifyTargetId || subId;
+      await api.post('/api/subdomains/' + tid + '/verify', {
+        preset: active ? active.dataset.key : 'custom',
+        host,
+        value,
+        scope: verifyScope,
+      });
+      toast('验证记录已写入并锁定');
+      document.getElementById('vValue').value = '';
+      loadAll();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  
+  document.getElementById('btnSoa').onclick = async () => {
+    try {
+      const d = await api.get('/api/soa');
+      const s = d.soa && d.soa.data;
+      openModal('区域 SOA（只读）', `
+        ${s ? `
+        <div class="kv">
+          <div class="k">区域</div><div class="mono">${esc(d.soa.name)}</div>
+          <div class="k">主 NS</div><div class="mono">${esc(s.mname)}</div>
+          <div class="k">管理员</div><div class="mono">${esc(s.rname)}</div>
+          <div class="k">序列号</div><div class="mono">${esc(s.serial)}</div>
+          <div class="k">刷新</div><div class="mono">${esc(s.refresh)}</div>
+          <div class="k">重试</div><div class="mono">${esc(s.retry)}</div>
+          <div class="k">过期</div><div class="mono">${esc(s.expire)}</div>
+          <div class="k">最小 TTL</div><div class="mono">${esc(s.minimum)}</div>
+        </div>` : '<div class="empty">未能获取 SOA 信息</div>'}
+        <div class="alert info" style="margin-top:12px">${esc(d.note)}</div>
+        <div class="row end"><button class="btn" onclick="closeModal()">关闭</button></div>`);
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  
+  document.getElementById('copyFqdn').onclick = () => copyText(sub.fqdn);
+  
+  /* ---------- 概览 ---------- */
+  function renderOverview() {
+    const box = document.getElementById('overviewBox');
+    if (!sub) return;
+    const rc = (records || []).length;
+    const perpetual = Number(sub.perpetual) === 1 || !sub.expires_at;
+    let expText = '永久有效', expCls = 'var(--ok)';
+    if (!perpetual) {
+      const left = Math.ceil((Number(sub.expires_at) - Date.now()) / 86400000);
+      expText = left > 0 ? left + ' 天后到期' : '已过期';
+      expCls = left > 180 ? 'var(--ok)' : left > 0 ? 'var(--warn)' : 'var(--danger)';
+    }
+    const st = sub.status === 'approved' ? '<span style="color:var(--ok)">正常</span>'
+             : sub.status === 'pending' ? '<span style="color:var(--warn)">审核中</span>'
+             : sub.status === 'suspended' ? '<span style="color:var(--danger)">已停用</span>'
+             : esc(sub.status);
+    box.innerHTML = `<div class="stat-grid">
+      <div class="stat"><div class="stat-k">域名状态</div><div class="stat-v">${st}</div></div>
+      <div class="stat"><div class="stat-k">DNS</div><div class="stat-v">${rc > 0 ? '<span style="color:var(--ok)">已解析</span>' : '<span style="color:var(--muted)">未添加记录</span>'}</div></div>
+      <div class="stat"><div class="stat-k">DNS 记录</div><div class="stat-v mono">${rc} 条</div></div>
+      <div class="stat"><div class="stat-k">有效期</div><div class="stat-v" style="color:${expCls}">${expText}</div></div>
+    </div>`;
+  }
+  
+  /* ---------- 标签页切换 ---------- */
+  function switchTab(name) {
+    document.querySelectorAll('#tabs .tab').forEach((x) => x.classList.toggle('on', x.dataset.tab === name));
+    document.querySelectorAll('.tabpane').forEach((pp) => pp.classList.toggle('on', pp.dataset.pane === name));
+  }
+  document.querySelectorAll('#tabs .tab').forEach((t) => {
+    t.onclick = () => switchTab(t.dataset.tab);
+  });
+  
+  /* ---------- 右侧快捷操作 ---------- */
+  async function doRenew() {
+    try {
+      const r = await api.post('/api/subdomains/' + subId + '/renew', {});
+      toast('已续期，新到期 ' + fmtDate(r.expiresAt));
+      loadAll();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+  
+  document.querySelectorAll('.op-btn').forEach((b) => {
+    b.onclick = () => {
+      const a = b.dataset.act;
+      if (a === 'add') {
+        switchTab('dns');
+        const btn = document.getElementById('btnAdd');
+        if (btn) btn.click();
+      } else if (a === 'ns') {
+        switchTab('ns');
+      } else if (a === 'whois') {
+        location.href = '/whois?name=' + encodeURIComponent(sub ? sub.label : '');
+      } else if (a === 'renew') {
+        if (Number(sub.perpetual) === 1 || !sub.expires_at) return toast('该域名永久有效，无需续期');
+        doRenew();
+      } else if (a === 'ssl') {
+        switchTab('dns');
+        toast('本站不签发证书：可在 DNS 解析里添加 ACME 验证记录，并用 CAA 记录限制签发机构', 'info');
+      }
+    };
+  });
+  
+  mountShell('domains').then(async () => {
+    try { applyBranding(await loadBranding()); } catch (e) {}
+    loadAll().catch((e) => console.error('域名详情加载失败', e));
+  }).catch((e) => console.error('初始化失败', e));
+  
+}

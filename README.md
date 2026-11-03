@@ -1,12 +1,10 @@
 # MeoyDomain
 
 **MeoyDomain** —— 免费、开源的新一代二级域名分发与 DNS 管理系统。
-基于 **Cloudflare Workers + D1 + R2**，用户自助申请 `xxx.你的根域名`，审核通过后自行添加 DNS 记录，所有记录通过 **Cloudflare API** 实时下发到你的 Zone。
 
-> 内置落地首页（`/home.html`）、12 种 DNS 记录、根域名验证、域名托管委派、工单与转移、积分与兑换券。
+前端 **React 18 + TypeScript + Vite**（单页应用，全站无手写 HTML 页面），后端 **TypeScript + Hono on Cloudflare Workers + D1 + R2**。用户自助申请 `xxx.你的根域名`，审核通过后自行添加 DNS 记录；每个根域名可单独选择通过 **Cloudflare API** 或 **Spaceship DNS API** 下发。
 
-
-基于 **Cloudflare Workers + D1** 的二级域名注册平台（类似 dnshe / hapdns）。用户自助申请 `xxx.你的根域名`，审核通过后自行添加 DNS 记录，所有记录通过 **Cloudflare API** 实时下发到你的 Zone。
+> 内置落地首页（`/home`）、12 种 DNS 记录、根域名验证、域名托管委派、工单与转移、积分与兑换券。
 
 ---
 
@@ -270,23 +268,23 @@ CNAME 探测走 DoH（cloudflare-dns.com → dns.google 双端点降级），5 �
 ```
 subdomain-hub/
 ├── src/
-│   ├── index.js                 入口：路由挂载、公开配置、尾斜杠兼容
+│   ├── index.ts                 入口：路由挂载、公开配置、SPA 回落
 │   ├── lib/
-│   │   ├── records.js           12 种记录类型的字段定义与校验、Cloudflare payload 构造
-│   │   ├── cf.js                Cloudflare DNS API 封装（含 MOCK 模式）
-│   │   ├── crypto.js            PBKDF2 密码哈希、会话令牌
-│   │   └── util.js              统一响应、审计日志
-│   ├── middleware/auth.js       会话解析、requireAuth / requireAdmin
-│   └── routes/
-│       ├── auth.js              注册 / 登录 / 登出 / 改密
-│       ├── subdomains.js        申请 / 列表 / 详情 / 释放（含可用性检查、保留字）
-│       ├── records.js           记录增删改 + 根域名验证 + 确认解锁 + SOA 查看
-│       └── admin.js             审核 / 封禁 / 配额 / 锁定管理 / 审计日志
-├── public/                      前端（原生 HTML + CSS + JS，无构建）
-│   ├── index.html               登录注册
-│   ├── dashboard.html           我的子域名
-│   ├── domain.html              DNS 记录管理 + 根域名验证
-│   └── admin.html               管理后台
+│   │   ├── records.ts           12 种记录类型的字段定义与校验
+│   │   ├── cf.ts                DNS API 封装（自动选 Cloudflare / Spaceship / 自定义）
+│   │   ├── spaceshipDns.ts      Spaceship DNS 记录读写适配
+│   │   ├── crypto.ts            PBKDF2 密码哈希、会话令牌
+│   │   └── util.ts              统一响应、审计日志
+│   ├── middleware/auth.ts       会话解析、requireAuth / requireAdmin
+│   └── routes/*.ts              注册 / 域名 / 记录 / 后台 / 工单 / 转移 …
+├── index.html                   唯一的 HTML 壳（挂载 React，Vite 入口）
+├── src/app/                     React 前端
+│   ├── main.tsx / App.tsx       入口 + SPA 路由（14 个页面）
+│   ├── pages/*.tsx              14 个页面组件
+│   ├── legacy/*.ts              由旧内联脚本平移的页面控制器
+│   └── lib/runtime.ts           公共运行时（导航 / 品牌 / 动效 / 头像）
+├── public/                      静态资源（css / img / favicon，Vite 原样复制）
+├── dist/client/                 Vite 构建产物，由 wrangler [assets] 托管
 ├── schema.sql                   D1 表结构
 └── wrangler.toml                配置
 ```
@@ -454,25 +452,30 @@ npm run dev
 
 ---
 
-## 开发语言：渐进式 TypeScript
+## 开发语言：全量 TypeScript + React
 
-项目支持 TypeScript，采用**渐进式迁移**，不破坏现有代码：
+前后端**全部 TypeScript**，无存量 `.js`：
 
-- Wrangler 原生支持 `.ts`（内置 esbuild 转译），**无需额外构建步骤**，`wrangler deploy` 直接可用
-- `tsconfig.json` 里 `allowJs: true` + `checkJs: false` —— 存量 `.js` 正常参与打包，但暂不做类型检查
-- 全局类型在 `src/types.d.ts`：`Env`（D1/R2/ASSETS/Secrets/Vars 全部绑定）、
-  数据行类型（与 `schema.sql` 一一对应）、`SessionUser` 等
-- 已迁移：~~`src/lib/util.js`~~ → `src/lib/util.ts`（统一响应 / audit / clientIp）
+- 前端：React 18 + Vite，`src/app/pages/*.tsx` 共 14 个页面组件；全站只有一个
+  `index.html` 作为挂载壳，由 `src/app/main.tsx` 渲染。旧的 14 个静态 HTML 页面已删除。
+- 后端：Hono on Workers，`src/**/*.ts`，Wrangler 内置 esbuild 直接打包。
+- 全局类型在 `src/types.d.ts`：`Env`（D1/R2/ASSETS/Secrets/Vars）、数据行类型、`SessionUser`。
+- `tsconfig.json` 用 `moduleResolution: Bundler`、`jsx: react-jsx`、`allowJs: false`。
 
 ```bash
-npm run typecheck   # tsc --noEmit，只检查 .ts
+npm install
+npm run typecheck   # tsc --noEmit
+npm run build       # Vite → dist/client
+npm run deploy      # build + wrangler deploy
 ```
 
-**为什么存量 `import ... from './util.js'` 不用改**：esbuild（Wrangler 内置）会把
-`./util.js` 自动解析到同名的 `util.ts`，因此删除 `.js` 后所有引用无需修改。
+**部署顺序**：CI 先 `npm install` → `npm run build` → `wrangler deploy`。
+仓库不提交 `package-lock.json`，所以 CI 用 `npm install`（不能用 `npm ci`），
+`actions/setup-node` 也不启用 npm 缓存选项。
 
-**新代码约定**：新增模块请用 `.ts`，并 `import type { Env, UserRow } from '../types'`；
-存量 `.js` 保持不动，除非要顺手重写。
+**SPA 路由**：站内链接为 `/dashboard`、`/register` 这类干净路径；`App.tsx` 仍保留
+`/xxx.html` 别名，老书签与 `whois.` 子域的服务端重定向继续可用。
+Worker 的 `SPA_PATHS` 白名单把这些路径统一回落到 `index.html`，由 React 接管。
 
 
 ---
@@ -527,9 +530,12 @@ npm run typecheck   # tsc --noEmit，只检查 .ts
 
 ## 天空蓝云层背景（Cloud Shader）
 
-落地页 Hero 用了 WebGL 云层着色器（`public/js/cloud-shader.js`，纯原生无依赖）。
+落地页 Hero 用了 WebGL 云层着色器（`src/app/lib/cloudShader.ts`，纯原生无依赖，由 `App.tsx` 按需动态挂载）。
 
-**关于 `npx shadcn@latest add @aceternity/cloud-shader`**：装不了，两个原因
+> 以下为**历史记录**：当时项目还是原生 HTML/CSS/JS，现已迁移到 React + TypeScript；
+> 结论（手写着色器）保留，但「无 React」的前提已不成立。
+
+**关于 `npx shadcn@latest add @aceternity/cloud-shader`**：当时装不了，两个原因
 
 1. **registry 被挡**：`ui.shadcn.com/r/registries.json` 与 `ui.aceternity.com/registry/*`
    在当前网络下均返回 403（`No policy rule matched the request`）。

@@ -324,6 +324,9 @@ tbody tr:hover td { background: hsl(var(--secondary)); padding-left: 16px; }
 }
 .stat {
   background: transparent !important;
+  /* v2 皮肤把 .stat 设成白字（配四色渐变卡片），文档风换成透明背景后
+     必须把文字色改回来，否则浅色模式就是「白字白底」完全看不见。 */
+  color: hsl(var(--foreground)) !important;
   border: 0 !important;
   border-right: 1px solid hsl(var(--border)) !important;
   border-radius: 0 !important;
@@ -331,9 +334,13 @@ tbody tr:hover td { background: hsl(var(--secondary)); padding-left: 16px; }
   padding: 18px 20px;
   transition: background .25s;
 }
+/* v2 的白色半透明装饰圆：文档风下不要（深色模式会变成一块灰圆） */
+.stat::after { display: none !important; }
 .stat:last-child { border-right: 0 !important; }
 .stat:hover { background: hsl(var(--secondary)); transform: none !important; box-shadow: none !important; }
-.stat b, .stat-v {
+/* admin.html / domain.html 实际生成的是 .v / .l，不是 b / span / .stat-v / .stat-k，
+   之前只覆盖了后者，所以数字与标签在浅色模式下仍是白色 —— 这里全部补齐。 */
+.stat b, .stat-v, .stat .v, .stat h2 {
   display: block;
   font-family: var(--mono) !important;
   font-size: 28px !important;
@@ -342,7 +349,8 @@ tbody tr:hover td { background: hsl(var(--secondary)); padding-left: 16px; }
   font-variant-numeric: tabular-nums;
   color: hsl(var(--foreground)) !important;
 }
-.stat span, .stat-k {
+.stat .v[style] { color: hsl(var(--foreground)) !important; }
+.stat span, .stat-k, .stat .l, .stat small {
   font-family: var(--sans) !important;
   font-size: 12.5px !important;
   text-transform: none !important;
@@ -350,6 +358,7 @@ tbody tr:hover td { background: hsl(var(--secondary)); padding-left: 16px; }
   color: hsl(var(--muted-foreground)) !important;
   margin-top: 6px;
 }
+.stat .em { color: hsl(var(--foreground)) !important; }
 
 /* ══════════ 9. 骨架：顶栏 / 侧栏 ══════════ */
 .topbar {
@@ -592,3 +601,52 @@ tbody.in tr { opacity: 1; transform: none; }
   h1 { font-size: 26px !important; }
   .topbar { left: 68px !important; }
 }
+
+
+/* ══════════ 统计卡可见性（终极兜底） ══════════
+   线上曾出现「浅色模式统计数字白字白底」：v2 皮肤把 .stat 设为白字，
+   文档风覆盖虽写了 hsl(var(--foreground))，但旧缓存 / 变量解析失败时仍会失效。
+   这里用 html[data-skin="doc"] 提高特指度并写死颜色，不依赖任何 CSS 变量。 */
+html[data-skin="doc"] .stat-grid .stat,
+html[data-skin="doc"] .stat-grid .stat .v,
+html[data-skin="doc"] .stat-grid .stat b,
+html[data-skin="doc"] .stat-grid .stat h2 { color: #15171c !important; }
+html[data-skin="doc"] .stat-grid .stat .l,
+html[data-skin="doc"] .stat-grid .stat small,
+html[data-skin="doc"] .stat-grid .stat span { color: #6b7280 !important; }
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat,
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat .v,
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat b,
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat h2 { color: #f2f5fa !important; }
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat .l,
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat small,
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat span { color: #a9b3c7 !important; }
+html[data-skin="doc"] .stat-grid .stat::after { display: none !important; }
+html[data-skin="doc"] .stat-grid .stat:hover { background: #f2f4f8 !important; }
+html[data-skin="doc"][data-theme="dark"] .stat-grid .stat:hover { background: #182338 !important; }
+
+/* dashboard 用的是另一套类名 .stat-card（v2 实心渐变 + 白字 + ::after 半圆装饰）。
+   上面的兜底选择器没命中它，因此浅色会白字白底、深色会有半圆灰块压在数字上。
+   这里整套收敛成文档风的细线白卡，并把颜色写死，不依赖 CSS 变量解析。 */
+html[data-skin="doc"] .stat-card {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  color: hsl(var(--foreground)) !important;
+}
+html[data-skin="doc"] .stat-card::after { display: none !important; }
+html[data-skin="doc"] .stat-card .sc-num { color: #15171c !important; font-size: 22px !important; }
+html[data-skin="doc"] .stat-card .sc-lbl { color: #6b7280 !important; }
+html[data-skin="doc"] .stat-card .sc-ico {
+  background: hsl(var(--secondary)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+html[data-skin="doc"] .stat-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  background: hsl(var(--secondary)) !important;
+}
+html[data-skin="doc"][data-theme="dark"] .stat-card .sc-num { color: #f2f5fa !important; }
+html[data-skin="doc"][data-theme="dark"] .stat-card .sc-lbl { color: #a9b3c7 !important; }
+html[data-skin="doc"][data-theme="dark"] .stat-card:hover { background: #182338 !important; }

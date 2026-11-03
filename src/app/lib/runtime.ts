@@ -1,0 +1,1194 @@
+/**
+ * MeoyDomain 前端运行时（TypeScript）
+ * 由旧 api.js / shell.js 合并迁移而来，保留全部工具函数与骨架注入逻辑。
+ * React 负责路由与页面组件；骨架与页面交互仍由这里的控制器驱动，
+ * 后续可按页面逐步改成 hooks，不影响其它页面。
+ */
+import type { LegacyCtx } from './types';
+import { mountMotionStandalone } from './motion';
+
+/* SPA 切页清理注册表：document / window 事件与定时器都登记在这里 */
+let cleanups: Array<() => void> = [];
+export function cleanupPage() {
+  for (const f of cleanups) { try { f(); } catch {} }
+  cleanups = [];
+}
+function track(target: any, type: string, fn: any, opts?: any) {
+  target.addEventListener(type, fn, opts);
+  cleanups.push(() => { try { target.removeEventListener(type, fn, opts); } catch {} });
+}
+const __docOn = (type: string, fn: any, opts?: any) => track(document, type, fn, opts);
+const __winOn = (type: string, fn: any, opts?: any) => track(window, type, fn, opts);
+const __setInterval = (fn: any, ms?: number) => {
+  const id = setInterval(fn, ms);
+  cleanups.push(() => clearInterval(id));
+  return id;
+};
+
+/* 全局符号表：legacy 控制器从这里解构，页面之间互不干扰 */
+export const RUNTIME_KEYS = [
+  'api','esc','fmtTime','fmtDate','toast','openModal','closeModal','loadBranding','applyBranding',
+  'applyFonts','STATUS_MAP','statusBadge','copyText','quotaText','mountNav','mountShell',
+  'mountSiteFooter','logoHtml','wallpaperSwitchHtml','applyWallpaper','mountWallpaper','mountSakura',
+  'DEFAULT_BRAND','CN_FONTS','WALLPAPERS','PAW_SVG','SHELL_NAV','SHELL_ICON','prefetch',
+  'readUserCache','writeUserCache','clearUserCache','idle','renderAvatars','catFaceFallback',
+  'mountDecor','mountMotion','applyBrand','pawBurst','shellItem','MeoyRenderAvatars',
+  'MeoyRenderCatFaces','refreshRuntime','cleanupPage','navigate',
+] as const;
+
+/* SPA 导航（供 legacy 脚本里的跳转使用，不刷新整页） */
+export function navigate(path: string) {
+  if (!path) return;
+  history.pushState({}, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+/* 每次切页后重新扫描动效/装饰/页脚/主题按钮 */
+export function refreshRuntime() {
+  try { mountDecor(); } catch {}
+  try { mountMotion(); } catch {}
+  try { mountSiteFooter(); } catch {}
+  try { (window as any).MeoyTheme?.remount?.(); } catch {}
+  try { mountMotionStandalone(); } catch {}
+}
+
+// 前端通用工具：接口封装、提示、渲染辅助、壁纸切换
+export const api = {
+  async req(method, path, body) {
+    const opt = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
+    if (body !== undefined) opt.body = JSON.stringify(body);
+    let res, data;
+    try {
+      res = await fetch(path, opt);
+      data = await res.json().catch(() => ({}));
+    } catch (e) {
+      throw new Error('网络请求失败');
+    }
+    if (res.status === 401) {
+      // 公开页（WHOIS / 条款）免登录，401 是正常现象，不能踢去登录页 ——
+      // 否则在 whois 子域下会形成 /whois → / → /whois.html 的循环。
+      if (window.MEOY_PUBLIC_PAGE) return data;   // 交给调用方自行处理
+      if (!['/', '/index'].includes(location.pathname)) location.href = '/';
+    }
+    if (!data.success) throw new Error(data.message || '请求失败');
+    return data;
+  },
+  get: (p) => api.req('GET', p),
+  post: (p, b) => api.req('POST', p, b),
+  patch: (p, b) => api.req('PATCH', p, b),
+  put: (p, b) => api.req('PUT', p, b),
+  del: (p) => api.req('DELETE', p),
+};
+
+/* ---------- 樱花飘落（合成器动画，不触发重排） ---------- */
+export function mountSakura() {
+  // 落地页用 DnsNeko 那种清透线条风，不铺樱花
+  if (document.body.classList.contains('page-home')) return;
+  if (document.getElementById('sakura')) return;
+  // 减少动态效果偏好时不开；小屏减少数量省性能
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  if (reduce) return;
+  const narrow = window.innerWidth < 720;
+  const n = narrow ? 9 : 16;
+
+  const box = document.createElement('div');
+  box.id = 'sakura';
+  box.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('i');
+    p.className = 'petal';
+    // 随机化：位置、时长、延迟、横向漂移、旋转、大小
+    p.style.left = (Math.random() * 100).toFixed(2) + 'vw';
+    p.style.setProperty('--dx', (Math.random() * 24 - 12).toFixed(1) + 'vw');
+    p.style.setProperty('--rot', (Math.random() * 720 - 360).toFixed(0) + 'deg');
+    p.style.animationDuration = (13 + Math.random() * 9).toFixed(1) + 's';
+    p.style.animationDelay = (-Math.random() * 18).toFixed(1) + 's';
+    p.style.width = p.style.height = (7 + Math.random() * 6).toFixed(1) + 'px';
+    p.style.opacity = (0.5 + Math.random() * 0.4).toFixed(2);
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+}
+
+/* ---------- 猫爪 SVG（站点吉祥物，多处复用） ---------- */
+export const PAW_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  '<ellipse cx="7" cy="8.5" rx="2.1" ry="2.6"/>' +
+  '<ellipse cx="12" cy="7" rx="2.1" ry="2.7"/>' +
+  '<ellipse cx="17" cy="8.5" rx="2.1" ry="2.6"/>' +
+  '<path d="M12 12c3.4 0 6 2.1 6 4.6 0 2.2-1.9 3.6-4.2 3.6h-3.6C8 20.2 6 18.8 6 16.6 6 14.1 8.6 12 12 12Z"/>' +
+  '</svg>';
+
+/* ---------- 壁纸：樱花猫 ---------- */
+export const WALLPAPERS = [
+  { key: 'sakura1', name: '樱花喵 1', url: '/img/sakura1.jpg' },
+  { key: 'sakura2', name: '樱花喵 2', url: '/img/sakura2.jpg' },
+  // 想换回 Miku / GUMI 主题时，在切换器里直接选即可（壁纸与主题互相独立）
+  { key: 'miku', name: 'Miku', url: '/img/miku.jpg' },
+  { key: 'gumi', name: 'GUMI', url: '/img/gumi.jpg' },
+];
+
+export function applyWallpaper(key) {
+  const w = WALLPAPERS.find((x) => x.key === key) || WALLPAPERS[0];
+  let el = document.getElementById('bg');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'bg';
+    document.body.prepend(el);
+  }
+  el.style.setProperty('--bg-img', `url('${w.url}')`);
+  try { localStorage.setItem('meoy_wallpaper', w.key); } catch {}
+  document.querySelectorAll('.bgswitch button').forEach((b) => b.classList.toggle('on', b.dataset.wp === w.key));
+}
+
+export function mountWallpaper() {
+  let saved = 'sakura1';
+  try { saved = localStorage.getItem('meoy_wallpaper') || 'sakura1'; } catch {}
+  applyWallpaper(saved);
+}
+
+export function wallpaperSwitchHtml() {
+  return `<span class="bgswitch">${WALLPAPERS.map(
+    (w) => `<button data-wp="${w.key}" title="切换背景：${w.name}">${w.name}</button>`
+  ).join('')}</span>`;
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('.bgswitch button');
+  if (b) applyWallpaper(b.dataset.wp);
+});
+
+/* ---------- 站点品牌（站点名 / Logo，管理员可在后台改） ---------- */
+export const DEFAULT_BRAND = { siteName: 'Meoy', logoUrl: '/img/logo.jpg', faviconUrl: '/favicon.ico' };
+export let brandPromise = null;
+
+export function loadBranding() {
+  if (!brandPromise) {
+    brandPromise = api
+      .get('/api/config')
+      .then((d) => ({
+        siteName: d.siteName || DEFAULT_BRAND.siteName,
+        logoUrl: d.logoUrl || DEFAULT_BRAND.logoUrl,
+        faviconUrl: d.faviconUrl || DEFAULT_BRAND.faviconUrl,
+        fontBody: d.fontBody || 'zcool',
+        fontDisplay: d.fontDisplay || 'zcool',
+      }))
+      .catch(() => ({ ...DEFAULT_BRAND }));
+  }
+  return brandPromise;
+}
+
+/** 应用站点名与 favicon */
+/* ---------- 全局中文字体（后台可配，全站生效） ----------
+   key: system | noto | lxgw | zcool
+   拉丁与数字始终由 Redaction 35 接管，这里只决定中文字符用哪个字体。 */
+export const CN_FONTS = {
+  system: "'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
+  noto: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+  lxgw: "'LXGW WenKai TC', 'LXGW WenKai', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+  zcool: "'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+};
+
+export function applyFonts(fontBody, fontDisplay) {
+  const root = document.documentElement;
+  const body = CN_FONTS[fontBody] || CN_FONTS.system;
+  const disp = CN_FONTS[fontDisplay] || CN_FONTS.zcool;
+  // 覆盖 CSS 变量 → 所有页面（前台 / WHOIS / 后台 / 条款）立即全局生效
+  root.style.setProperty('--cn-body', body);
+  root.style.setProperty('--cn-display', disp);
+}
+
+export function applyBranding(b) {
+  if (b.fontBody || b.fontDisplay) applyFonts(b.fontBody, b.fontDisplay);
+  document.title = (document.title || '').replace(/^[^·]*·\s*/, b.siteName + ' · ');
+  let f = document.querySelector('link[rel="icon"]');
+  if (!f) {
+    f = document.createElement('link');
+    f.rel = 'icon';
+    document.head.appendChild(f);
+  }
+  f.href = b.faviconUrl;
+  document.querySelectorAll('[data-site-name]').forEach((el) => (el.textContent = b.siteName));
+  document.querySelectorAll('[data-logo-img]').forEach((el) => (el.src = b.logoUrl));
+}
+
+/** 生成 Logo 图片 HTML（size 为像素） */
+export function logoHtml(b, size, cls = '') {
+  return `<img src="${esc(b.logoUrl)}" alt="${esc(b.siteName)}" class="${cls}"
+    style="width:${size}px;height:${size}px;object-fit:contain;border-radius:${Math.round(size * 0.22)}px">`;
+}
+
+/* ---------- 提示 ---------- */
+export function toast(msg, type = 'ok', ms = 2600) {
+  let box = document.getElementById('toast');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'toast';
+    document.body.appendChild(box);
+  }
+  const d = document.createElement('div');
+  d.className = 'toast ' + (type === 'err' ? 'err' : '');
+  d.textContent = msg;
+  box.appendChild(d);
+  setTimeout(() => d.remove(), ms);
+}
+
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+export function fmtTime(ts) {
+  if (!ts) return '-';
+  const d = new Date(Number(ts));
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** 只显示日期：2026-11-01 */
+export function fmtDate(ts) {
+  if (!ts) return '-';
+  const d = new Date(Number(ts));
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+export function copyText(t) {
+  navigator.clipboard?.writeText(t).then(() => toast('已复制'), () => toast('复制失败', 'err'));
+}
+
+/** 配额显示：负数（或管理员）显示 ∞ */
+export function quotaText(quota, unlimited) {
+  if (unlimited || Number(quota) < 0) return '<span class="badge inf">∞ 不限</span>';
+  return String(quota);
+}
+
+export const STATUS_MAP = {
+  pending: { cls: 'warn', text: '待审核' },
+  approved: { cls: 'ok', text: '已开通' },
+  rejected: { cls: 'danger', text: '已驳回' },
+  suspended: { cls: 'danger', text: '已停用' },
+};
+
+export function statusBadge(s) {
+  const m = STATUS_MAP[s] || { cls: '', text: s };
+  return `<span class="badge ${m.cls}">${m.text}</span>`;
+}
+
+/* ---------- 顶部导航 ---------- */
+/**
+ * 挂载导航。
+ * @param active 当前页签
+ * @param opts.optional 为 true 时未登录也不跳转（用于服务条款等公开页）
+ */
+export async function mountNav(active, opts = {}) {
+  const nav = document.getElementById('nav');
+  if (!nav) return null;
+  let user = null;
+  try {
+    user = (await api.get('/api/auth/me')).user;
+  } catch {
+    if (!opts.optional) { location.href = '/'; return null; }
+  }
+  if (!user) {
+    const b0 = await loadBranding();
+    nav.innerHTML = `
+      <div class="logo">
+        <img src="${esc(b0.logoUrl)}" alt="${esc(b0.siteName)}" style="width:30px;height:30px;object-fit:contain;border-radius:3px">
+        <span class="logo-text">${esc(b0.siteName)}</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="links">
+        <a class="navlink ${active === 'whois' ? 'active' : ''}" href="/whois">WHOIS</a>
+        <a class="navlink ${active === 'terms' ? 'active' : ''}" href="/terms">条款</a>
+        ${wallpaperSwitchHtml()}
+        <span class="sep"></span>
+        <a class="btn sm primary" href="/">登录 / 注册</a>
+      </div>`;
+    document.querySelectorAll('.bgswitch button').forEach((btn) => {
+      btn.onclick = () => applyWallpaper(btn.dataset.wp);
+    });
+    return null;
+  }
+  const isAdmin = user.role === 'admin';
+  const b = await loadBranding();
+  let rootHost = '';
+  try { rootHost = (await api.get('/api/config')).rootDomain || ''; } catch {}
+  nav.innerHTML = `
+    <div class="logo">
+      <img src="${esc(b.logoUrl)}" alt="${esc(b.siteName)}" style="width:30px;height:30px;object-fit:contain;border-radius:3px">
+      <span class="logo-text">${esc(b.siteName)}<em>${esc(rootHost || 'subdomain')}</em></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="links">
+      <a class="navlink ${active === 'dash' ? 'active' : ''}" href="/dashboard">我的域名</a>
+      <a class="navlink ${active === 'whois' ? 'active' : ''}" href="/whois">WHOIS</a>
+      ${isAdmin ? `<a class="navlink ${active === 'admin' ? 'active' : ''}" href="/admin">管理后台</a>` : ''}
+      ${wallpaperSwitchHtml()}
+      <span class="sep"></span>
+      <span class="badge" style="font-weight:400">${esc(user.email)}</span>
+      <button class="btn sm ghost" id="btnLogout">退出</button>
+    </div>`;
+  document.getElementById('btnLogout').onclick = async () => {
+    await api.post('/api/auth/logout', {});
+    location.href = '/?login=1';   // 带 login=1，避免被「已登录直入控制台」的逻辑带走
+  };
+  document.querySelectorAll('.bgswitch button').forEach((b) => {
+    b.onclick = () => applyWallpaper(b.dataset.wp);
+  });
+  return user;
+}
+
+export function openModal(title, html) {
+  const m = document.getElementById('modal');
+  if (!m) return;
+  // 兼容两种结构：旧页 <div class="box">，新页 <div class="modal-card" id="modalCard">
+  const box = m.querySelector('.modal-card') || m.querySelector('.box');
+  if (!box) return;
+  box.innerHTML = `<h2>${esc(title)}</h2>${html}`;
+  m.classList.add('show');
+}
+export function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+window.closeModal = closeModal;
+
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'modal') closeModal();
+});
+
+/* ---------- WHOIS 子域名跳转 ----------
+   已由 Worker 服务端中间件处理（见 src/index.js），前端不再做任何跳转。
+   此前前端也做一份，结果在 /dashboard 上又把它踢去 /whois.html?name=dashboard，
+   与「已登录 → 控制台」逻辑互相抢夺，形成来回跳转。此处只保留清理旧计数的逻辑。 */
+try { sessionStorage.removeItem('meoy_whois_n'); } catch {}
+
+mountWallpaper();
+// 樱花飘落：等首屏内容就绪再挂，不抢占渲染
+if (document.readyState === 'complete') setTimeout(mountSakura, 400);
+else window.addEventListener('load', () => setTimeout(mountSakura, 400), { once: true });
+
+
+/* ══════════════════════════════════════════════════════════════
+   全站底部署名：MeoyDomain + GitHub 链接
+   所有页面都引入了本文件，因此注入一次即可全站生效。
+   - 追加到 body 末尾（静态流，不用 fixed，避免遮挡内容）
+   - 页面已有 .site-foot 或 <footer> 时不重复注入
+   - 控制台页（.main）会把左偏移对齐侧栏
+   ══════════════════════════════════════════════════════════════ */
+export function mountSiteFooter() {
+  var REPO = 'https://github.com/wcvjk8tnz8-create/MeoyDomain';
+  function inject() {
+    try {
+      if (document.querySelector('.site-foot') || document.querySelector('footer')) return;
+      var f = document.createElement('footer');
+      f.className = 'site-foot';
+      f.innerHTML =
+        '<div class="site-foot-in">' +
+        '<span class="sf-brand">MeoyDomain</span>' +
+        '<a class="sf-link" href="' + REPO + '" target="_blank" rel="noopener noreferrer">' +
+        '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.07-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.15 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A7.995 7.995 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>' +
+        '<span>GitHub</span></a>' +
+        '</div>';
+      document.body.appendChild(f);
+    } catch (e) { /* 底部署名失败不影响页面 */ }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inject);
+  } else {
+    inject();
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   数字滚动 + 元素入场（全站通用）
+   ══════════════════════════════════════════════════════════════ */
+(function motion() {
+  var reduced = false;
+  try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  /** 数字从 0 滚到目标值，只动 textContent（不触发重排） */
+  function countUp(el) {
+    if (reduced || el.dataset.counted === '1') return;
+    var raw = String(el.textContent || '').trim();
+    var target = parseFloat(raw.replace(/[^\d.]/g, ''));
+    if (!isFinite(target) || target === 0) return;
+    el.dataset.counted = '1';
+    var suffix = raw.replace(/[\d.]/g, '');
+    var decimals = (raw.split('.')[1] || '').length;
+    var start = performance.now();
+    var dur = 620;
+    (function step(t) {
+      var p = Math.min(1, (t - start) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);           // easeOutCubic
+      var v = target * eased;
+      el.textContent = (decimals ? v.toFixed(decimals) : Math.round(v)) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = raw;                     // 收尾精确还原原文本
+    })(start);
+  }
+
+  /** 给统计数字加上滚动效果 */
+  function scanCountUp() {
+    var sels = ['.stat-card .sc-num', '.stat-num', '.point-num', '[data-count]'];
+    sels.forEach(function (s) {
+      document.querySelectorAll(s).forEach(countUp);
+    });
+  }
+
+  /** 观察新插入的行，让它们逐条淡入（配合 CSS 的 rowIn） */
+  function observeRows() {
+    if (reduced || typeof MutationObserver === 'undefined') return;
+    var mo = new MutationObserver(function (muts) {
+      muts.forEach(function (m) {
+        (m.addedNodes || []).forEach(function (n) {
+          if (n.nodeType !== 1) return;
+          var rows = n.matches && n.matches('tr') ? [n] : n.querySelectorAll ? n.querySelectorAll('tbody tr') : [];
+          Array.prototype.forEach.call(rows, function (r, i) {
+            r.style.animation = 'none';
+            // 强制回流后再挂动画，保证每次重新插入都会播放
+            void r.offsetWidth;
+            r.style.animation = '';
+            r.style.animationDelay = Math.min(i * 0.03, 0.24) + 's';
+          });
+        });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('tbody, .tablewrap'), function (t) {
+      mo.observe(t, { childList: true, subtree: true });
+    });
+  }
+
+  /** 顶栏滚动加影 */
+  function topbarShadow() {
+    var bar = document.querySelector('.topbar') || document.querySelector('.home-top');
+    if (!bar) return;
+    var onScroll = function () {
+      bar.classList.toggle('is-scrolled', window.scrollY > 4);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  function boot() {
+    scanCountUp();
+    observeRows();
+    topbarShadow();
+    // 异步渲染的统计卡（等数据回来后再扫一次）
+    setTimeout(scanCountUp, 700);
+    setTimeout(scanCountUp, 1600);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+
+
+/* ══════════════════════════════════════════════════════════════
+   主题切换（浅色 = DnsNeko 蓝白网格 / 深色 = 雪岭深蓝云雾）
+   - 最早执行：避免刷新时白/黑闪屏
+   - 记忆在 localStorage；首次跟随系统 prefers-color-scheme
+   - 顶栏自动挂按钮（控制台 / 落地页 / 登录页都生效）
+   ══════════════════════════════════════════════════════════════ */
+(function theme() {
+  var KEY = 'meoy_theme';
+
+  /** 读取当前应生效的主题 */
+  function current() {
+    try {
+      var v = localStorage.getItem(KEY);
+      if (v === 'dark' || v === 'light') return v;
+    } catch (e) {}
+    try {
+      return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (e) {}
+    return 'light';
+  }
+
+  /** 应用主题（只切 data-theme，样式全由 CSS 令牌接管） */
+  function apply(t, animate) {
+    var html = document.documentElement;
+    if (animate) {
+      html.classList.add('theme-anim');
+      setTimeout(function () { html.classList.remove('theme-anim'); }, 320);
+    }
+    if (t === 'dark') html.setAttribute('data-theme', 'dark');
+    else html.removeAttribute('data-theme');
+    // 同步浏览器 UI（地址栏/滚动条）配色
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#0a1220' : '#ffffff');
+    document.querySelectorAll('.theme-btn').forEach(function (b) {
+      b.title = t === 'dark' ? '切换到浅色' : '切换到深色';
+      b.setAttribute('aria-label', b.title);
+    });
+  }
+
+  // ★ 立即应用（本文件在 <head> 之后、body 渲染前已加载，避免闪屏）
+  apply(current(), false);
+
+  var SUN = '<svg class="i-sun" viewBox="0 0 24 24"><path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m11.32 0 1.41 1.41M4.93 4.93l1.41 1.41M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  var MOON = '<svg class="i-moon" viewBox="0 0 24 24"><path d="M20.7 14.3A9 9 0 0 1 9.7 3.3 9 9 0 1 0 20.7 14.3Z"/></svg>';
+
+  function makeBtn() {
+    var b = document.createElement('button');
+    b.className = 'theme-btn';
+    b.type = 'button';
+    b.innerHTML = MOON + SUN;
+    b.onclick = function () {
+      var next = current() === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+      apply(next, true);
+    };
+    return b;
+  }
+
+  /** 把按钮插到顶栏（控制台/落地页各自的容器） */
+  function mount() {
+    if (document.querySelector('.theme-btn')) return;
+    var host =
+      document.querySelector('.topbar-in') ||
+      document.querySelector('.home-top-in .home-nav');
+    if (!host) return;
+    var b = makeBtn();
+    // 放到铃铛前面，与其它图标按钮成一组
+    var bell = host.querySelector('.bell');
+    if (bell) host.insertBefore(b, bell);
+    else host.insertBefore(b, host.firstChild);
+    apply(current(), false);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
+  else mount();
+  // 顶栏可能是异步渲染的（shell.js），补两次
+  setTimeout(mount, 300);
+  setTimeout(mount, 1200);
+
+  // 用户没手动选过时，跟随系统变化
+  try {
+    var mq = matchMedia('(prefers-color-scheme: dark)');
+    var onChange = function (e) {
+      var saved = null;
+      try { saved = localStorage.getItem(KEY); } catch (err) {}
+      if (!saved) apply(e.matches ? 'dark' : 'light', true);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  } catch (e) {}
+
+  window.MeoyTheme = { remount: mount, get: current, set: function (t) { try { localStorage.setItem(KEY, t); } catch (e) {} apply(t, true); } };
+})();
+
+
+/* ═══ shell.js ═══ */
+/* ============================================================
+   站点骨架：紫蓝渐变顶栏 + 左侧功能导航
+   用法：页面里调 mountShell('domains') 即可，无需各自写导航。
+   active 取值：domains | checkin | rewards | whois | chat | admin
+   ============================================================ */
+
+export const SHELL_NAV = [
+  { key: 'domains', name: '域名管理', icon: 'globe', href: '/dashboard', group: '控制台' },
+  { key: 'register', name: '注册域名', icon: 'plus', href: '/register', group: '控制台' },
+  { key: 'whois', name: 'WHOIS 查询', icon: 'search', href: '/whois', group: '资源管理' },
+  { key: 'transfer', name: '域名转移', icon: 'swap', href: '/transfer', group: '资源管理' },
+  { key: 'checkin', name: '签到地', icon: 'calendar', href: '/checkin', group: '用户中心' },
+  { key: 'rewards', name: '奖励中心', icon: 'gift', href: '/rewards', group: '用户中心' },
+  { key: 'chat', name: '聊天地', icon: 'chat', href: '/chat', group: '用户中心' },
+  { key: 'tickets', name: '工单系统', icon: 'ticket', href: '/tickets', group: '用户中心' },
+  { key: 'profile', name: '个人资料', icon: 'user', href: '/profile', group: '用户中心' },
+  { key: 'home', name: '站点首页', icon: 'home', href: '/home', group: '用户中心' },
+];
+
+export const SHELL_ICON = {
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/>',
+  gift: '<path d="M20 7h-2.2A3 3 0 0 0 12 3.2 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h8V8h2v3h8V8a1 1 0 0 0-1-1ZM4 13v7a1 1 0 0 0 1 1h6v-8H4Zm9 8h6a1 1 0 0 0 1-1v-7h-7v8Z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/>',
+  chat: '<path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8l-4 4V5a1 1 0 0 1 1-1Z"/><path d="M8 9h8M8 13h5"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  ticket: '<path d="M4 5h16a1 1 0 0 1 1 1v4a2 2 0 0 0 0 4v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a2 2 0 0 0 0-4V6a1 1 0 0 1 1-1Z"/><path d="M9 9v6"/>',
+  home: '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5Z"/>',
+  swap: '<path d="M7 4 3 8l4 4V9h9a2 2 0 0 1 2 2v1h2v-1a4 4 0 0 0-4-4H7V4Zm10 12 4-4-4-4v3H8a2 2 0 0 0-2 2v1H4v-1a4 4 0 0 1 4-4h9v3Z"/>',
+  admin: '<path d="M12 3 4 6v6c0 5 3.4 9.3 8 10 4.6-.7 8-5 8-10V6l-8-3Z"/><path d="M9.5 12l1.8 1.8L15 10"/>',
+  terms: '<path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',
+  logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
+  bell: '<path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+};
+
+
+/* ---------- v2：SVG 精灵（猫脸头像 / 猫娘吉祥物） ---------- */
+export const NEKO_SPRITE = `
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="catface" viewBox="0 0 100 100">
+    <rect width="100" height="100" fill="var(--bg,#cfe4ff)"/>
+    <circle cx="20" cy="22" r="3" fill="#fff" opacity=".7"/><circle cx="82" cy="30" r="2.2" fill="#fff" opacity=".8"/><circle cx="76" cy="80" r="3.5" fill="#fff" opacity=".5"/>
+    <path d="M18 46 L20 16 Q21 12 25 14 L44 28 Z" fill="var(--fur,#fff)" stroke="var(--line,#5a6aa0)" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M82 46 L80 16 Q79 12 75 14 L56 28 Z" fill="var(--fur,#fff)" stroke="var(--line,#5a6aa0)" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M24 38 L25 22 L37 31 Z" fill="var(--ear,#ffb6d1)"/>
+    <path d="M76 38 L75 22 L63 31 Z" fill="var(--ear,#ffb6d1)"/>
+    <ellipse cx="50" cy="60" rx="35" ry="30" fill="var(--fur,#fff)" stroke="var(--line,#5a6aa0)" stroke-width="2.5"/>
+    <ellipse cx="36" cy="60" rx="6" ry="7.5" fill="var(--eye,#3b4a7a)"/><ellipse cx="64" cy="60" rx="6" ry="7.5" fill="var(--eye,#3b4a7a)"/>
+    <circle cx="38" cy="57" r="2.4" fill="#fff"/><circle cx="66" cy="57" r="2.4" fill="#fff"/>
+    <circle cx="35" cy="63" r="1.2" fill="#fff"/><circle cx="63" cy="63" r="1.2" fill="#fff"/>
+    <ellipse cx="26" cy="72" rx="6" ry="3.5" fill="#ff9ab8" opacity=".6"/><ellipse cx="74" cy="72" rx="6" ry="3.5" fill="#ff9ab8" opacity=".6"/>
+    <path d="M44 72 Q47 76 50 72 Q53 76 56 72" fill="none" stroke="var(--line,#5a6aa0)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M12 62 L22 64 M12 70 L22 69 M88 62 L78 64 M88 70 L78 69" stroke="var(--line,#5a6aa0)" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+    <path d="M50 28 q-3 -6 0 -10 q3 4 0 10z" fill="var(--accent,#ff8fbf)"/>
+  </symbol>
+
+</svg>`;
+
+/* 闪光装饰（位置固定，纯装饰） */
+export const SPARKS = [
+  { l: '30%', t: '14%', fs: 18, d: 0 },
+  { l: '62%', t: '8%',  fs: 12, d: 1 },
+  { l: '86%', t: '36%', fs: 20, d: .5 },
+  { l: '44%', t: '70%', fs: 14, d: 1.6 },
+  { l: '92%', t: '78%', fs: 12, d: 2 },
+];
+
+/** 挂载 v2 装饰：精灵图 / 闪光 / 猫娘吉祥物（只挂载一次）
+    文档风主题（theme-doc.css）下跳过闪光与吉祥物：它们已被 CSS 隐藏，
+    再插入 DOM 只是白白增加节点。 */
+export function mountDecor() {
+  if (document.getElementById('nekoSprite')) return;
+  const plain = document.documentElement.getAttribute('data-skin') === 'doc';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = NEKO_SPRITE + (plain ? '' :
+    SPARKS.map((p) => `<span class="spark" style="left:${p.l};top:${p.t};font-size:${p.fs}px;animation-delay:${p.d}s">✦</span>`).join(''));
+  while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
+}
+
+/* ══════════════════════════════════════════════════════════
+   动效引擎（文档风）
+   - 顶部 2px 滚动进度条
+   - 元素滚动到视口才播入场（IntersectionObserver）
+   - 表格行错峰淡入
+   只动 transform / opacity，不触发重排；reduced-motion 下全部跳过
+   ══════════════════════════════════════════════════════════ */
+export function mountMotion() {
+  const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* 滚动进度条 */
+  if (!REDUCED) {
+    let bar = document.getElementById('docProgress');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'docProgress';
+      bar.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(bar);
+    }
+    const onScroll = () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+    };
+    __winOn('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  /* 错峰入场 */
+  const io = (!REDUCED && 'IntersectionObserver' in window)
+    ? new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        });
+      }, { threshold: .06, rootMargin: '0px 0px -28px 0px' })
+    : null;
+
+  const play = (root) => {
+    const scope = root || document;
+    scope.querySelectorAll('tbody').forEach((tb, i) => {
+      Array.prototype.forEach.call(tb.rows, (tr, j) => {
+        tr.style.transitionDelay = (j * 55) + 'ms';
+      });
+      tb.classList.add('in');
+    });
+    const reveal = scope.querySelectorAll('.reveal');
+    if (!reveal.length) return;
+    if (!io) { reveal.forEach((el) => el.classList.add('in')); return; }
+    reveal.forEach((el, i) => {
+      el.style.transitionDelay = (i * 45) + 'ms';
+      io.observe(el);
+    });
+  };
+
+  play(document);
+  // 内容异步渲染后（列表/表格晚于骨架出现），延迟再扫一遍
+  setTimeout(() => play(document), 400);
+  setTimeout(() => play(document), 1200);
+}
+
+
+/* ---------- 头像：顶栏与个人资料页必须一致 ----------
+   优先级：用户自定义头像（URL） > 猫脸 SVG（按邮箱哈希，同一账号恒定）
+   customUrl 从 /api/profile 读取，与个人资料页同源。 */
+/* 未选择头像时默认用初音未来（Q版）。内置头像库见 /api/profile 返回的 avatars。 */
+export const DEFAULT_AVATAR = '/img/avatar/miku-headset.webp';
+
+/* 图片加载失败时的兜底：自绘猫脸 SVG，避免头像位置空白 */
+export function catFaceFallback() {
+  document.querySelectorAll('.top-av-wrap').forEach((el) => {
+    const size = el.dataset.size ? `width:${el.dataset.size}px;height:${el.dataset.size}px;` : '';
+    el.innerHTML = `<svg class="top-av" viewBox="0 0 100 100" style="${size}${el.dataset.catstyle || ''}"><use href="#catface"/></svg>`;
+  });
+}
+
+export function renderAvatars(customUrl) {
+  const safe = (u) => (/^(https?:\/\/|\/|data:image\/)/i.test(String(u || '')) ? String(u) : '');
+  const url = safe(customUrl) || DEFAULT_AVATAR;
+  document.querySelectorAll('.top-av-wrap').forEach((el) => {
+    const size = el.dataset.size ? `width:${el.dataset.size}px;height:${el.dataset.size}px;` : '';
+    el.innerHTML = `<img class="top-av" src="${url.replace(/"/g, '&quot;')}" alt="头像" style="${size}" onerror="window.MeoyRenderCatFaces&&window.MeoyRenderCatFaces()">`;
+  });
+}
+window.MeoyRenderAvatars = renderAvatars;
+window.MeoyRenderCatFaces = catFaceFallback;
+
+/* ---------- 品牌信息缓存（避免每次切页都等一个网络往返） ---------- */
+export const BRAND_KEY = 'meoy_brand';
+export const BRAND_TTL = 5 * 60 * 1000;   // 5 分钟
+
+export function readBrandCache() {
+  try {
+    const raw = sessionStorage.getItem(BRAND_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || Date.now() - o.t > BRAND_TTL) return null;
+    return o.v;
+  } catch { return null; }
+}
+
+export function writeBrandCache(v) {
+  try { sessionStorage.setItem(BRAND_KEY, JSON.stringify({ t: Date.now(), v })); } catch {}
+}
+
+/** 就地更新品牌（顶栏 logo / 站点名 / 标题） */
+export function applyBrand(b) {
+  document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = b.siteName));
+  // 品牌 logo 现在在侧栏（顶栏改为面包屑）
+  document.querySelectorAll('.side-brand img').forEach((li) => {
+    if (li.getAttribute('src') !== b.logoUrl) li.src = b.logoUrl;
+  });
+  const t = document.title;
+  const i = t.lastIndexOf(' · ');
+  if (i > 0) document.title = t.slice(0, i) + ' · ' + b.siteName;
+}
+
+/* ---------- 链接预取：hover / 空闲时把目标页 HTML 拉进缓存 ---------- */
+export const prefetched = new Set();
+export function prefetch(url) {
+  if (!url || prefetched.has(url)) return;
+  prefetched.add(url);
+  try {
+    const l = document.createElement('link');
+    l.rel = 'prefetch';
+    l.as = 'document';
+    l.href = url;
+    document.head.appendChild(l);
+  } catch {}
+}
+
+/** 侧栏链接 hover 即预取，点击时几乎瞬时 */
+export function bindPrefetch(root) {
+  (root || document).querySelectorAll('#sidebar a[href], .top-brand[href]').forEach((a) => {
+    const h = a.getAttribute('href') || '';
+    if (!h || h.charAt(0) !== '/' || h.indexOf('.html') < 0) return;
+    const go = () => prefetch(h);
+    a.addEventListener('mouseenter', go, { once: true, passive: true });
+    a.addEventListener('touchstart', go, { once: true, passive: true });
+  });
+}
+
+/* ---------- 用户信息缓存：切页时侧栏立即渲染，不等网络 ---------- */
+export const USER_KEY = 'meoy_user';
+
+export function readUserCache() {
+  try {
+    const raw = sessionStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+export function writeUserCache(u) {
+  try { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); } catch {}
+}
+
+// 注意：shell.js 以普通 <script> 加载，不能用 export 语法
+export function clearUserCache() {
+  try { sessionStorage.removeItem(USER_KEY); } catch {}
+}
+
+/** 点猫爪 → 冒几个小爱心（纯装饰，走 transform 动画） */
+export function pawBurst(anchor) {
+  for (let i = 0; i < 5; i++) {
+    const h = document.createElement('i');
+    h.className = 'heart';
+    h.textContent = '♥';
+    h.style.setProperty('--hx', ((Math.random() * 40) - 20).toFixed(0) + 'px');
+    h.style.setProperty('--hy', (-24 - Math.random() * 26).toFixed(0) + 'px');
+    h.style.animationDelay = (i * 0.055).toFixed(3) + 's';
+    anchor.appendChild(h);
+    setTimeout(() => h.remove(), 950);
+  }
+  anchor.classList.remove('tapped');
+  void anchor.offsetWidth;
+  anchor.classList.add('tapped');
+}
+
+/** 生成侧边栏一项 */
+export function shellItem(it, active, isAdmin) {
+  if (it.key === 'admin' && !isAdmin) return '';
+  const on = it.key === active;
+  return `<a class="side-item${on ? ' on' : ''}" href="${it.href}" data-key="${it.key}">
+    <span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON[it.icon] || SHELL_ICON.globe}</svg></span>
+    <span class="side-txt">${it.name}</span>
+  </a>`;
+}
+
+/**
+ * 挂载骨架
+ * @param {string} active  当前页签
+ * @param {object} opt     { optional: 未登录也允许停留 }
+ */
+export async function mountShell(active, opt = {}) {
+  const host = document.getElementById('topbar');
+  const side = document.getElementById('sidebar');
+  if (!host || !side) return;
+
+  // 品牌 + 用户信息都走 sessionStorage 缓存，命中时不等待任何网络往返 —— 切页零阻塞
+  let brand = readBrandCache() || { siteName: 'Meoy', logoUrl: '/img/logo.jpg' };
+  let me = readUserCache();
+
+  // 无缓存时才等网络（首次进入 / 硬刷新）
+  if (!me || !me.id) {
+    try {
+      const r = await api.get('/api/auth/me');
+      me = (r && r.user) || r || null;   // 接口返回 { success, user }
+      if (me && me.id) writeUserCache(me);
+    } catch { me = null; }
+  }
+  if (!me || !me.id) {
+    if (!opt.optional) { location.href = '/'; return; }
+    me = null;
+  }
+
+  document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = brand.siteName));
+  // 后台刷新品牌（不阻塞渲染），拿到后再就地更新
+  api.get('/api/config').then((cfg) => {
+    const b = { siteName: cfg.siteName || cfg.site_name || 'Meoy', logoUrl: cfg.logoUrl || cfg.logo_url || '/img/logo.jpg' };
+    writeBrandCache(b);
+    if (b.siteName !== brand.siteName || b.logoUrl !== brand.logoUrl) applyBrand(b);
+  }).catch(() => {});
+
+  const isAdmin = me && me.role === 'admin';
+  // 兜底猫脸配色：仅当角色头像图片加载失败时才用到，按邮箱稳定取一套
+  const AV_SETS = [
+    { bg: '#ffd3e6', fur: '#fff', eye: '#3b4a7a', accent: '#ff8fbf' },
+    { bg: '#fff0b8', fur: '#fffdf3', eye: '#7a5a2b', accent: '#ffb148' },
+    { bg: '#ffc9c9', fur: '#fff', eye: '#8a2f3f', accent: '#ff6b8a' },
+    { bg: '#cfe4ff', fur: '#fff', eye: '#2f4f8a', accent: '#4f9bff' },
+    { bg: '#e1d6ff', fur: '#f6f1ff', eye: '#5a3f9a', accent: '#a897ff' },
+    { bg: '#cdf3e2', fur: '#fff', eye: '#2f7a5a', accent: '#4cc38a' },
+    { bg: '#ffe0c2', fur: '#ffe9d2', eye: '#7a4a2b', accent: '#ff9a4d' },
+    { bg: '#d6d9e6', fur: '#eceef6', eye: '#3b4258', accent: '#8b97b5' },
+  ];
+  let _hs = 0;
+  const _mail = String((me && me.email) || '');
+  for (let i = 0; i < _mail.length; i++) _hs = (_hs * 31 + _mail.charCodeAt(i)) >>> 0;
+  const _av = AV_SETS[_hs % AV_SETS.length];
+  const catStyle = `--bg:${_av.bg};--fur:${_av.fur};--eye:${_av.eye};--accent:${_av.accent}`;
+
+  // 面包屑当前页名
+  const EXTRA_NAME = { admin: '管理后台', terms: '服务条款', domain: '域名详情', register: '注册域名' };
+  const _all = [...SHELL_NAV, { key: 'admin', name: '管理后台' }];
+  const _cur = _all.find((x) => x.key === active);
+  const curName = (opt.title || (_cur && _cur.name) || EXTRA_NAME[active] || '控制台');
+
+  // 头像用邮箱首字符（圆形色块），比堆一长串邮箱更好看
+  const initial = me ? (me.email || '?').trim().charAt(0).toUpperCase() : '';
+  // 去掉 @ 域名部分，只显示用户名，避免手机上顶栏被撑爆
+  const shortName = me ? String(me.email || '').split('@')[0] : '';
+
+  host.innerHTML = `
+    <div class="topbar-in">
+      <button class="side-toggle" id="sideToggle" aria-label="菜单">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+
+      <div class="crumb">首页<span>/</span><b>${esc(curName)}</b></div>
+
+      <button class="top-search" id="topSearch" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:15px;height:15px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/></svg>
+        <span>搜索</span><kbd>Ctrl K</kbd>
+      </button>
+
+      ${me ? `
+        <button class="iconbtn" id="bellBtn" title="通知" aria-label="通知">
+          <svg viewBox="0 0 24 24">${SHELL_ICON.bell}</svg>
+          <b id="bellCount" hidden></b>
+        </button>
+        <div class="user-chip" id="userChip" title="${esc(me.email)}" style="display:flex;align-items:center;gap:0;background:none;border:none;padding:0;box-shadow:none">
+          <span class="top-av-wrap" id="topAvWrap" data-catstyle="${catStyle}"></span>
+        </div>
+        <div class="user-menu" id="userMenu">
+          <div class="um-head">
+            <span class="top-av-wrap" data-size="38" data-catstyle="${catStyle}"></span>
+            <div>
+              <div class="um-name">${esc(shortName)}</div>
+              <div class="um-mail">${esc(me.email)}</div>
+            </div>
+          </div>
+          <div class="um-body">
+            <a href="/dashboard">我的域名</a>
+            <a href="/rewards">奖励中心</a>
+            ${isAdmin ? '<a href="/admin">管理后台</a>' : ''}
+            <a href="/terms">服务条款</a>
+          </div>
+          <div class="um-foot">
+            <button class="btn sm ghost" id="btnLogout">退出登录</button>
+          </div>
+        </div>
+      ` : `<a class="btn sm" href="/">登录</a>`}
+    </div>`;
+
+  const items = [...SHELL_NAV, { key: 'admin', name: '管理后台', icon: 'admin', href: '/admin', group: '系统' }];
+  const visible = items.filter((it) => it.key !== 'admin' || isAdmin);
+  // 按 group 顺序分组渲染（参照后台面板模板）
+  const groups = [];
+  visible.forEach((it) => {
+    let g = groups.find((x) => x.name === it.group);
+    if (!g) { g = { name: it.group, items: [] }; groups.push(g); }
+    g.items.push(it);
+  });
+
+  side.innerHTML = `
+    <div class="side-brand">
+      <img src="${esc(brand.logoUrl)}" alt="">
+      <b data-brand-name>${esc(brand.siteName)}</b>
+    </div>
+    <div class="side-in">
+      ${groups.map((g) => `
+        <div class="side-group">
+          <div class="side-gtitle">${esc(g.name)}</div>
+          ${g.items.map((it) => shellItem(it, active, isAdmin)).join('')}
+        </div>`).join('')}
+      <div class="side-group">
+        <div class="side-gtitle">其它</div>
+        <a class="side-item" href="/terms"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.terms}</svg></span><span class="side-txt">服务条款</span></a>
+        ${me ? `<a class="side-item" href="#" id="sideLogout"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.logout}</svg></span><span class="side-txt">退出登录</span></a>` : ''}
+      </div>
+    </div>`;
+
+  const tg = document.getElementById('sideToggle');
+  const setSide = (open) => document.body.classList.toggle('side-open', open);
+  if (tg) tg.onclick = () => setSide(!document.body.classList.contains('side-open'));
+  // 移动端：点遮罩关闭、Esc 关闭、点菜单项后自动关闭（此前只能再点汉堡，容易「卡住」）
+  __docOn('click', (e) => {
+    if (!document.body.classList.contains('side-open')) return;
+    if (e.target.closest?.('#sideToggle') || e.target.closest?.('.sidebar')) {
+      if (e.target.closest?.('.side-item')) setSide(false);   // 选中导航后收起
+      return;
+    }
+    setSide(false);   // 点遮罩/其它区域 → 关闭
+  });
+  __docOn('keydown', (e) => {
+    if (e.key === 'Escape') { setSide(false); const mm = document.getElementById('userMenu'); if (mm) { mm.classList.remove('on'); document.getElementById('userChip')?.classList.remove('on'); } }
+  });
+
+  /* 用户菜单：点 chip 展开，点外部或按 Esc 关闭 */
+  const chip = document.getElementById('userChip');
+  const menu = document.getElementById('userMenu');
+  const setMenu = (open) => {
+    if (!chip || !menu) return;
+    chip.classList.toggle('on', open);
+    menu.classList.toggle('on', open);
+  };
+  if (chip && menu) {
+    chip.onclick = (e) => {
+      e.stopPropagation();
+      setMenu(!menu.classList.contains('on'));
+    };
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    __docOn('click', () => setMenu(false));
+    __docOn('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+  }
+
+  /* 顶栏猫爪：点一下放个小爱心 */
+  const pawBtn = document.getElementById('pawBtn');
+  if (pawBtn) pawBtn.onclick = () => pawBurst(pawBtn);
+
+  const out = async () => {
+    clearUserCache();
+    try { await api.post('/api/auth/logout', {}); } catch {}
+    location.href = '/?login=1';
+  };
+  const bl = document.getElementById('btnLogout');
+  if (bl) bl.onclick = out;
+  const sl = document.getElementById('sideLogout');
+  if (sl) sl.onclick = (e) => { e.preventDefault(); out(); };
+
+  /* 铃铛：站内通知（域名审核结果 / 登录 IP 提醒），点击展开下拉面板 */
+  const bellCount = document.getElementById('bellCount');
+  const bellBtn = document.getElementById('bellBtn');
+
+  function setBell(n) {
+    if (!bellCount) return;
+    if (n > 0) { bellCount.textContent = n > 99 ? '99+' : String(n); bellCount.hidden = false; }
+    else bellCount.hidden = true;
+  }
+
+  async function loadBell() {
+    try {
+      const r = await api.get('/api/notifications/unread');
+      setBell((r && r.unread) | 0);
+    } catch (e) {}
+  }
+
+  if (bellBtn) {
+    bellBtn.onclick = async (e) => {
+      e.stopPropagation();
+      let panel = document.getElementById('notifPanel');
+      if (panel) { panel.remove(); return; }
+
+      panel = document.createElement('div');
+      panel.id = 'notifPanel';
+      panel.className = 'notif-panel';
+      panel.innerHTML = '<div class="np-head">通知</div><div class="np-body"><div class="np-empty">加载中…</div></div>';
+      document.body.appendChild(panel);
+      // 定位到铃铛下方
+      const r = bellBtn.getBoundingClientRect();
+      panel.style.top = (r.bottom + 8) + 'px';
+      panel.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+      panel.onclick = (ev) => ev.stopPropagation();
+      __docOn('click', function close(ev) {
+        if (!panel.isConnected) return document.removeEventListener('click', close);
+        if (!panel.contains(ev.target)) { panel.remove(); document.removeEventListener('click', close); }
+      });
+
+      try {
+        const d = await api.get('/api/notifications?filter=all');
+        const items = (d && d.items) || [];
+        panel.querySelector('.np-body').innerHTML = items.length
+          ? items.map((n) => `
+            <div class="np-item ${n.read ? '' : 'unread'}" data-id="${n.id}">
+              <div class="np-t"><b>${esc(n.title)}</b><span class="np-tag">${esc(n.tag || '系统通知')}</span></div>
+              <div class="np-b">${esc(n.body)}</div>
+            </div>`).join('')
+          : '<div class="np-empty">暂无通知</div>';
+
+        panel.querySelectorAll('.np-item').forEach((it) => {
+          it.onclick = async () => {
+            const id = Number(it.dataset.id);
+            try { await api.post('/api/notifications/read', { id }); } catch (e) {}
+            it.classList.remove('unread');
+            loadBell();
+            const link = (items.find((x) => x.id === id) || {}).link;
+            if (link) location.href = link;
+          };
+        });
+
+        const head = panel.querySelector('.np-head');
+        const btn = document.createElement('button');
+        btn.className = 'np-readall';
+        btn.textContent = '全部已读';
+        btn.onclick = async () => {
+          try { await api.post('/api/notifications/read-all', {}); } catch (e) {}
+          panel.querySelectorAll('.np-item').forEach((x) => x.classList.remove('unread'));
+          setBell(0);
+        };
+        head.appendChild(btn);
+      } catch (err) {
+        const b = panel.querySelector('.np-body');
+        if (b) b.innerHTML = '<div class="np-empty">加载失败</div>';
+      }
+    };
+    loadBell();
+  }
+  /* 搜索框：Ctrl+K 聚焦页面内的域名搜索，聚焦不到就跳域名管理页 */
+  const ts = document.getElementById('topSearch');
+  if (ts) ts.onclick = () => {
+    const el = document.getElementById('label') || document.getElementById('qName') || document.getElementById('whoisName');
+    if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    else location.href = '/dashboard';
+  };
+  __docOn('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') {
+      e.preventDefault();
+      const el = document.getElementById('label') || document.getElementById('qName') || document.getElementById('whoisName');
+      if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      else location.href = '/dashboard';
+    }
+  });
+
+  /* 公告条：后台可配置，未配置则不渲染 */
+  try {
+    const cfg = await api.get('/api/config');
+    const notice = String(cfg.notice || cfg.announcement || '').trim();
+    const main = document.querySelector('.main');
+    if (notice && main && !document.getElementById('shellNotice')) {
+      const n = document.createElement('div');
+      n.id = 'shellNotice';
+      n.className = 'notice';
+      n.innerHTML = '<span class="n-ico"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg></span><span>' + esc(notice) + '</span>';
+      const first = main.querySelector('.main-in') || main.firstElementChild;
+      if (first) main.insertBefore(n, first);
+      else main.insertBefore(n, main.firstChild);
+    }
+  } catch {}
+
+  /* 页脚 */
+  try {
+    const main = document.querySelector('.main');
+    if (main && !document.getElementById('shellFoot')) {
+      const f = document.createElement('footer');
+      f.id = 'shellFoot';
+      f.className = 'main-foot';
+      f.innerHTML = '<b>MeoyDomain</b> · 二级域名分发与 DNS 管理 · <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer" style="color:inherit">GitHub</a>';
+      main.appendChild(f);
+    }
+  } catch {}
+
+  mountDecor();
+  mountMotion();
+
+  // 顶栏头像与个人资料页保持同源：先显示默认 Miku，拿到已保存头像后再就地替换
+  renderAvatars('');
+  api.get('/api/profile').then((d) => {
+    const av = (d && d.profile && d.profile.avatar) || '';
+    if (av) renderAvatars(av);
+  }).catch(() => {});
+
+  bindPrefetch(side);
+  // 空闲时预取其余常用页（不抢占当前页资源）
+  idle(() => ['/dashboard', '/whois', '/checkin', '/rewards', '/chat'].forEach(prefetch));
+
+  // 入场动画
+  document.body.classList.add('shell-ready');
+  return me;
+}
+
+/** requestIdleCallback 兜底 */
+export function idle(fn) {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout: 2500 });
+  else setTimeout(fn, 1200);
+}
+
+/* ── 把运行时挂到 window，供内联 onclick / 旧代码使用 ── */
+const R: Record<string, any> = {
+  api, esc, fmtTime, fmtDate, toast, openModal, closeModal, loadBranding, applyBranding,
+  applyFonts, STATUS_MAP, statusBadge, copyText, quotaText, mountNav, mountShell,
+  mountSiteFooter, logoHtml, wallpaperSwitchHtml, applyWallpaper, mountWallpaper, mountSakura,
+  DEFAULT_BRAND, CN_FONTS, WALLPAPERS, PAW_SVG, SHELL_NAV, SHELL_ICON, prefetch,
+  readUserCache, writeUserCache, clearUserCache, idle, renderAvatars, catFaceFallback,
+  mountDecor, mountMotion, applyBrand, pawBurst, shellItem, refreshRuntime, cleanupPage, navigate,
+};
+(window as any).MeoyRuntime = R;
+Object.assign(window, {
+  api, esc, fmtTime, fmtDate, toast, openModal, closeModal, loadBranding, applyBranding,
+  STATUS_MAP, statusBadge, copyText, quotaText, mountShell, mountNav, mountSiteFooter,
+  MeoyRenderAvatars, MeoyRenderCatFaces, refreshRuntime, cleanupPage, navigate,
+});
