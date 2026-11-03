@@ -60,8 +60,8 @@ export default function CheckinPage() {
       
       
       
-      <style>
-      .coin { display:inline-flex; align-items:baseline; gap:7px; justify-content:center; }
+      <style>{`
+.coin { display:inline-flex; align-items:baseline; gap:7px; justify-content:center; }
       .coin-num {
         font-family: var(--mono);
         font-size: 44px; font-weight: 700;
@@ -76,7 +76,7 @@ export default function CheckinPage() {
         40%  { transform: scale(1.16); }
         100% { transform: scale(1); }
       }
-      </style>
+`}</style>
     </div>
   );
 }

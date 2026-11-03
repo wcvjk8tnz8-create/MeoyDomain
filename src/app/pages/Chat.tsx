@@ -95,8 +95,8 @@ export default function ChatPage() {
       
       
       
-      <style>
-      .post-row {
+      <style>{`
+.post-row {
         padding: 11px 0;
         border-bottom: 1px solid rgba(123, 108, 246, .1);
         transition: background .16s ease;
@@ -116,7 +116,7 @@ export default function ChatPage() {
         border-bottom: 1px solid rgba(123, 108, 246, .1);
       }
       .reply-row:last-child { border-bottom: none; }
-      </style>
+`}</style>
     </div>
   );
 }
