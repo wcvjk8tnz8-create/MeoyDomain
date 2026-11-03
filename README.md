@@ -657,3 +657,38 @@ DPR 上限 1.75 以照顾移动端性能；主题切换后自动重取配色。
 
 `scripts/ensure-r2.mjs` 会自动寻找/创建桶并**自动写入 `[[r2_buckets]]` 绑定**；
 失败（权限不足）则移除绑定并降级，不阻断部署。
+
+---
+
+## Spaceship 域名注册商（自动发现根域名）
+
+后台 → 站点设置 → **Spaceship 域名注册商**，填入后即可自动发现账号下的域名：
+
+| 项 | 说明 |
+|---|---|
+| API 地址 | 默认 `https://spaceship.dev/api`，可改成代理地址 |
+| API Key | Spaceship → API Manager 创建，需 **domains 读取权限** |
+| API Secret | 同上 |
+
+流程：**保存 → 测试连接 → 拉取我的域名 → 弹窗列出账号下全部域名 → 勾选要添加的 → 添加选中**。
+拉取是只读的，**不注册、不续费、不改 NS**，避免误触资金操作。
+
+配置也可用环境变量覆盖（优先级更高）：
+`SPACESHIP_API_URL` / `SPACESHIP_API_KEY` / `SPACESHIP_API_SECRET`。
+Key 与 Secret 只存服务端，后台只回显掩码。
+
+添加后的根域名存进 `settings` 表的 `root_domains_extra` / `cf_zone_ids_extra`，
+每个请求由中间件合并进 `ROOT_DOMAINS` / `CF_ZONE_IDS`，因此**无需改环境变量、无需重新部署**。
+接口：
+
+```
+POST /api/admin/spaceship/test     测试连通性
+GET  /api/admin/spaceship/domains 拉取域名（标注已添加 / Zone 状态）
+POST /api/admin/spaceship/add     勾选添加（可附带 Cloudflare Zone ID）
+DELETE /api/admin/spaceship/roots/:domain  移除动态根域名
+GET  /api/admin/roots             当前全部根域名（含来源）
+```
+
+> 官方规范：`GET /v1/domains?take=100&skip=0`，Header `X-Api-Key` + `X-Api-Secret`，
+> 响应 `{ items, total }`。列表限流 300 次 / 300 秒，`take` 最大 100，本项目自动翻页（最多 5 页）。
+> 若新域名要用 Cloudflare 做 DNS 解析，需把该域名 NS 指向 Cloudflare 并填写对应 Zone ID。

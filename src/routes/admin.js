@@ -8,6 +8,8 @@ import { ensurePoints, addPoints } from '../lib/points.js';
 import { pointRules } from './points.js';
 import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColumns, migrateLegacyPerpetual } from '../lib/expiry.js';
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
+import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
+import { addExtraRoots, removeExtraRoot, effectiveRootList, loadExtra } from '../lib/rootStore.js';
 
 const app = new Hono();
 
@@ -413,7 +415,7 @@ app.get('/settings', async (c) => {
   const raw = Object.fromEntries(results.map((r) => [r.key, r.value]));
 
   // 敏感项：不回传明文，只回传「是否已配置 + 尾号」，前端显示为占位符
-  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret', 'dns_api_key', 'dns_api_secret', 'mail_api_key'];
+  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret', 'dns_api_key', 'dns_api_secret', 'mail_api_key', 'spaceship_api_key', 'spaceship_api_secret'];
   const items = { ...raw };
   for (const k of SENSITIVE) delete items[k];
 
@@ -453,6 +455,21 @@ app.get('/settings', async (c) => {
         && (raw.mail_api_key || String(c.env.MAIL_API_KEY || '').trim())
         && String(raw.mail_from || c.env.MAIL_FROM || '').trim()),
     },
+    // Spaceship 域名注册商（Key/Secret 只回掩码）
+    spaceship: {
+      url: String(raw.spaceship_api_url || c.env.SPACESHIP_API_URL || '').trim(),
+      keySet: !!(raw.spaceship_api_key || String(c.env.SPACESHIP_API_KEY || '').trim()),
+      secretSet: !!(raw.spaceship_api_secret || String(c.env.SPACESHIP_API_SECRET || '').trim()),
+      keyMasked: mask(raw.spaceship_api_key || String(c.env.SPACESHIP_API_KEY || '').trim()),
+      secretMasked: mask(raw.spaceship_api_secret || String(c.env.SPACESHIP_API_SECRET || '').trim()),
+      fromEnv: !!(String(c.env.SPACESHIP_API_KEY || '').trim() && String(c.env.SPACESHIP_API_SECRET || '').trim()),
+      enabled: !!(String(raw.spaceship_api_url || c.env.SPACESHIP_API_URL || '').trim()
+        && (raw.spaceship_api_key || String(c.env.SPACESHIP_API_KEY || '').trim())
+        && (raw.spaceship_api_secret || String(c.env.SPACESHIP_API_SECRET || '').trim())),
+    },
+    // 当前生效的根域名（含后台导入的）
+    rootDomains: listRoots(c.env).map((r) => r.domain),
+
     // R2 头像公网地址（留空则用 Worker 代理 /api/avatar/<key>）
     r2PublicUrl: String(raw.r2_public_url || c.env.R2_PUBLIC_URL || '').trim(),
     r2FromEnv: !!String(c.env.R2_PUBLIC_URL || '').trim(),
@@ -498,6 +515,21 @@ app.post('/settings', async (c) => {
   // 域名有效期规则
   if (body.domainValidDays !== undefined) await set('domain_valid_days', String(body.domainValidDays || '').trim());
   if (body.renewWindowDays !== undefined) await set('renew_window_days', String(body.renewWindowDays || '').trim());
+
+  // Spaceship 域名注册商 API（只读：拉取账号下域名）
+  if (body.spaceshipApiUrl !== undefined) {
+    const u = String(body.spaceshipApiUrl || '').trim().replace(/\/$/, '').slice(0, 300);
+    if (u && !/^https?:\/\//i.test(u)) return fail(c, 'Spaceship API 地址需以 http:// 或 https:// 开头');
+    await set('spaceship_api_url', u);
+  }
+  if (body.spaceshipApiKey !== undefined) {
+    const k = String(body.spaceshipApiKey || '').trim();
+    if (k && !k.startsWith('••')) await set('spaceship_api_key', k.slice(0, 200));
+  }
+  if (body.spaceshipApiSecret !== undefined) {
+    const k = String(body.spaceshipApiSecret || '').trim();
+    if (k && !k.startsWith('••')) await set('spaceship_api_secret', k.slice(0, 200));
+  }
 
   // 邮件与验证码（Resend / Brevo）
   if (body.mailProvider !== undefined) {
@@ -599,6 +631,86 @@ app.post('/settings/reset-logo', async (c) => {
   }
   await audit(c, u.id, 'admin.settings', 'site', '恢复默认 Logo');
   return ok(c, {});
+});
+
+
+// ══════════════════════════════════════════════════════════
+//  Spaceship 域名注册商：拉取账号域名 → 管理员勾选添加为根域名
+//  全部只读，不注册 / 不续费 / 不改 NS（避免误触资金操作）
+// ══════════════════════════════════════════════════════════
+
+/** 测试连通性（只取 1 条，不消耗多少额度） */
+app.post('/spaceship/test', async (c) => {
+  const r = await testSpaceship(c.env);
+  if (!r.ok) return fail(c, r.error, r.notConfigured ? 400 : 502);
+  await audit(c, c.get('user').id, 'admin.spaceship.test', 'spaceship', `域名数=${r.total}`);
+  return ok(c, { total: r.total, base: r.base });
+});
+
+/** 拉取账号下的域名，并标注哪些已经是本站根域名 */
+app.get('/spaceship/domains', async (c) => {
+  const cfg = await spaceshipConfig(c.env);
+  if (!spaceshipEnabled(cfg)) {
+    return fail(c, '未配置 Spaceship API 凭证，请先在「站点设置」填写 API Key 与 Secret', 400, { notConfigured: true });
+  }
+  const r = await listSpaceshipDomains(c.env);
+  if (!r.ok) return fail(c, r.error, r.notConfigured ? 400 : 502);
+
+  const roots = await effectiveRootList(c.env);
+  const known = new Map(roots.map((x) => [x.domain, x.zoneId || '']));
+  const items = r.domains.map((d) => ({
+    ...d,
+    alreadyAdded: known.has(d.domain),
+    zoneId: known.get(d.domain) || '',
+    hasZone: !!known.get(d.domain),
+  }));
+  await audit(c, c.get('user').id, 'admin.spaceship.list', 'spaceship', `拉取 ${items.length} 个域名`);
+  return ok(c, {
+    items,
+    total: r.total,
+    base: r.base,
+    configuredRoots: roots.map((x) => x.domain),
+  });
+});
+
+/** 把勾选的域名添加为根域名（可附带 Cloudflare Zone ID） */
+app.post('/spaceship/add', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const entries = Array.isArray(body.domains) ? body.domains : [];
+  if (!entries.length) return fail(c, '请至少选择一个域名');
+  if (entries.length > 100) return fail(c, '一次最多添加 100 个域名');
+
+  const r = await addExtraRoots(c.env, entries);
+  if (!r.added.length) {
+    return fail(c, r.invalid.length
+      ? '域名格式不正确：' + r.invalid.join('、')
+      : '所选域名都已添加过了');
+  }
+  await audit(c, c.get('user').id, 'admin.spaceship.add', 'spaceship', '添加根域名：' + r.added.join(','));
+  return ok(c, {
+    added: r.added,
+    skipped: r.skipped,
+    invalid: r.invalid,
+    rootDomains: r.roots,
+    note: '已生效。若要做 DNS 解析，请把该域名的 NS 指向 Cloudflare 并填写对应 Zone ID。',
+  });
+});
+
+/** 移除一个后台导入的根域名（环境变量里的不受影响） */
+app.delete('/spaceship/roots/:domain', async (c) => {
+  const r = await removeExtraRoot(c.env, c.req.param('domain'));
+  if (!r.removed) return fail(c, '该域名不是通过 Spaceship 导入的，或已不存在', 404);
+  await audit(c, c.get('user').id, 'admin.spaceship.remove', 'spaceship', '移除根域名：' + c.req.param('domain'));
+  return ok(c, { rootDomains: r.roots });
+});
+
+/** 当前根域名列表（含来源，便于后台展示） */
+app.get('/roots', async (c) => {
+  const extra = await loadExtra(c.env);
+  const roots = await effectiveRootList(c.env);
+  return ok(c, {
+    items: roots.map((r) => ({ ...r, dynamic: extra.domains.includes(r.domain) })),
+  });
 });
 
 export default app;

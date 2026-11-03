@@ -65,6 +65,68 @@ const HEADS = {
   audit: ['时间', '用户', '动作', '对象', '详情'],
 };
 
+
+/* ---------- Spaceship 域名选择弹窗 ----------
+   拉取后不直接添加，先把账号下所有域名列出来让管理员勾选，
+   并可顺手填 Cloudflare Zone ID（做 DNS 解析时需要）。 */
+function openSpaceshipPicker(items, showRoots) {
+  let mask = document.getElementById('spMask');
+  if (mask) mask.remove();
+  mask = document.createElement('div');
+  mask.id = 'spMask';
+  mask.style.cssText = 'position:fixed;inset:0;z-index:200;background:rgba(20,28,50,.45);display:grid;place-items:center;padding:16px';
+  const rows = items.map((it, i) => `
+    <label class="sp-row" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);cursor:${it.alreadyAdded ? 'default' : 'pointer'}">
+      <input type="checkbox" class="sp-chk" data-i="${i}" ${it.alreadyAdded ? 'disabled' : ''} style="width:16px;height:16px;flex-shrink:0">
+      <span style="flex:1;min-width:0">
+        <b class="mono">${esc(it.domain)}</b>
+        ${it.alreadyAdded ? '<span class="badge ok" style="margin-left:8px">已添加</span>' : ''}
+        <div class="hint" style="margin-top:2px">${it.expirationDate ? '到期 ' + esc(String(it.expirationDate).slice(0, 10)) : 'Spaceship 账号域名'}${it.hasZone ? ' · 已配 Zone' : ''}</div>
+      </span>
+      ${it.alreadyAdded ? '' : `<input class="input sp-zone" data-i="${i}" placeholder="CF Zone ID（可选）" style="width:170px;padding:6px 9px;font-size:12px">`}
+    </label>`).join('');
+  mask.innerHTML = `
+    <div style="background:#fff;border-radius:18px;width:min(640px,96vw);max-height:86vh;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(20,28,50,.25);overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px">
+        <b style="font-size:16px">从 Spaceship 添加根域名</b>
+        <span class="dim" style="margin-left:auto;font-size:12px">共 ${items.length} 个</span>
+      </div>
+      <div style="padding:6px 20px;overflow-y:auto;flex:1">
+        ${items.length ? rows : '<div class="empty" style="padding:40px 0">账号下没有域名</div>'}
+        <div class="hint" style="padding:12px 4px">勾选后即为本站可用根域名。若要用 Cloudflare 做 DNS 解析，请把该域名 NS 指向 Cloudflare 并填入对应 Zone ID（也可稍后在环境变量配置）。</div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" id="spCancel">取消</button>
+        <button class="btn primary" id="spAdd">添加选中</button>
+      </div>
+    </div>`;
+  document.body.appendChild(mask);
+
+  const close = () => mask.remove();
+  mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+  document.getElementById('spCancel').onclick = close;
+  document.getElementById('spAdd').onclick = async () => {
+    const picked = [];
+    mask.querySelectorAll('.sp-chk:checked').forEach((cb) => {
+      const i = Number(cb.dataset.i);
+      const z = mask.querySelector('.sp-zone[data-i="' + i + '"]');
+      picked.push({ domain: items[i].domain, zoneId: z ? z.value.trim() : '' });
+    });
+    if (!picked.length) return toast('请先勾选要添加的域名', 'err');
+    const btn = document.getElementById('spAdd');
+    btn.disabled = true; btn.textContent = '添加中…';
+    try {
+      const r = await api.post('/api/admin/spaceship/add', { domains: picked });
+      toast('已添加：' + r.added.join('、') + (r.skipped.length ? '（跳过已存在 ' + r.skipped.length + ' 个）' : ''));
+      if (showRoots) showRoots(r.rootDomains);
+      close();
+    } catch (e) {
+      btn.disabled = false; btn.textContent = '添加选中';
+      toast(e.message, 'err');
+    }
+  };
+}
+
 async function load() {
   const s = await api.get('/api/admin/stats');
   document.getElementById('stats').innerHTML = [
@@ -384,6 +446,22 @@ async function load() {
             </select>
             <div class="hint">本人与管理员始终可见完整地址，不受此项影响。</div>
           </div>
+          <div class="field">
+            <label>Spaceship 域名注册商（自动发现域名）</label>
+            <div class="grid2">
+              <div><span class="dim">API 地址</span><input id="sSpUrl" placeholder="https://spaceship.dev/api"></div>
+              <div><span class="dim">API Key</span><input id="sSpKey" type="text" autocomplete="off" placeholder="留空则不修改"></div>
+            </div>
+            <div class="field" style="margin:8px 0 0">
+              <span class="dim">API Secret</span><input id="sSpSecret" type="password" autocomplete="new-password" placeholder="留空则不修改">
+              <div class="hint" id="spHint">在 Spaceship → API Manager 创建 Key（需 domains 读取权限）。本站只读取域名列表，不注册、不续费、不改 NS。</div>
+            </div>
+            <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+              <button class="btn sm" id="spTest" type="button">测试连接</button>
+              <button class="btn sm primary" id="spFetch" type="button">拉取我的域名</button>
+            </div>
+            <div class="hint" id="spRoots" style="margin-top:8px">当前根域名：读取中…</div>
+          </div>
           <div class="alert info" style="margin-bottom:12px">
             Logo 可以是站内路径（<span class="mono">/img/logo.jpg</span>）或外链图片地址（<span class="mono">https://…</span>）。
             想换成本地图，把图片放进仓库的 <span class="mono">public/img/</span> 再推一次即可。<br>
@@ -433,6 +511,9 @@ async function load() {
           mailApiKey: document.getElementById('sMailKey').value,
           mailVerifyRequired: document.getElementById('sMailVerifyRequired').checked,
           r2PublicUrl: document.getElementById('sR2PublicUrl').value,
+          spaceshipApiUrl: document.getElementById('sSpUrl').value,
+          spaceshipApiKey: document.getElementById('sSpKey').value,
+          spaceshipApiSecret: document.getElementById('sSpSecret').value,
         });
         toast('已保存，刷新页面后生效');
         // 立即刷新导航 Logo
@@ -538,6 +619,58 @@ async function load() {
       } else {
         hint.innerHTML = '留空则使用公开模式（免认证，官方限制 <b>2 次/分钟/IP</b>）。填写后额度更高、查询更稳定。';
       }
+    }
+
+    /* ---------- Spaceship：配置状态 + 拉取域名 + 勾选添加 ---------- */
+    {
+      const sp = d.spaceship || {};
+      const u = document.getElementById('sSpUrl');
+      const k = document.getElementById('sSpKey');
+      const sc = document.getElementById('sSpSecret');
+      const hint = document.getElementById('spHint');
+      const rootsEl = document.getElementById('spRoots');
+      if (u) u.value = sp.url || '';
+      if (sp.fromEnv) {
+        [u, k, sc].forEach((e) => { if (e) e.disabled = true; });
+        if (k) k.value = sp.keyMasked || '';
+        if (hint) hint.innerHTML = '<span class="badge ok">已由环境变量配置</span> 后台不可修改。';
+      } else if (sp.enabled) {
+        if (k) k.placeholder = sp.keyMasked || '已配置，留空不修改';
+        if (sc) sc.placeholder = '已配置，留空不修改';
+        if (hint) hint.innerHTML = '<span class="badge ok">已配置</span> 点「拉取我的域名」即可查看账号下的域名并选择添加。';
+      } else if (hint) {
+        hint.innerHTML = '未配置。填写 API Key / Secret 并保存后即可自动发现域名。';
+      }
+      const showRoots = (list) => {
+        if (rootsEl) rootsEl.textContent = '当前根域名：' + ((list && list.length) ? list.join('、') : '（未配置）');
+      };
+      showRoots(d.rootDomains);
+
+      const testBtn = document.getElementById('spTest');
+      if (testBtn) testBtn.onclick = async () => {
+        testBtn.disabled = true;
+        try {
+          const r = await api.post('/api/admin/spaceship/test', {});
+          toast('连接成功，账号下共 ' + r.total + ' 个域名');
+        } catch (e) { toast(e.message, 'err'); }
+        testBtn.disabled = false;
+      };
+
+      const fetchBtn = document.getElementById('spFetch');
+      if (fetchBtn) fetchBtn.onclick = async () => {
+        fetchBtn.disabled = true;
+        fetchBtn.textContent = '拉取中…';
+        try {
+          const r = await api.get('/api/admin/spaceship/domains');
+          fetchBtn.disabled = false;
+          fetchBtn.textContent = '拉取我的域名';
+          openSpaceshipPicker(r.items || [], showRoots);
+        } catch (e) {
+          fetchBtn.disabled = false;
+          fetchBtn.textContent = '拉取我的域名';
+          toast(e.message, 'err');
+        }
+      };
     }
     return;
   }

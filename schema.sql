@@ -416,3 +416,17 @@ INSERT OR IGNORE INTO settings(key, value) VALUES ('mail_api_key', '');       --
 INSERT OR IGNORE INTO settings(key, value) VALUES ('mail_verify_required', '0'); -- 注册是否需要验证码（1=需要）
 -- R2 头像公网地址（留空则用 Worker 代理 /api/avatar/<key>）
 INSERT OR IGNORE INTO settings(key, value) VALUES ('r2_public_url', '');
+
+-- ══════════════════════════════════════════════════════════
+--  Spaceship 域名注册商（只读：拉取账号下域名并添加为根域名）
+--  后台「站点设置 → Spaceship」可填；也可用环境变量
+--  SPACESHIP_API_URL / SPACESHIP_API_KEY / SPACESHIP_API_SECRET 覆盖
+-- ══════════════════════════════════════════════════════════
+INSERT OR IGNORE INTO settings(key, value) VALUES ('spaceship_api_url', 'https://spaceship.dev/api');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('spaceship_api_key', '');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('spaceship_api_secret', '');
+
+-- 后台导入的根域名（无需改环境变量；中间件会合并进 ROOT_DOMAINS）
+-- 格式：逗号分隔域名 / "域名:ZoneID" 对
+INSERT OR IGNORE INTO settings(key, value) VALUES ('root_domains_extra', '');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('cf_zone_ids_extra', '');

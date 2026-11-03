@@ -1,4 +1,5 @@
 import { listRoots } from './lib/roots.js';
+import { mergeRootEnv } from './lib/rootStore.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -70,6 +71,19 @@ app.use('*', async (c, next) => {
 });
 
 app.use('*', attachUser);
+
+/**
+ * 动态根域名：把后台「Spaceship 导入」添加的域名合并进本次请求的 env。
+ * 这样 roots.ts（纯函数）与所有既有调用点都不用改，配置保存后下一个请求即生效。
+ * 无动态配置时不做任何赋值，零开销。
+ */
+app.use('*', async (c, next) => {
+  try {
+    const merged = await mergeRootEnv(c.env);
+    if (merged) c.env = merged;   // Hono Context.env 是普通属性，可安全替换
+  } catch { /* settings 表尚未建立等异常：降级走原环境变量，不影响站点 */ }
+  return next();
+});
 
 // 健康检查
 app.get('/api/health', (c) =>
