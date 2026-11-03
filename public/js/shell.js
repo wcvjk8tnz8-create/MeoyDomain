@@ -66,14 +66,77 @@ const SPARKS = [
   { l: '92%', t: '78%', fs: 12, d: 2 },
 ];
 
-/** 挂载 v2 装饰：精灵图 / 闪光 / 猫娘吉祥物（只挂载一次） */
+/** 挂载 v2 装饰：精灵图 / 闪光 / 猫娘吉祥物（只挂载一次）
+    文档风主题（theme-doc.css）下跳过闪光与吉祥物：它们已被 CSS 隐藏，
+    再插入 DOM 只是白白增加节点。 */
 function mountDecor() {
   if (document.getElementById('nekoSprite')) return;
+  const plain = document.documentElement.getAttribute('data-skin') === 'doc';
   const wrap = document.createElement('div');
-  wrap.innerHTML = NEKO_SPRITE +
-    SPARKS.map((p) => `<span class="spark" style="left:${p.l};top:${p.t};font-size:${p.fs}px;animation-delay:${p.d}s">✦</span>`).join('');
+  wrap.innerHTML = NEKO_SPRITE + (plain ? '' :
+    SPARKS.map((p) => `<span class="spark" style="left:${p.l};top:${p.t};font-size:${p.fs}px;animation-delay:${p.d}s">✦</span>`).join(''));
   while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
+}
 
+/* ══════════════════════════════════════════════════════════
+   动效引擎（文档风）
+   - 顶部 2px 滚动进度条
+   - 元素滚动到视口才播入场（IntersectionObserver）
+   - 表格行错峰淡入
+   只动 transform / opacity，不触发重排；reduced-motion 下全部跳过
+   ══════════════════════════════════════════════════════════ */
+function mountMotion() {
+  const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* 滚动进度条 */
+  if (!REDUCED) {
+    let bar = document.getElementById('docProgress');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'docProgress';
+      bar.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(bar);
+    }
+    const onScroll = () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  /* 错峰入场 */
+  const io = (!REDUCED && 'IntersectionObserver' in window)
+    ? new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        });
+      }, { threshold: .06, rootMargin: '0px 0px -28px 0px' })
+    : null;
+
+  const play = (root) => {
+    const scope = root || document;
+    scope.querySelectorAll('tbody').forEach((tb, i) => {
+      Array.prototype.forEach.call(tb.rows, (tr, j) => {
+        tr.style.transitionDelay = (j * 55) + 'ms';
+      });
+      tb.classList.add('in');
+    });
+    const reveal = scope.querySelectorAll('.reveal');
+    if (!reveal.length) return;
+    if (!io) { reveal.forEach((el) => el.classList.add('in')); return; }
+    reveal.forEach((el, i) => {
+      el.style.transitionDelay = (i * 45) + 'ms';
+      io.observe(el);
+    });
+  };
+
+  play(document);
+  // 内容异步渲染后（列表/表格晚于骨架出现），延迟再扫一遍
+  setTimeout(() => play(document), 400);
+  setTimeout(() => play(document), 1200);
 }
 
 
@@ -501,6 +564,7 @@ async function mountShell(active, opt = {}) {
   } catch {}
 
   mountDecor();
+  mountMotion();
 
   // 顶栏头像与个人资料页保持同源：拉取已保存的自定义头像，没有则回落猫脸
   renderAvatars('');
