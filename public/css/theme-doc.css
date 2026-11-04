@@ -769,43 +769,45 @@ body:has(.main) .site-foot { margin-left: var(--sb-w) !important; }
    展开成非法颜色被浏览器丢弃 → 面板透明、后面的欢迎条文字透上来。
    这里显式声明不透明纯色，并顺手抹掉渐变 / 毛玻璃 / 彩色高亮。 */
 .notif-panel {
-  background: hsl(var(--card)) !important;
-  border: 1px solid hsl(var(--border)) !important;
+  background: #fff !important;                       /* 兜底：令牌缺失时仍是实心 */
+  background: hsl(var(--card, 0 0% 100%)) !important;
+  border: 1px solid hsl(var(--border, 220 13% 91%)) !important;
   border-radius: var(--radius) !important;
   box-shadow: 0 10px 30px hsl(215 25% 20% / .12) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  color: hsl(var(--foreground)) !important;
+  color: hsl(var(--foreground, 220 9% 10%)) !important;
+  isolation: isolate !important;
 }
 .notif-panel .np-head {
-  background: hsl(var(--secondary)) !important;
-  border-bottom: 1px solid hsl(var(--border)) !important;
+  background: hsl(var(--secondary, 220 14% 96%)) !important;
+  border-bottom: 1px solid hsl(var(--border, 220 13% 91%)) !important;
   font-family: var(--sans) !important;
   font-size: 14px !important;
 }
 .notif-panel .np-readall {
-  color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary, 224 79% 47%)) !important;
   font-size: 12px !important;
 }
-.notif-panel .np-readall:hover { background: hsl(var(--primary) / .08) !important; }
-.notif-panel .np-body { background: hsl(var(--card)) !important; }
+.notif-panel .np-readall:hover { background: hsl(var(--primary, 224 79% 47%) / .08) !important; }
+.notif-panel .np-body { background: hsl(var(--card, 0 0% 100%)) !important; }
 .notif-panel .np-item { border-radius: 4px !important; }
-.notif-panel .np-item:hover { background: hsl(var(--secondary)) !important; }
-.notif-panel .np-item.unread { background: hsl(var(--primary) / .06) !important; }
-.notif-panel .np-item.unread:hover { background: hsl(var(--primary) / .10) !important; }
-.notif-panel .np-t b { color: hsl(var(--foreground)) !important; }
+.notif-panel .np-item:hover { background: hsl(var(--secondary, 220 14% 96%)) !important; }
+.notif-panel .np-item.unread { background: hsl(var(--primary, 224 79% 47%) / .06) !important; }
+.notif-panel .np-item.unread:hover { background: hsl(var(--primary, 224 79% 47%) / .10) !important; }
+.notif-panel .np-t b { color: hsl(var(--foreground, 220 9% 10%)) !important; }
 .notif-panel .np-tag {
-  background: hsl(var(--secondary)) !important;
-  color: hsl(var(--primary)) !important;
+  background: hsl(var(--secondary, 220 14% 96%)) !important;
+  color: hsl(var(--primary, 224 79% 47%)) !important;
   border-radius: 3px !important;
 }
-.notif-panel .np-b { color: hsl(var(--muted-foreground)) !important; }
-.notif-panel .np-empty { color: hsl(var(--muted-foreground)) !important; }
-/* 深色下基础层的写死色会串味，统一收口到令牌 */
+.notif-panel .np-b { color: hsl(var(--muted-foreground, 220 6% 43%)) !important; }
+.notif-panel .np-empty { color: hsl(var(--muted-foreground, 220 6% 43%)) !important; }
+/* 深色下基础层的写死色会串味，统一收口到令牌（深色 --card 自带深色值） */
 [data-theme="dark"] .notif-panel,
-[data-theme="dark"] .notif-panel .np-body { background: hsl(var(--card)) !important; }
-[data-theme="dark"] .notif-panel .np-head { background: hsl(var(--secondary)) !important; }
-[data-theme="dark"] .notif-panel .np-item:hover { background: hsl(var(--secondary)) !important; }
-[data-theme="dark"] .notif-panel .np-item.unread { background: hsl(var(--primary) / .16) !important; }
-[data-theme="dark"] .notif-panel .np-tag { background: hsl(var(--secondary)) !important; }
-[data-theme="dark"] .notif-panel .np-b { color: hsl(var(--muted-foreground)) !important; }
+[data-theme="dark"] .notif-panel .np-body { background: hsl(var(--card, 220 12% 9%)) !important; }
+[data-theme="dark"] .notif-panel .np-head { background: hsl(var(--secondary, 220 10% 14%)) !important; }
+[data-theme="dark"] .notif-panel .np-item:hover { background: hsl(var(--secondary, 220 10% 14%)) !important; }
+[data-theme="dark"] .notif-panel .np-item.unread { background: hsl(var(--primary, 224 79% 47%) / .16) !important; }
+[data-theme="dark"] .notif-panel .np-tag { background: hsl(var(--secondary, 220 10% 14%)) !important; }
+[data-theme="dark"] .notif-panel .np-b { color: hsl(var(--muted-foreground, 220 8% 62%)) !important; }
