@@ -20,9 +20,11 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
     var el = document.getElementById('aiRootTip');
     if (!el) return;
     var bits = [];
-    if (AI_ROOTS.indexOf(d) >= 0) bits.push('该后缀由 AI 自动审核，通过后立即开通（无需人工同意）');
+    var inAi = AI_ROOTS.indexOf('*') >= 0 || AI_ROOTS.indexOf(d) >= 0;
+    if (inAi) bits.push('该后缀由 AI 自动审核，通过后立即开通（无需人工同意）');
+    else if (d) bits.push('该后缀不在 AI 自动审核名单内，申请会进入人工审核');
     if (DNS_UNLIMITED.indexOf(d) >= 0) bits.push('DNS 记录数不限');
-    el.textContent = bits.length ? '✨ ' + bits.join(' · ') : '';
+    el.textContent = bits.length ? (inAi ? '✨ ' : 'ℹ ') + bits.join(' · ') : '';
     el.style.display = bits.length ? '' : 'none';
   }
   var APPLY_PAUSED = false;
@@ -261,11 +263,14 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       localStorage.setItem('meoy_agree_use', '1');
       var r = await api.post('/api/subdomains', { label: label, note: note, root: currentRoot() });
       const rejected = r.status === 'rejected';
+      var pendingMsg = r.aiSkipText
+        ? '已提交，等待管理员审核（AI 未自动审核：' + r.aiSkipText + '）'
+        : '已提交，等待管理员审核';
       toast(rejected
         ? 'AI 审核未通过：' + (r.aiReason || '请修改用途说明后再试')
         : r.status === 'approved'
           ? (r.aiReviewed ? 'AI 审核通过，已自动开通' : '申请成功，已开通')
-          : '已提交，等待管理员审核', rejected ? 'err' : 'ok');
+          : pendingMsg, rejected ? 'err' : 'ok');
       if (rejected) {
         // 驳回时保留输入，方便用户改写用途说明重新提交；不跳转
         document.getElementById('checkTip').innerHTML = '<span style="color:var(--danger)">'
@@ -275,7 +280,12 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       }
       document.getElementById('label').value = '';
       document.getElementById('note').value = '';
-      document.getElementById('checkTip').innerHTML = '';
+      document.getElementById('checkTip').innerHTML = (r.status === 'pending' && r.aiSkipText)
+        ? '<span style="color:var(--warn)">AI 未自动审核：' + esc(r.aiSkipText)
+          + (r.aiAttempts && r.aiAttempts.length
+            ? '<br><span class="mono" style="font-size:12px">' + esc(r.aiAttempts.join(' | ').slice(0, 300)) + '</span>' : '')
+          + '</span>'
+        : '';
       document.getElementById('costBox').style.display = 'none';
       loadPending();
       // 新版四步向导存在时停在第四步展示结果；没有时才沿用旧的自动跳转

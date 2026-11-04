@@ -44,6 +44,40 @@ export interface AiConfig {
   configured: boolean;
 }
 
+/** AI 未触发的精确原因。此前一律静默返回 null，用户只看到「等待审核」却不知道为什么。 */
+export type AiSkipReason =
+  | 'disabled' | 'no-key' | 'root-not-listed'
+  | 'all-models-failed' | 'parse-failed' | 'timeout';
+
+export interface AiDiag {
+  applies: boolean;
+  skipReason: AiSkipReason | null;
+  skipText: string;
+  root: string;
+  roots: string[];
+  keySet: boolean;
+  model: string;
+  attempts: string[];
+  enabled: boolean;
+}
+
+export function explainAiSkip(r: AiSkipReason | null): string {
+  switch (r) {
+    case 'disabled': return '后台「AI 自动审核」开关未开启';
+    case 'no-key': return '未配置 API Key（后台填一次，或 npx wrangler secret put AI_API_KEY）';
+    case 'root-not-listed': return '当前根域名不在「AI 自动审核名单」里；名单填 * 可对所有根域名生效';
+    case 'all-models-failed': return '所有候选模型调用失败（网关报错或网络不可达），已回落人工审核';
+    case 'parse-failed': return '模型有回复但结论无法解析，已回落人工审核';
+    case 'timeout': return 'AI 调用超时（12 秒），已回落人工审核';
+    default: return '';
+  }
+}
+
+/** 名单里的 * 表示对所有根域名生效 */
+export function rootInAiList(cfg: AiConfig, root: string): boolean {
+  return cfg.roots.includes('*') || (!!root && cfg.roots.includes(root));
+}
+
 function envStr(env: any, k: string): string {
   return String(env?.[k] ?? '').trim();
 }
@@ -85,7 +119,7 @@ export async function dnsUnlimited(env: any, rootDomain: string): Promise<boolea
 export async function aiAppliesTo(env: any, rootDomain: string): Promise<AiConfig | null> {
   const d = normalizeDomain(rootDomain);
   const cfg = await loadAiConfig(env);
-  if (!cfg.enabled || !cfg.configured || !d || !cfg.roots.includes(d)) return null;
+  if (!cfg.enabled || !cfg.configured || !d || !rootInAiList(cfg, d)) return null;
   return cfg;
 }
 
@@ -394,41 +428,83 @@ export async function aiTest(env: any): Promise<AiTestResult> {
   } finally { clearTimeout(timer); }
 }
 
+/** AI 审核的完整结果：结论 + 为什么（成功或没触发都要讲清楚） */
+export interface AiReviewOutcome {
+  verdict: { approve: boolean; reason: string; model?: string } | null;
+  diag: AiDiag;
+}
+
 /**
- * 调用 AI 判定申请是否可自动批准。
- * 已选定模型时**不请求 /models**，直接送审；未选时用官方清单兜底。
- * @returns approve=true 自动开通；false 自动驳回；null 回落人工审核
+ * 带诊断的审核。此前 aiAppliesTo 返回 null 就悄悄吞掉一切，
+ * 用户只看到「等待管理员审核」却不知道是没配 Key、后缀不在名单、还是模型报错。
+ * 现在每一项前置条件都单独给出原因，前端与审计日志都能显示。
  */
-export async function aiReview(
-  env: any, input: ReviewInput,
-): Promise<{ approve: boolean; reason: string; model?: string } | null> {
-  const cfg = await aiAppliesTo(env, input.root);
-  if (!cfg) return null;
+export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<AiReviewOutcome> {
+  const root = normalizeDomain(input.root);
+  const cfg = await loadAiConfig(env).catch(() => null);
+  const diag: AiDiag = {
+    applies: false,
+    skipReason: null,
+    skipText: '',
+    root,
+    roots: cfg?.roots || [],
+    keySet: !!cfg?.configured,
+    model: cfg?.model || AGNES_CHAT_MODELS[0],
+    attempts: [],
+    enabled: !!cfg?.enabled,
+  };
+  const skip = (r: AiSkipReason): AiReviewOutcome => {
+    diag.skipReason = r;
+    diag.skipText = explainAiSkip(r);
+    return { verdict: null, diag };
+  };
+
+  if (!cfg) return skip('no-key');
+  if (!cfg.enabled) return skip('disabled');
+  if (!cfg.configured) return skip('no-key');
+  if (!root || !rootInAiList(cfg, root)) return skip('root-not-listed');
+  diag.applies = true;
 
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 12000);
+  let gotReply = false;
   try {
     const prompt = buildReviewPrompt(input);
-    // 探测只发生在「后台选模型」阶段；审核链路不依赖 /models
+    // 探测只发生在「后台选模型」阶段；审核链路不请求 /models
     const selected = cfg.model || AGNES_CHAT_MODELS[0];
-    const candidates = [
-      selected,
-      ...FALLBACK_MODELS.filter((x) => x !== selected),
-    ].slice(0, 4);
+    const candidates = [selected, ...FALLBACK_MODELS.filter((x) => x !== selected)].slice(0, 4);
 
     for (const model of candidates) {
       if (ctl.signal.aborted) break;
       try {
         const r = await chatOnce(cfg, model, prompt, ctl.signal);
-        if (!r.text) continue;
+        if (!r.text) {
+          diag.attempts.push(`${model} → HTTP ${r.status}${r.err ? ' · ' + r.err.slice(0, 90) : ''}`);
+          continue;
+        }
+        gotReply = true;
         const verdict = parseVerdict(r.text);
-        if (verdict) return { ...verdict, model };
-      } catch { /* 超时或网络异常，换下一个 */ }
+        if (verdict) {
+          diag.attempts.push(`${model} → ${verdict.approve ? 'PASS' : 'REJECT'}`);
+          return { verdict: { ...verdict, model }, diag };
+        }
+        diag.attempts.push(`${model} → 回复无法解析：${r.text.trim().slice(0, 60)}`);
+      } catch (e) {
+        diag.attempts.push(`${model} → ${String((e as Error)?.name || 'error')}`);
+      }
     }
-    return null;
+    if (ctl.signal.aborted) return skip('timeout');
+    return skip(gotReply ? 'parse-failed' : 'all-models-failed');
   } catch {
-    return null;
+    return skip(ctl.signal.aborted ? 'timeout' : 'all-models-failed');
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** 兼容旧调用点：只要结论 */
+export async function aiReview(
+  env: any, input: ReviewInput,
+): Promise<{ approve: boolean; reason: string; model?: string } | null> {
+  return (await aiReviewDetailed(env, input)).verdict;
 }

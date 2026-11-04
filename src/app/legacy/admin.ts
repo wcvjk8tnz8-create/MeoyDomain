@@ -352,9 +352,10 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 <div class="hint" id="aiHint">读取中…</div>
               </div>
               <div class="grid2" style="margin-top:8px">
-                <div><span class="dim">自动审核的根域名</span><input id="sAiRoots" placeholder="v-1.top"></div>
+                <div><span class="dim">自动审核的根域名（填 * = 全部）</span><input id="sAiRoots" placeholder="v-1.top"></div>
                 <div><span class="dim">不限 DNS 记录数的根域名</span><input id="sAiDnsRoots" placeholder="v-1.top"></div>
               </div>
+              <div class="hint"><b>注意：名单里的根域名必须和你实际申请时选的后缀一致</b>；只填了 <span class="mono">v-1.top</span> 时，在 <span class="mono">meoy.top</span> 下申请不会触发 AI。想对所有后缀生效就填 <span class="mono">*</span>。另外 AI 已不再依赖全局「需要审核」开关，即使设为免审核也会照常判定。</div>
               <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。审核时会把「AI，你好，你现在要帮我审核一个子域名申请，域名是…，理由：…」发给下面选定的模型，按 <span class="mono">PASS / REJECT</span> 判定。AI 未配置、超时或返回异常时，申请自动回落为人工审核。</div>
               <div class="hint" id="aiModelHint" style="margin:6px 0 0">填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-2.5-flash）。</div>
               <div class="row" style="gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">

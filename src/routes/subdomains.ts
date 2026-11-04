@@ -7,7 +7,7 @@ import { pointRules } from './points.js';
 import { expiryRules, computeExpiry, expiryState, renewExpiry, migrateLegacyPerpetual, ensureExpiryColumns } from '../lib/expiry.js';
 import { defaultRoot, isAllowedRoot, listRoots } from '../lib/roots.js';
 import { applyGate } from '../lib/applyGate.js';
-import { aiReview } from '../lib/aiReview.js';
+import { aiReviewDetailed } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -262,15 +262,20 @@ const createMine = async (c) => {
   // 多根域名：允许 body.root 指定，必须是已配置的根域名之一
   const fqdn = `${v.label}.${reqRoot}`;
 
-  // AI 自动审核：仅对 ai_review_roots 中的根域名生效。
-  // 没配 Key / 超时 / 返回异常 → 返回 null，安静回落为 pending 人工审核，不卡申请。
+  // AI 自动审核：只要配置生效就尝试，不再绑死 REQUIRE_APPROVAL。
+  // 之前若 CI 变量把 REQUIRE_APPROVAL 设成 0，AI 会被整段跳过 —— 这是
+  // 「AI 没有自动审核」最常见的原因。现在即使全局免审核，AI 仍能驳回违规申请。
+  // 失败时返回带原因的诊断，前端与审计日志都会写明为什么没自动审核。
   let ai = null;
-  if (!isAdmin && c.env.REQUIRE_APPROVAL === '1') {
+  let aiDiag: any = null;
+  if (!isAdmin) {
     try {
-      ai = await aiReview(c.env, {
+      const out = await aiReviewDetailed(c.env, {
         fqdn, label: v.label, root: reqRoot, note: String(note || ''),
       });
-    } catch { /* 失败即降级 */ }
+      ai = out.verdict;
+      aiDiag = out.diag;
+    } catch { /* 失败即降级，不卡申请 */ }
   }
   const aiApproved = !!ai?.approve;
   const aiRejected = !!ai && !ai.approve;
@@ -319,7 +324,7 @@ const createMine = async (c) => {
   const detail = [status];
   if (isAdmin) detail.push('管理员免审核，AI 不触发');
   else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · 模型 ${ai.model || '自动探测'} · ${ai.reason}`);
-  else detail.push('AI 未触发（未配置 Key / 不在自动审核名单 / 模型调用失败）');
+  else detail.push(`AI 未触发：${aiDiag?.skipText || '审核模块异常，已回落人工审核'}${aiDiag?.attempts?.length ? ' · ' + aiDiag.attempts.join(' | ').slice(0, 240) : ''}`);
   if (!isAdmin && !aiRejected) {
     if (cost === 0) detail.push(rootOverride ? `${reqRoot} 单独设为 0 分（免费）` : '积分为 0，免费开通');
     else detail.push(`消耗 ${cost} 分${short && !rootOverride ? '（单字域名）' : ''}`);
@@ -334,7 +339,9 @@ const createMine = async (c) => {
     aiReviewed: !!ai,
     aiReason: ai ? String(ai.reason || '') : '',
     aiModel: ai ? String(ai.model || '') : '',
-    aiSkip: isAdmin ? 'admin' : c.env.REQUIRE_APPROVAL !== '1' ? 'review-off' : ai ? null : 'unavailable',
+    aiSkip: isAdmin ? 'admin' : ai ? null : (aiDiag?.skipReason || 'unavailable'),
+    aiSkipText: isAdmin ? '管理员免审核' : (aiDiag?.skipText || ''),
+    aiAttempts: aiDiag?.attempts || [],
     reserved: isReserved,
     cost: isAdmin ? 0 : (aiRejected ? 0 : cost),
     short,

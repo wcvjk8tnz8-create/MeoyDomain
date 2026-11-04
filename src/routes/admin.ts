@@ -11,7 +11,7 @@ import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColum
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
 import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList, setDnsBackend } from '../lib/rootStore.js';
-import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS } from '../lib/aiReview.js';
+import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS, rootInAiList } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -543,15 +543,31 @@ app.post('/ai-diagnose', async (c) => {
     const cfg = await loadAiConfig(c.env);
     const probe = cfg.configured ? await probeAiModels(c.env) : null;
     const test = cfg.configured ? await aiTest(c.env) : null;
+    const allRoots = listRoots(c.env).map((r) => r.domain);
     const lines = [
       `API Key：${cfg.configured ? '已配置' : '未配置'}`,
       `接口地址：${cfg.base}`,
       `当前模型：${cfg.model || '（未选，审核时用 ' + AGNES_CHAT_MODELS[0] + '）'}`,
       `自动审核开关：${cfg.enabled ? '开启' : '关闭'}`,
-      `作用根域名：${cfg.roots.join(', ') || '（无）'}`,
+      `作用根域名：${cfg.roots.join(', ') || '（无）'}${cfg.roots.includes('*') ? '  ← * 表示所有根域名' : ''}`,
+      `全局 REQUIRE_APPROVAL：${c.env.REQUIRE_APPROVAL || '（未设置）'}（现已不作为 AI 的前置条件）`,
+      `站点当前根域名：${allRoots.join(', ') || '（无）'}`,
+      '每个根域名是否会触发 AI：',
+      ...(allRoots.length ? allRoots : ['（未配置）']).map(
+        (d) => `  ${d} → ${rootInAiList(cfg, d) ? '✓ 会触发' : '✗ 不在名单，申请会走人工审核'}`,
+      ),
       `/models：${probe ? (probe.source === 'gateway' ? '网关返回 ' + probe.models.length + ' 个' : '不可用，已回落内置清单') : '未检测'}`,
       `chat/completions：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
     ];
+    const blockers = [];
+    if (!cfg.configured) blockers.push('未配置 API Key');
+    if (!cfg.enabled) blockers.push('自动审核开关未开启');
+    const matched = allRoots.filter((d) => rootInAiList(cfg, d));
+    if (!matched.length) blockers.push(`AI 名单（${cfg.roots.join(', ') || '空'}）没有覆盖任何当前根域名`);
+    if (cfg.configured && !test?.ok) blockers.push('chat/completions 调用失败');
+    lines.push(blockers.length
+      ? `结论：AI 不会自动审核 → ${blockers.join('；')}`
+      : '结论：配置齐全，普通用户在名单内根域名申请会由 AI 自动判定');
     if (test?.attempts?.length) lines.push('候选模型逐项：' + test.attempts.join(' | ').slice(0, 500));
     if (probe?.attempts?.length) {
       lines.push('/models 请求明细：');
@@ -620,7 +636,7 @@ app.post('/settings', async (c) => {
      也支持 Worker Secret AI_API_KEY（此时后台只读，避免两处配置打架）。 */
   const cleanRoots = (v) => String(v ?? '')
     .split(',').map((x) => x.trim().toLowerCase().replace(/^\.+|\.+$/g, ''))
-    .filter((x) => /^[a-z0-9][a-z0-9.-]{0,251}$/.test(x)).slice(0, 30).join(',');
+    .filter((x) => x === '*' || /^[a-z0-9][a-z0-9.-]{0,251}$/.test(x)).slice(0, 30).join(',');
   if (body.aiEnabled !== undefined) await set('ai_review_enabled', body.aiEnabled ? '1' : '0');
   if (body.aiRoots !== undefined) await set('ai_review_roots', cleanRoots(body.aiRoots));
   if (body.aiDnsUnlimitedRoots !== undefined) await set('dns_unlimited_roots', cleanRoots(body.aiDnsUnlimitedRoots));
