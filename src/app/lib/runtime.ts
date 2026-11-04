@@ -1,5 +1,5 @@
 /**
- * MeoyDomain 前端运行时（TypeScript）
+ * TerraDomain 前端运行时（TypeScript）
  * 由旧 api.js / shell.js 合并迁移而来，保留全部工具函数与骨架注入逻辑。
  * React 负责路由与页面组件；骨架与页面交互仍由这里的控制器驱动，
  * 后续可按页面逐步改成 hooks，不影响其它页面。
@@ -18,6 +18,8 @@ function track(target: any, type: string, fn: any, opts?: any) {
   cleanups.push(() => { try { target.removeEventListener(type, fn, opts); } catch {} });
 }
 const __docOn = (type: string, fn: any, opts?: any) => track(document, type, fn, opts);
+/** 供各页面控制器注册 document 级事件：随 SPA 切页自动注销，避免重复监听累积 */
+export const onDoc = __docOn;
 const __winOn = (type: string, fn: any, opts?: any) => track(window, type, fn, opts);
 const __setInterval = (fn: any, ms?: number) => {
   const id = setInterval(fn, ms);
@@ -159,7 +161,7 @@ document.addEventListener('click', (e) => {
 });
 
 /* ---------- 站点品牌（站点名 / Logo，管理员可在后台改） ---------- */
-export const DEFAULT_BRAND = { siteName: 'Meoy', logoUrl: '/img/logo.jpg', faviconUrl: '/favicon.ico' };
+export const DEFAULT_BRAND = { siteName: 'TerraDomain', logoUrl: '/img/logo.jpg', faviconUrl: '/favicon.ico' };
 export let brandPromise = null;
 
 export function loadBranding() {
@@ -198,6 +200,18 @@ export function applyFonts(fontBody, fontDisplay) {
   root.style.setProperty('--cn-display', disp);
 }
 
+/** 写入站点名：长名自动缩字号并保留 title 全文，避免侧栏被截成「TerraD…」 */
+export function setBrandName(el, name) {
+  if (!el) return;
+  const n = String(name || '');
+  el.textContent = n;
+  try { el.title = n; } catch (e) {}
+  // 按字符数分档（中英混排 / emoji 都按字符计），最长两行折行由 CSS 负责
+  const len = Array.from(n).length;
+  const size = len > 24 ? '12.5px' : len > 18 ? '14px' : len > 13 ? '15.5px' : '';
+  try { el.style.fontSize = size; } catch (e) {}
+}
+
 export function applyBranding(b) {
   if (b.fontBody || b.fontDisplay) applyFonts(b.fontBody, b.fontDisplay);
   document.title = (document.title || '').replace(/^[^·]*·\s*/, b.siteName + ' · ');
@@ -208,7 +222,7 @@ export function applyBranding(b) {
     document.head.appendChild(f);
   }
   f.href = b.faviconUrl;
-  document.querySelectorAll('[data-site-name]').forEach((el) => (el.textContent = b.siteName));
+  document.querySelectorAll('[data-site-name],[data-brand-name]').forEach((el) => setBrandName(el, b.siteName));
   document.querySelectorAll('[data-logo-img]').forEach((el) => (el.src = b.logoUrl));
 }
 
@@ -369,7 +383,7 @@ else window.addEventListener('load', () => setTimeout(mountSakura, 400), { once:
 
 
 /* ══════════════════════════════════════════════════════════════
-   全站底部署名：MeoyDomain + GitHub 链接
+   全站底部署名：TerraDomain + GitHub 链接
    所有页面都引入了本文件，因此注入一次即可全站生效。
    - 追加到 body 末尾（静态流，不用 fixed，避免遮挡内容）
    - 页面已有 .site-foot 或 <footer> 时不重复注入
@@ -384,7 +398,7 @@ export function mountSiteFooter() {
       f.className = 'site-foot';
       f.innerHTML =
         '<div class="site-foot-in">' +
-        '<span class="sf-brand">MeoyDomain</span>' +
+        '<span class="sf-brand">TerraDomain</span>' +
         '<a class="sf-link" href="' + REPO + '" target="_blank" rel="noopener noreferrer">' +
         '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.07-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.15 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A7.995 7.995 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>' +
         '<span>GitHub</span></a>' +
@@ -767,7 +781,7 @@ export function writeBrandCache(v) {
 
 /** 就地更新品牌（顶栏 logo / 站点名 / 标题） */
 export function applyBrand(b) {
-  document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = b.siteName));
+  document.querySelectorAll('[data-brand-name]').forEach((el) => setBrandName(el, b.siteName));
   // 品牌 logo 现在在侧栏（顶栏改为面包屑）
   document.querySelectorAll('.side-brand img').forEach((li) => {
     if (li.getAttribute('src') !== b.logoUrl) li.src = b.logoUrl;
@@ -860,7 +874,7 @@ export async function mountShell(active, opt = {}) {
   if (!host || !side) return;
 
   // 品牌 + 用户信息都走 sessionStorage 缓存，命中时不等待任何网络往返 —— 切页零阻塞
-  let brand = readBrandCache() || { siteName: 'Meoy', logoUrl: '/img/logo.jpg' };
+  let brand = readBrandCache() || { siteName: 'TerraDomain', logoUrl: '/img/logo.jpg' };
   let me = readUserCache();
 
   // 无缓存时才等网络（首次进入 / 硬刷新）
@@ -879,7 +893,7 @@ export async function mountShell(active, opt = {}) {
   document.querySelectorAll('[data-brand-name]').forEach((el) => (el.textContent = brand.siteName));
   // 后台刷新品牌（不阻塞渲染），拿到后再就地更新
   api.get('/api/config').then((cfg) => {
-    const b = { siteName: cfg.siteName || cfg.site_name || 'Meoy', logoUrl: cfg.logoUrl || cfg.logo_url || '/img/logo.jpg' };
+    const b = { siteName: cfg.siteName || cfg.site_name || 'TerraDomain', logoUrl: cfg.logoUrl || cfg.logo_url || '/img/logo.jpg' };
     writeBrandCache(b);
     if (b.siteName !== brand.siteName || b.logoUrl !== brand.logoUrl) applyBrand(b);
   }).catch(() => {});
@@ -982,6 +996,7 @@ export async function mountShell(active, opt = {}) {
         ${me ? `<a class="side-item" href="#" id="sideLogout"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.logout}</svg></span><span class="side-txt">退出登录</span></a>` : ''}
       </div>
     </div>`;
+  side.querySelectorAll('[data-brand-name]').forEach((el) => setBrandName(el, brand.siteName));
 
   const tg = document.getElementById('sideToggle');
   const setSide = (open) => document.body.classList.toggle('side-open', open);
@@ -1147,7 +1162,7 @@ export async function mountShell(active, opt = {}) {
       const f = document.createElement('footer');
       f.id = 'shellFoot';
       f.className = 'main-foot';
-      f.innerHTML = '<b>MeoyDomain</b> · 二级域名分发与 DNS 管理 · <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer" style="color:inherit">GitHub</a>';
+      f.innerHTML = '<b>TerraDomain</b> · 二级域名分发与 DNS 管理 · <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer" style="color:inherit">GitHub</a>';
       main.appendChild(f);
     }
   } catch {}

@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════
-   MeoyDomain · 文档风主题层（覆盖在 style.css 之后）
+   TerraDomain · 文档风主题层（覆盖在 style.css 之后）
    参考 nic.ddns.ge（极简文档风）× nic.fj.kg（信息架构）
 
    设计原则：
@@ -377,7 +377,7 @@ tbody tr:hover td { background: hsl(var(--secondary)); padding-left: 16px; }
 
 .sidebar {
   top: 58px !important;
-  width: 208px;
+  width: var(--sb-w);
   background: hsl(var(--background)) !important;
   border-right: 1px solid hsl(var(--border)) !important;
   box-shadow: none !important;
@@ -408,7 +408,7 @@ tbody tr:hover td { background: hsl(var(--secondary)); padding-left: 16px; }
 .side-item.on::before { background: hsl(var(--foreground)) !important; width: 2px; border-radius: 0 !important; }
 .side-item.on .side-ico svg { opacity: 1; }
 
-.main { margin-left: 208px; padding: 74px 24px 40px !important; }
+.main { margin-left: var(--sb-w); padding: 74px 24px 40px !important; }
 .main-in { max-width: 1040px; }
 
 /* ══════════ 10. 弹窗 / Toast / 页脚 ══════════ */
@@ -591,15 +591,15 @@ tbody.in tr { opacity: 1; transform: none; }
 
 /* ══════════ 13. 移动端 ══════════ */
 @media (max-width: 900px) {
-  .main { margin-left: 68px; padding: 74px 16px 32px !important; }
-  .sidebar { width: 68px; }
+  .main { margin-left: var(--sb-w-mini); padding: 74px 16px 32px !important; }
+  .sidebar { width: var(--sb-w-mini); }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .stat:nth-child(2n) { border-right: 0 !important; }
   .stat:nth-child(-n+2) { border-bottom: 1px solid hsl(var(--border)) !important; }
 }
 @media (max-width: 760px) {
   h1 { font-size: 26px !important; }
-  .topbar { left: 68px !important; }
+  .topbar { left: var(--sb-w-mini) !important; }
 }
 
 
@@ -650,3 +650,116 @@ html[data-skin="doc"] .stat-card:hover {
 html[data-skin="doc"][data-theme="dark"] .stat-card .sc-num { color: #f2f5fa !important; }
 html[data-skin="doc"][data-theme="dark"] .stat-card .sc-lbl { color: #a9b3c7 !important; }
 html[data-skin="doc"][data-theme="dark"] .stat-card:hover { background: #182338 !important; }
+
+/* ══════════ 14. 侧栏宽度收敛（最后加载，覆盖历史硬编码 208/224/64/68） ══════════
+   只认 :root 的 --sb-w / --sb-w-mini；topbar.left 与 main.margin-left
+   必须与 sidebar.width 完全一致，否则会出现「顶栏盖住 logo / 内容错位」。 */
+.sidebar { width: var(--sb-w) !important; }
+.topbar  { left: var(--sb-w) !important; }
+.main    { margin-left: var(--sb-w) !important; }
+body .site-foot,
+body:has(.main) .site-foot { margin-left: var(--sb-w) !important; }
+
+/* 站点名可能很长（如 TerraDomain 或自定义超长名）：允许折行两行，不再省略号截断 */
+.side-brand { height: auto !important; min-height: 58px; padding: 9px 14px !important; gap: 10px; }
+.side-brand img { flex: 0 0 32px; width: 32px; height: 32px; }
+.side-brand b {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: clip;
+  line-height: 1.18;
+  font-size: 17px !important;
+  letter-spacing: 0;
+}
+
+@media (max-width: 1000px) {
+  .sidebar { width: var(--sb-w-mini) !important; }
+  .topbar  { left: var(--sb-w-mini) !important; }
+  .main    { margin-left: var(--sb-w-mini) !important; }
+  body .site-foot,
+  body:has(.main) .site-foot { margin-left: var(--sb-w-mini) !important; }
+}
+
+/* ══════════ 15. 根域名后缀选择器（参考 DnsNeko 注册页） ══════════
+   点击右侧后缀按钮展开浮层，每行「.后缀           Free」；
+   不再用原生 <select>，避免浏览器弹层样式不可控 / 窄屏被裁。 */
+.root-row { position: relative; }
+.root-picker { position: relative; flex: 0 0 auto; height: 100%; }
+.root-picker-btn {
+  height: 100%;
+  min-width: 132px;
+  display: flex; align-items: center; justify-content: center; gap: 2px;
+  padding: 0 14px;
+  border: 1px solid hsl(var(--border)) !important;
+  border-left: none !important;
+  border-radius: 0 var(--radius) var(--radius) 0 !important;
+  background: hsl(var(--secondary)) !important;
+  color: hsl(var(--foreground)) !important;
+  font-family: var(--mono) !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .18s, box-shadow .18s;
+}
+.root-picker-btn:hover:not(:disabled) { background: hsl(var(--primary) / .08) !important; }
+.root-picker-btn:focus-visible { box-shadow: 0 0 0 2px hsl(var(--primary) / .35) !important; }
+.root-picker-btn:disabled { opacity: .55; cursor: not-allowed; }
+.root-picker-btn.single { cursor: default; }
+.root-picker-btn.single:hover { background: hsl(var(--secondary)) !important; }
+.root-dot { opacity: .55; margin-right: 1px; }
+.root-chev {
+  width: 14px; height: 14px; margin-left: 8px; flex: 0 0 14px;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  opacity: .6; transition: transform .2s;
+}
+.root-picker-btn[aria-expanded="true"] .root-chev { transform: rotate(180deg); }
+.root-picker-btn.single .root-chev { display: none; }
+
+.root-picker-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 186px;
+  z-index: 60;
+  padding: 6px;
+  background: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px hsl(215 25% 20% / .14) !important;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(.98);
+  transform-origin: top right;
+  transition: opacity .18s ease, transform .18s ease, visibility .18s;
+}
+.root-picker-menu.show { opacity: 1; visibility: visible; transform: none; }
+.root-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px !important;
+  font-family: var(--mono) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: hsl(var(--foreground)) !important;
+  text-align: left;
+  transition: background .15s, color .15s;
+}
+.root-opt:hover { background: hsl(var(--secondary)) !important; }
+.root-opt.on { color: hsl(var(--primary)) !important; background: hsl(var(--primary) / .07) !important; }
+.root-opt-name { white-space: nowrap; }
+.root-opt-free { font-family: var(--sans) !important; font-size: 12px; font-weight: 500; color: hsl(var(--muted-foreground)); }
+
+@media (max-width: 620px) {
+  .root-picker-btn { min-width: 108px; padding: 0 9px; font-size: 12px !important; }
+  .root-chev { margin-left: 4px; }
+  .root-picker-menu { min-width: 160px; }
+}

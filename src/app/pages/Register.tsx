@@ -29,11 +29,21 @@ export default function RegisterPage() {
           <div className="alert a-info" id="applyTip">创建子域名不会自动写入任何 DNS 记录，审核通过后到「DNS 记录」页按需添加。</div>
       
           <label className="f">子域名前缀</label>
-          <div className="row" style={{gap: "0", flexWrap: "nowrap"}}>
-            <input id="label" placeholder="mail" autocomplete="off" spellcheck="false" style={{borderRadius: "var(--radius-s) 0 0 var(--radius-s)", borderRight: "none", flex: "1"}} />
-            <span className="mono" id="rootWrap" style={{padding: "0 11px", background: "rgba(79,155,255,.12)", border: "1px solid var(--ink-line)", borderRadius: "0 var(--radius-s) var(--radius-s) 0", display: "flex", alignItems: "center", whiteSpace: "nowrap", color: "var(--blue)", fontSize: "12px"}}>.<span id="rootDomain"></span></span>
+          <div className="row root-row" style={{gap: "0", flexWrap: "nowrap"}}>
+            <input id="label" placeholder="mail" autoComplete="off" spellCheck={false} style={{borderRadius: "var(--radius-s) 0 0 var(--radius-s)", borderRight: "none", flex: "1", minWidth: "0"}} />
+            {/* 后缀选择器：参考 DnsNeko —— 点击按钮展开浮层，每项右侧标 Free，
+                替代原来塞在小胶囊里的原生 <select>（窄、原生弹层、样式不可控） */}
+            <div className="root-picker" id="rootPicker">
+              <button type="button" className="root-picker-btn" id="rootPickerBtn"
+                      aria-haspopup="listbox" aria-expanded="false" title="选择根域名">
+                <span className="root-dot">.</span><span id="rootDomain"></span>
+                <svg className="root-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+              </button>
+              <div className="root-picker-menu" id="rootPickerMenu" role="listbox" aria-label="选择根域名"></div>
+            </div>
           </div>
           <div className="hint" id="checkTip">输入前缀后自动检查是否可用，仅支持字母、数字与连字符。</div>
+          <div className="hint" id="aiRootTip" style={{display: "none"}}></div>
       
           <label className="f">用途说明（选填，供管理员审核参考）</label>
           <input id="note" className="input" placeholder="例如：个人博客 / 邮件服务" />

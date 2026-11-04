@@ -1,4 +1,5 @@
 import { matchRoot } from '../lib/roots.js';
+import { dnsUnlimited } from '../lib/aiReview.js';
 
 /**
  * 取某条子域名所属的根域名，用于选择对应的 Cloudflare Zone。
@@ -83,9 +84,15 @@ app.post('/subdomains/:id/records', async (c) => {
   const type = String(body.type || '').toUpperCase();
   if (!RECORD_TYPES[type]) return fail(c, '不支持的记录类型');
 
-  const cnt = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM dns_records WHERE subdomain_id = ?').bind(id).first();
-  if ((cnt?.n || 0) >= MAX_RECORDS_PER_SUBDOMAIN)
-    return fail(c, `单个子域名最多 ${MAX_RECORDS_PER_SUBDOMAIN} 条记录`);
+  // 按根域名豁免：dns_unlimited_roots 里列出的根域名（默认 v-1.top）不限记录数。
+  // 读配置失败时按「不豁免」处理，保持原有安全上限。
+  let unlimited = false;
+  try { unlimited = await dnsUnlimited(c.env, rootOf(c, sub)); } catch { /* 回落原限制 */ }
+  if (!unlimited) {
+    const cnt = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM dns_records WHERE subdomain_id = ?').bind(id).first();
+    if ((cnt?.n || 0) >= MAX_RECORDS_PER_SUBDOMAIN)
+      return fail(c, `单个子域名最多 ${MAX_RECORDS_PER_SUBDOMAIN} 条记录`);
+  }
 
   const hostRes = resolveHost(body.host, sub.fqdn, sub.label);
   if (!hostRes.ok) return fail(c, hostRes.error);

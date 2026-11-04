@@ -267,7 +267,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           </td>
           <td>
             <div class="grid2" style="margin-bottom:10px">
-              <div class="field" style="margin:0"><label>站点名称</label><input id="sName" value="${esc(s.site_name || 'Meoy')}" placeholder="Meoy"></div>
+              <div class="field" style="margin:0"><label>站点名称</label><input id="sName" value="${esc(s.site_name || 'TerraDomain')}" placeholder="TerraDomain"></div>
               <div class="field" style="margin:0"><label>Logo 地址</label><input id="sLogo" value="${esc(s.logo_url || '')}" placeholder="/img/logo.jpg"></div>
             </div>
             <div class="grid2" style="margin-bottom:12px">
@@ -333,6 +333,27 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 填写后上传的头像直接外链到该地址，可省 Worker 流量。当前状态：<span id="r2Hint" class="dim">读取中…</span></div>
             </div>
             <div class="field">
+              <label>AI 自动审核（Agnes AI · OpenAI 兼容）</label>
+              <label class="check" style="margin:0 0 8px">
+                <input type="checkbox" id="sAiEnabled">
+                <span>启用自动审核（仅对下方根域名生效；通过后无需管理员同意）</span>
+              </label>
+              <div class="grid2">
+                <div><span class="dim">接口地址</span><input id="sAiUrl" placeholder="https://apihub.agnes-ai.com/v1"></div>
+                <div><span class="dim">模型（留空自动探测）</span><input id="sAiModel" placeholder="留空读取 /models"></div>
+              </div>
+              <div class="field" style="margin:8px 0 0">
+                <span class="dim">API Key</span>
+                <input id="sAiKey" type="password" autocomplete="new-password" placeholder="留空则不修改">
+                <div class="hint" id="aiHint">读取中…</div>
+              </div>
+              <div class="grid2" style="margin-top:8px">
+                <div><span class="dim">自动审核的根域名</span><input id="sAiRoots" placeholder="v-1.top"></div>
+                <div><span class="dim">不限 DNS 记录数的根域名</span><input id="sAiDnsRoots" placeholder="v-1.top"></div>
+              </div>
+              <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。AI 未配置、超时或返回异常时，申请自动回落为人工审核，不会卡住用户。</div>
+            </div>
+            <div class="field">
               <label>滥用举报渠道（外部域名 WHOIS 展示）</label>
               <div class="grid2">
                 <div><span class="dim">投诉邮箱</span><input id="sAbuseEmail" placeholder="abuse@meoy.top"></div>
@@ -344,10 +365,10 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               <label>托管面板域名（CNAME 识别）</label>
               <div class="grid2">
                 <div><span class="dim">面板域名</span><input id="sPanelDomain" placeholder="dash.domain.meoy.top"></div>
-                <div><span class="dim">显示名称</span><input id="sPanelName" placeholder="Meoy 面板"></div>
+                <div><span class="dim">显示名称</span><input id="sPanelName" placeholder="TerraDomain 面板"></div>
               </div>
               <div class="hint">外部域名 WHOIS 会探测 CNAME 指向；指向该域名时显示你设定的名称（如
-                <span class="mono">meoy.top CNAME dash.domain.meoy.top</span> → 显示「Meoy 面板」）。
+                <span class="mono">meoy.top CNAME dash.domain.meoy.top</span> → 显示「TerraDomain 面板」）。
                 Vercel / Netlify / GitHub Pages 等常见平台自动识别，无需配置。</div>
             </div>
             <div class="field">
@@ -482,6 +503,12 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             spaceshipApiSecret: document.getElementById('sSpSecret').value,
             applyPaused: document.getElementById('sApplyPaused').checked,
             applyPausedMessage: document.getElementById('sApplyPausedMsg').value,
+            aiEnabled: document.getElementById('sAiEnabled').checked,
+            aiUrl: document.getElementById('sAiUrl').value,
+            aiModel: document.getElementById('sAiModel').value,
+            aiApiKey: document.getElementById('sAiKey').value,
+            aiRoots: document.getElementById('sAiRoots').value,
+            aiDnsUnlimitedRoots: document.getElementById('sAiDnsRoots').value,
           });
           toast('已保存，刷新页面后生效');
           // 立即刷新导航 Logo
@@ -549,6 +576,30 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         }
       }
   
+      // AI 自动审核：Key 只回掩码，留空表示不修改
+      {
+        const a = d.ai || {};
+        const setv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+        const en = document.getElementById('sAiEnabled');
+        if (en) en.checked = !!a.enabled;
+        setv('sAiUrl', a.url);
+        setv('sAiModel', a.model);
+        setv('sAiRoots', a.roots);
+        setv('sAiDnsRoots', a.dnsUnlimitedRoots);
+        const k = document.getElementById('sAiKey');
+        const hint = document.getElementById('aiHint');
+        if (a.fromEnv) {
+          [k].forEach((el) => { if (el) el.disabled = true; });
+          if (k) k.value = a.keyMasked || '';
+          if (hint) hint.innerHTML = '<span class="badge ok">已由 Worker Secret 配置</span> 后台不可修改。';
+        } else if (a.ready) {
+          if (k) { k.placeholder = a.keyMasked || '已配置，留空不修改'; k.value = ''; }
+          if (hint) hint.innerHTML = '<span class="badge ok">已启用</span> 当前 Key ' + esc(a.keyMasked || '') + '。需更换时填入新 Key，留空保持原值。';
+        } else {
+          if (hint) hint.innerHTML = '未配置 Key：AI 不会调用，申请照常进入人工审核。也可用 <span class="mono">npx wrangler secret put AI_API_KEY</span> 配置。';
+        }
+      }
+
       // 自定义 DNS 提供商：URL 可回显，Key/Secret 只显示掩码；留空表示不修改
       {
         const p = d.dnsProvider || {};

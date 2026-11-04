@@ -189,7 +189,9 @@ INSERT OR IGNORE INTO settings(key, value) VALUES ('initial_points', '10');     
 -- WHOIS 持有人邮箱显示方式：masked 脱敏（默认）| none 不显示 | full 完整
 INSERT OR IGNORE INTO settings(key, value) VALUES ('whois_holder', 'masked');
 -- 站点品牌（后台「站点设置」可改）
-INSERT OR IGNORE INTO settings(key, value) VALUES ('site_name', 'Meoy');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('site_name', 'TerraDomain');
+-- 迁移：MeoyDomain 品牌更名为 TerraDomain（只改仍是旧默认值的库，不覆盖管理员自定义名称）
+UPDATE settings SET value = 'TerraDomain' WHERE key = 'site_name' AND value IN ('Meoy', 'MeoyDomain');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('logo_url', '/img/logo.jpg');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('favicon_url', '/favicon.ico');
 
@@ -430,3 +432,15 @@ INSERT OR IGNORE INTO settings(key, value) VALUES ('spaceship_api_secret', '');
 -- 格式：逗号分隔域名 / "域名:ZoneID" 对
 INSERT OR IGNORE INTO settings(key, value) VALUES ('root_domains_extra', '');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('cf_zone_ids_extra', '');
+
+-- AI 自动审核（Agnes AI 等 OpenAI 兼容网关）
+-- 注意：API Key 只存 settings.ai_api_key 或 Worker Secret AI_API_KEY，
+--       绝不写进代码库；后台 GET 只回显掩码，公开 /api/config 不含任何密钥。
+INSERT OR IGNORE INTO settings(key, value) VALUES ('ai_review_enabled', '1');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('ai_review_roots', 'v-1.top');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('ai_api_url', 'https://apihub.agnes-ai.com/v1');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('ai_api_key', '');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('ai_model', '');
+
+-- 不限制「单个子域名最多 50 条 DNS 记录」的根域名（逗号分隔）
+INSERT OR IGNORE INTO settings(key, value) VALUES ('dns_unlimited_roots', 'v-1.top');

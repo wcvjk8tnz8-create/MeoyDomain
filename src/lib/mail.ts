@@ -107,7 +107,7 @@ export async function issueCode(env, email, scene, ip) {
     .run();
 
   const siteName =
-    (await env.DB.prepare("SELECT value FROM settings WHERE key = 'site_name'").first())?.value || 'Meoy';
+    (await env.DB.prepare("SELECT value FROM settings WHERE key = 'site_name'").first())?.value || 'TerraDomain';
   const isReset = scene === 'reset';
   const subject = isReset ? `${siteName} 重置密码验证码` : `${siteName} 注册验证码`;
   const text = `你的验证码是 ${code}，10 分钟内有效。如非本人操作请忽略此邮件。`;

@@ -1,4 +1,4 @@
-/* Meoy · 二级域名分发系统
+/* TerraDomain · 二级域名分发系统
    风格：ARCADE / 二次元（参考台风模拟器那种粉白圆角卡片 UI）
    - 粉白半透明卡片 + 大圆角 + 柔和彩色阴影（游戏化、轻快）
    - 蓝紫 / 樱粉糖果色系，配初音未来 / GUMI 壁纸作底层
@@ -9,6 +9,12 @@
    采用 HSL 通道值，便于 hsl(var(--x) / opacity) 的写法
    ══════════════════════════════════════════════════════════ */
 :root {
+  /* 侧栏宽度：站点名可能很长（如 TerraDomain），需留出足够空间
+     同时 topbar 的 left、main 的 margin-left 必须同步引用同一个变量，
+     否则会出现「侧栏 208 / 顶栏 224」这类错位（历史上出过） */
+  --sb-w: 264px;
+  --sb-w-mini: 72px;
+
   /* 基底 */
   --background: 217 100% 97%;   /* v2 #eef5ff 系 */
   --foreground: 224 39% 25%;   /* v2 --ink #27345a */
@@ -3460,14 +3466,15 @@ body .site-foot { margin-left: 224px; }
    3. `.topbar{left:0;right:0}` 横跨整页 → 盖住侧栏顶部的 logo
 
    当前方案（三件套，缺一不可）：
-     .sidebar  fixed，left:0，宽 224px
-     .topbar   fixed，left:224px（让开侧栏），高 64px
-     .main     margin-left:224px + padding-top:64px（让开 fixed 顶栏）
+     .sidebar  fixed，left:0，宽 var(--sb-w)
+     .topbar   fixed，left:var(--sb-w)（让开侧栏），高 64px
+     .main     margin-left:var(--sb-w) + padding-top:64px（让开 fixed 顶栏）
+   宽度只允许改 :root 里的 --sb-w / --sb-w-mini，禁止再写死数字。
    ══════════════════════════════════════════════════════════════ */
 .sidebar {
   position: fixed;
   top: 0; left: 0; bottom: 0;
-  width: 224px;
+  width: var(--sb-w);
   height: 100vh;
   z-index: 250;
   transform: none;              /* 清掉旧版抽屉的 translateX(-100%) */
@@ -3476,7 +3483,7 @@ body .site-foot { margin-left: 224px; }
 }
 .topbar {
   position: fixed;
-  top: 0; left: 224px; right: 0;
+  top: 0; left: var(--sb-w); right: 0;
   height: 64px;
   margin-left: 0;
   z-index: 300;
@@ -3484,7 +3491,7 @@ body .site-foot { margin-left: 224px; }
 .main {
   position: relative;
   z-index: 1;
-  margin-left: 224px;
+  margin-left: var(--sb-w);
   padding: 64px 0 0;            /* 顶栏是 fixed，必须让开这 64px */
   display: flex;
   flex-direction: column;
@@ -3493,10 +3500,10 @@ body .site-foot { margin-left: 224px; }
 .footer, .site-foot { position: relative; z-index: 1; }
 
 @media (max-width: 1000px) {
-  .sidebar { width: 68px; }
-  .topbar  { left: 68px; }
-  .main    { margin-left: 68px; }
-  body .site-foot { margin-left: 68px; }
+  .sidebar { width: var(--sb-w-mini); }
+  .topbar  { left: var(--sb-w-mini); }
+  .main    { margin-left: var(--sb-w-mini); }
+  body .site-foot { margin-left: var(--sb-w-mini); }
 }
 
 /* ══════════════════════════════════════════════════════════

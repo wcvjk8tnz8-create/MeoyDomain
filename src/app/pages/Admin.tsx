@@ -23,7 +23,7 @@ export default function AdminPage() {
       <aside className="sidebar" id="sidebar"></aside>
       
       <main className="main"><div className="main-in"><div className="wrap">
-        <h1><span data-site-name>Meoy</span> · 管理后台</h1>
+        <h1><span data-site-name>TerraDomain</span> · 管理后台</h1>
         <div className="sub" id="envTip"></div>
       
         <div className="stat-grid" id="stats" style={{marginBottom: "16px"}}></div>

@@ -1,7 +1,7 @@
 // ============================================================
 //  托管服务商识别（CNAME 探测）
 //  查询域名的 CNAME 指向，匹配已知平台，像 DNSHE 系那样展示「托管在谁家」。
-//  例：meoy.top CNAME → dash.domain.meoy.top  → 显示「Meoy 面板」
+//  例：meoy.top CNAME → dash.domain.meoy.top  → 显示「TerraDomain 面板」
 //      xxx.com  CNAME → cname.vercel-dns.com → 显示「Vercel」
 //  数据走 DoH（DNS-over-HTTPS），无需 API Key。
 // ============================================================
@@ -76,7 +76,7 @@ export async function detectHosting(domain, custom = null) {
   const cname = await resolveCname(domain);
   if (!cname) return { hosting: null, cname: null, source: 'none' };
 
-  // ① 自定义面板域名优先（如 dash.domain.meoy.top → Meoy 面板）
+  // ① 自定义面板域名优先（如 dash.domain.meoy.top → TerraDomain 面板）
   if (custom && custom.domain) {
     const cd = norm(custom.domain);
     if (cname === cd || cname.endsWith('.' + cd)) {

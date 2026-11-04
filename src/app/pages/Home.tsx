@@ -26,7 +26,7 @@ export default function HomePage() {
         <div className="home-top-in">
           <a className="home-brand" href="/home">
             <img data-logo-img src="/img/logo.jpg" alt="" />
-            <span><b data-site-name>Meoy</b><i>二级域名分发</i></span>
+            <span><b data-site-name>TerraDomain</b><i>二级域名分发</i></span>
           </a>
           <nav className="home-nav">
             <a href="/terms">Language</a>
@@ -87,7 +87,7 @@ export default function HomePage() {
       {/* ══ 核心服务 ══ */}
       <section className="nk-sec">
         <div className="nk-wrap">
-          <h2 className="nk-h2">MeoyDomain 核心服务</h2>
+          <h2 className="nk-h2">TerraDomain 核心服务</h2>
           <div className="nk-svc">
             <div className="card nk-svc-card">
               <div className="nk-svc-ico">
@@ -184,7 +184,7 @@ export default function HomePage() {
         <div className="nk-wrap">
           <div className="nk-foot-in">
             <div className="nk-fcol">
-              <div className="nk-fbrand"><img data-logo-img src="/img/logo.jpg" alt="" /><span data-site-name>Meoy</span></div>
+              <div className="nk-fbrand"><img data-logo-img src="/img/logo.jpg" alt="" /><span data-site-name>TerraDomain</span></div>
               <p className="nk-fdesc">免费、开源的二级域名分发与 DNS 管理系统。<br />基于 Cloudflare Workers + D1。</p>
             </div>
             <div className="nk-fcol">
@@ -201,7 +201,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="nk-fbottom">
-            <span>© <span id="yr">2026</span> <b>MeoyDomain</b> · 二级域名分发</span>
+            <span>© <span id="yr">2026</span> <b>TerraDomain</b> · 二级域名分发</span>
             <a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer">GitHub</a>
           </div>
         </div>

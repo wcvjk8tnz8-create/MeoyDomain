@@ -112,7 +112,7 @@ app.get('/api/avatar/:key', async (c) => {
 // 公开配置（含站点品牌，登录页也要用）
 app.get('/api/config', async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from','apply_paused','apply_paused_message')"
+    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from','apply_paused','apply_paused_message','ai_review_roots','dns_unlimited_roots')"
   ).all();
   const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
   // 注册是否需要邮箱验证码（后台开启且邮件服务已配置时才真正启用）
@@ -130,11 +130,14 @@ app.get('/api/config', async (c) => {
     recordTypes: TYPE_NAMES.map((k) => ({ key: k, ...RECORD_TYPES[k] })),
     ttlChoices: TTL_CHOICES,
     verifyPresets: VERIFY_PRESETS,
-    siteName: s.site_name || 'Meoy',
+    siteName: s.site_name || 'TerraDomain',
     logoUrl: s.logo_url || '/img/logo.jpg',
     faviconUrl: s.favicon_url || '/favicon.ico',
     fontBody: s.font_body || 'zcool',
     fontDisplay: s.font_display || 'zcool',
+    // 仅名单，不含任何 AI 接口地址或密钥
+    aiReviewRoots: String(s.ai_review_roots || 'v-1.top').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
+    dnsUnlimitedRoots: String(s.dns_unlimited_roots || 'v-1.top').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
     // 邮箱验证码：mailOk 表示邮件服务已配置（可发送），verifyRequired 表示后台开了注册验证
     mailOk,
     mailVerifyRequired: verifyRequired,

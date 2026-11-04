@@ -2,22 +2,35 @@
  * Register 页面控制器（由 register.html 内联脚本平移）
  * 外部符号由 runtime 提供；DOM 查询作用于当前挂载的页面。
  */
-import { api, toast, mountShell } from '../lib/runtime';
+import { api, toast, mountShell, onDoc } from '../lib/runtime';
 
 import type { LegacyCtx } from '../lib/types';
 
 export async function mountRegister(_root: HTMLElement | null): Promise<void> {
   
   var ROOTS = [];
+  var AI_ROOTS = [];
+  var DNS_UNLIMITED = [];
   var checkTimer = 0;
+
+  /* 当前后缀的规则提示：AI 自动审核 / DNS 记录不限 */
+  function updateRootTip(d){
+    var el = document.getElementById('aiRootTip');
+    if (!el) return;
+    var bits = [];
+    if (AI_ROOTS.indexOf(d) >= 0) bits.push('该后缀由 AI 自动审核，通过后立即开通（无需人工同意）');
+    if (DNS_UNLIMITED.indexOf(d) >= 0) bits.push('DNS 记录数不限');
+    el.textContent = bits.length ? '✨ ' + bits.join(' · ') : '';
+    el.style.display = bits.length ? '' : 'none';
+  }
   var APPLY_PAUSED = false;
   var APPLY_MSG = '';
   var IS_ADMIN = false;
   
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
   function currentRoot(){
-    var sel = document.getElementById('rootDomainSel');
-    if (sel) return sel.value;
+    var btn = document.getElementById('rootPickerBtn');
+    if (btn && btn.getAttribute('data-root')) return btn.getAttribute('data-root');
     return ROOTS[0] || '';
   }
   function rootQuery(){ var r = currentRoot(); return r ? '&root=' + encodeURIComponent(r) : ''; }
@@ -33,15 +46,50 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
     }
     if (IS_ADMIN) return;                 // 管理员是「开通」，不锁
     APPLY_PAUSED = true;
-    ['label','note','agreeUse','btnApply','rootDomainSel'].forEach(function(id){
+    ['label','note','agreeUse','btnApply','rootPickerBtn'].forEach(function(id){
       var el = document.getElementById(id);
-      if (el) el.disabled = true;
+      if (el) (el as HTMLButtonElement).disabled = true;
     });
+    closeRootMenu();
     var btn = document.getElementById('btnApply');
     if (btn) btn.textContent = '申请已暂停';
   }
   
-  /* 根域名：单个时静态后缀，多个时下拉 */
+  /* ───── 根域名选择器（参考 DnsNeko） ─────
+     原来是塞在窄胶囊里的原生 <select>：弹层由浏览器绘制、样式不可控、
+     小屏还会被裁。改为自定义按钮 + 浮层列表，每项右侧标 Free。 */
+  function closeRootMenu(){
+    var menu = document.getElementById('rootPickerMenu');
+    var btn = document.getElementById('rootPickerBtn');
+    if (menu) { menu.classList.remove('show'); menu.setAttribute('aria-hidden', 'true'); }
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+  function toggleRootMenu(){
+    var menu = document.getElementById('rootPickerMenu');
+    var btn = document.getElementById('rootPickerBtn') as HTMLButtonElement;
+    if (!menu || !btn || btn.disabled) return;
+    var on = !menu.classList.contains('show');
+    menu.classList.toggle('show', on);
+    menu.setAttribute('aria-hidden', on ? 'false' : 'true');
+    btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  }
+  function selectRoot(d){
+    if (!d) return;
+    var btn = document.getElementById('rootPickerBtn');
+    var span = document.getElementById('rootDomain');
+    if (span) span.textContent = d;
+    if (btn) btn.setAttribute('data-root', d);
+    document.querySelectorAll('#rootPickerMenu .root-opt').forEach(function(el){
+      var on = el.getAttribute('data-root') === d;
+      el.classList.toggle('on', on);
+      el.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    closeRootMenu();
+    updateRootTip(d);
+    var v = (document.getElementById('label') as HTMLInputElement)?.value.trim();
+    if (v) runCheck(v);   // 换后缀立即重新查可用性
+  }
+
   async function setupRoots(){
     try {
       var cfg = await api.get('/api/config');
@@ -50,17 +98,49 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
         ? cfg.rootDomains
         : (cfg.rootDomain ? [cfg.rootDomain] : []);
       ROOTS = list;
-      var wrap = document.getElementById('rootWrap');
+      AI_ROOTS = Array.isArray(cfg.aiReviewRoots) ? cfg.aiReviewRoots : [];
+      DNS_UNLIMITED = Array.isArray(cfg.dnsUnlimitedRoots) ? cfg.dnsUnlimitedRoots : [];
+      updateRootTip(list[0] || '');
+
+      var btn = document.getElementById('rootPickerBtn') as HTMLButtonElement;
       var span = document.getElementById('rootDomain');
-      if (!wrap) return;
-      if (list.length <= 1) { if (span) span.textContent = list[0] || ''; return; }
-      wrap.innerHTML = '<span style="opacity:.5">.</span><select id="rootDomainSel" style="border:none;background:transparent;color:var(--blue);font-family:var(--mono);font-size:12px;padding:0 2px;outline:none;cursor:pointer">'
-        + list.map(function(d){ return '<option value="' + esc(d) + '">' + esc(d) + '</option>'; }).join('')
-        + '</select>';
-      document.getElementById('rootDomainSel').onchange = function(){
-        var v = document.getElementById('label').value.trim();
-        if (v) runCheck(v);
-      };
+      var menu = document.getElementById('rootPickerMenu');
+      // 兼容仍使用旧 #rootWrap / #rootDomainSel 结构的页面
+      if (!btn || !span || !menu) {
+        var wrap = document.getElementById('rootWrap');
+        if (wrap && list.length > 1) {
+          wrap.innerHTML = '<span style="opacity:.5">.</span><select id="rootDomainSel">'
+            + list.map(function(d){ return '<option value="' + esc(d) + '">' + esc(d) + '</option>'; }).join('')
+            + '</select>';
+        } else if (span) span.textContent = list[0] || '';
+        return;
+      }
+
+      var first = list[0] || '';
+      span.textContent = first;
+      btn.setAttribute('data-root', first);
+
+      if (list.length <= 1) {
+        btn.classList.add('single');
+        menu.innerHTML = '';
+        return;   // 只有一个后缀：整块就是静态文字，不展开
+      }
+
+      menu.innerHTML = list.map(function(d, i){
+        return '<button type="button" class="root-opt' + (i === 0 ? ' on' : '') + '" role="option"'
+          + ' data-root="' + esc(d) + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '">'
+          + '<span class="root-opt-name">.' + esc(d.toUpperCase()) + '</span>'
+          + '<span class="root-opt-free">Free</span></button>';
+      }).join('');
+      menu.querySelectorAll('.root-opt').forEach(function(el){
+        (el as HTMLButtonElement).onclick = function(){ selectRoot(el.getAttribute('data-root')); };
+      });
+      btn.onclick = function(e){ e.stopPropagation(); toggleRootMenu(); };
+      // 点外部 / Esc 关闭；监听随切页自动注销
+      onDoc('click', function(e){
+        if (!(e.target as HTMLElement)?.closest?.('#rootPicker')) closeRootMenu();
+      });
+      onDoc('keydown', function(e){ if (e.key === 'Escape') closeRootMenu(); });
     } catch (e) {}
   }
   
@@ -144,7 +224,19 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
     try {
       localStorage.setItem('meoy_agree_use', '1');
       var r = await api.post('/api/subdomains', { label: label, note: note, root: currentRoot() });
-      toast(r.status === 'approved' ? '申请成功，已开通' : '已提交，等待管理员审核');
+      const rejected = r.status === 'rejected';
+      toast(rejected
+        ? 'AI 审核未通过：' + (r.aiReason || '请修改用途说明后再试')
+        : r.status === 'approved'
+          ? (r.aiReviewed ? 'AI 审核通过，已自动开通' : '申请成功，已开通')
+          : '已提交，等待管理员审核', rejected ? 'err' : 'ok');
+      if (rejected) {
+        // 驳回时保留输入，方便用户改写用途说明重新提交；不跳转
+        document.getElementById('checkTip').innerHTML = '<span style="color:var(--danger)">'
+          + esc(r.aiReason || '用途说明未通过自动审核') + '</span>';
+        document.getElementById('costBox').style.display = 'none';
+        return;
+      }
       document.getElementById('label').value = '';
       document.getElementById('note').value = '';
       document.getElementById('checkTip').innerHTML = '';

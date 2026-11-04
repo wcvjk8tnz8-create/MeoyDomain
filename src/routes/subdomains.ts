@@ -7,6 +7,7 @@ import { pointRules } from './points.js';
 import { expiryRules, computeExpiry, expiryState, renewExpiry, migrateLegacyPerpetual, ensureExpiryColumns } from '../lib/expiry.js';
 import { defaultRoot, isAllowedRoot, listRoots } from '../lib/roots.js';
 import { applyGate } from '../lib/applyGate.js';
+import { aiReview } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -254,11 +255,26 @@ const createMine = async (c) => {
     await audit(c, u.id, 'subdomain.reapply', `${v.label}.${reqRoot}`, '清除此前被驳回的同名记录');
   }
 
-  // 免审核：全局关闭审核，或管理员申请（管理员自建即开通，含保留域名）
-  const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin;
-  const status = autoApprove ? 'approved' : 'pending';
   // 多根域名：允许 body.root 指定，必须是已配置的根域名之一
   const fqdn = `${v.label}.${reqRoot}`;
+
+  // AI 自动审核：仅对 ai_review_roots 中的根域名生效。
+  // 没配 Key / 超时 / 返回异常 → 返回 null，安静回落为 pending 人工审核，不卡申请。
+  let ai = null;
+  if (!isAdmin && c.env.REQUIRE_APPROVAL === '1') {
+    try {
+      ai = await aiReview(c.env, {
+        fqdn, label: v.label, root: reqRoot, note: String(note || ''),
+      });
+    } catch { /* 失败即降级 */ }
+  }
+  const aiApproved = !!ai?.approve;
+  const aiRejected = !!ai && !ai.approve;
+
+  // 免审核：全局关闭审核 / 管理员 / AI 判定通过
+  const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin || aiApproved;
+  const status = aiRejected ? 'rejected' : autoApprove ? 'approved' : 'pending';
+  const statusReason = aiRejected ? String(ai.reason || 'AI 审核未通过').slice(0, 200) : '';
 
   // 有效期：管理员的域名永久有效；其余即时开通的现在起算，待审核的等批准时再起算
   const expRules = await expiryRules(c.env);
@@ -268,12 +284,12 @@ const createMine = async (c) => {
   let res;
   try {
     res = await c.env.DB.prepare(
-      `INSERT INTO subdomains (label, root_domain, fqdn, user_id, status, note, expires_at, perpetual, created_at, updated_at, reviewed_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO subdomains (label, root_domain, fqdn, user_id, status, note, reason, expires_at, perpetual, created_at, updated_at, reviewed_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
     )
       .bind(
-        v.label, reqRoot, fqdn, u.id, status, String(note || '').slice(0, 300),
-        expiresAt, isPerpetual, now(), now(), autoApprove ? now() : null
+        v.label, reqRoot, fqdn, u.id, status, String(note || '').slice(0, 300), statusReason,
+        expiresAt, isPerpetual, now(), now(), (autoApprove || aiRejected) ? now() : null
       )
       .run();
   } catch (e) {
@@ -284,9 +300,9 @@ const createMine = async (c) => {
     throw e;
   }
 
-  // 扣除积分（管理员不扣）
+  // 扣除积分（管理员不扣；AI 驳回视为未受理，不扣）
   let pointsAfter = UNLIMITED_POINTS;
-  if (!isAdmin && cost > 0) {
+  if (!isAdmin && !aiRejected && cost > 0) {
     pointsAfter = await addPoints(
       c.env.DB,
       u.id,
@@ -298,6 +314,7 @@ const createMine = async (c) => {
 
   const detail = [status];
   if (isAdmin) detail.push('管理员免审核');
+  else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · ${ai.reason}`);
   else if (cost > 0) detail.push(`消耗 ${cost} 分${short ? '（单字域名）' : ''}`);
   if (isReserved) detail.push('保留域名');
   await audit(c, u.id, 'subdomain.create', fqdn, detail.join(' · '));
@@ -306,8 +323,10 @@ const createMine = async (c) => {
     id: res.meta?.last_row_id,
     fqdn,
     status,
+    aiReviewed: !!ai,
+    aiReason: ai ? String(ai.reason || '') : '',
     reserved: isReserved,
-    cost: isAdmin ? 0 : cost,
+    cost: isAdmin ? 0 : (aiRejected ? 0 : cost),
     short,
     points: pointsAfter,
   });

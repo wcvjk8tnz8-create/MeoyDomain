@@ -1,6 +1,6 @@
-# MeoyDomain
+# TerraDomain
 
-**MeoyDomain** —— 免费、开源的新一代二级域名分发与 DNS 管理系统。
+**TerraDomain** —— 免费、开源的新一代二级域名分发与 DNS 管理系统。
 
 前端 **React 18 + TypeScript + Vite**（单页应用，全站无手写 HTML 页面），后端 **TypeScript + Hono on Cloudflare Workers + D1 + R2**。用户自助申请 `xxx.你的根域名`，审核通过后自行添加 DNS 记录；每个根域名可单独选择通过 **Cloudflare API** 或 **Spaceship DNS API** 下发。
 
@@ -165,7 +165,7 @@
 
 | CNAME 指向 | 显示为 |
 |---|---|
-| `dash.domain.meoy.top`（后台配置） | 你设定的名称，如「Meoy 面板」 |
+| `dash.domain.meoy.top`（后台配置） | 你设定的名称，如「TerraDomain 面板」 |
 | `cname.vercel-dns.com` | Vercel |
 | `*.pages.dev` | Cloudflare Pages |
 | `*.github.io` | GitHub Pages |
@@ -252,7 +252,7 @@ CNAME 探测走 DoH（cloudflare-dns.com → dns.google 双端点降级），5 �
 
 | 项 | 默认 | 说明 |
 |---|---|---|
-| 站点名称 | `Meoy` | 显示在导航、标题、浏览器标签 |
+| 站点名称 | `TerraDomain` | 显示在导航、标题、浏览器标签 |
 | Logo | `/img/logo.jpg` | 站内路径或外链图片均可，带实时预览 |
 | favicon | `/img/favicon.png` | 浏览器标签图标 |
 | 站点公告 | 空 | 预留 |
@@ -717,3 +717,40 @@ GET  /api/admin/roots             当前全部根域名（含来源）
 > 官方规范：`GET /v1/domains?take=100&skip=0`，Header `X-Api-Key` + `X-Api-Secret`，
 > 响应 `{ items, total }`。列表限流 300 次 / 300 秒，`take` 最大 100，本项目自动翻页（最多 5 页）。
 > 若新域名要用 Cloudflare 做 DNS 解析，需把该域名 NS 指向 Cloudflare 并填写对应 Zone ID。
+
+
+---
+
+## AI 自动审核 + 按根域名的 DNS 限额
+
+后台 → **站点设置 → AI 自动审核**（`src/lib/aiReview.ts`）。
+
+| 配置 | 默认值 | 说明 |
+|---|---|---|
+| 启用自动审核 | 开 | 关掉后所有申请回到人工审核 |
+| 接口地址 | `https://apihub.agnes-ai.com/v1` | 任何 OpenAI 兼容网关 |
+| 模型 | 留空 | 自动探测 `/models` 取第一个，失败回落 `gpt-4o-mini` |
+| 自动审核的根域名 | `v-1.top` | 逗号分隔；只对这些后缀生效 |
+| 不限 DNS 记录数的根域名 | `v-1.top` | 逗号分隔；豁免「单域名最多 50 条」 |
+| API Key | 空 | **只存数据库或 Worker Secret，绝不写进代码库** |
+
+配置 Key 两种方式（二选一）：
+
+```bash
+# 方式 A：Worker Secret（推荐，后台只读不改）
+npx wrangler secret put AI_API_KEY
+```
+
+方式 B：后台设置页直接粘贴。后台 GET 只回 `keySet` + `keyMasked`（尾 4 位），
+公开的 `/api/config` 只返回两份根域名名单，不含地址与密钥。
+
+**审核流程**：申请落在名单内的根域名 → 把「域名 + 用途说明」发给模型，
+要求只输出 `{"approve":true/false,"reason":"..."}` → 通过则直接 `approved`
+（`reviewed_at` 写入、审计日志记录 AI 结论）；驳回则 `rejected` 且不扣积分，
+前端保留输入让用户改写用途说明重新提交。
+
+**失败即降级**：没配 Key、8 秒超时、模型报错、返回无法解析 —— 一律回落为
+`pending` 人工审核，不会卡住申请，也不会因为 AI 故障误批准。
+
+**根域名归属**：域名列表的「根域名」列取库里的 `root_domain`，缺失时从
+`fqdn` 去掉首段反推（`lol.v-1.top` → `v-1.top`），不再写死默认根域名。

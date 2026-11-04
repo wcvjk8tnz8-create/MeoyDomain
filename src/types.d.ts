@@ -1,5 +1,5 @@
 /**
- * MeoyDomain · 全局类型定义
+ * TerraDomain · 全局类型定义
  *
  * 渐进式 TypeScript 迁移的基础设施：
  *  - Env：Worker 的全部绑定（D1 / R2 / ASSETS / Secrets / Vars）
@@ -41,6 +41,14 @@ export interface Env {
   R2_PUBLIC_URL?: string;
   AVATAR_MAX_KB?: string;
   ALLOWED_EMAIL_DOMAINS?: string;
+
+  // ── AI 自动审核（密钥走 Secret / 后台设置，不写进代码库）──
+  AI_API_KEY?: string;
+  AI_API_URL?: string;
+  AI_MODEL?: string;
+  AI_REVIEW_ENABLED?: string;
+  AI_REVIEW_ROOTS?: string;
+  DNS_UNLIMITED_ROOTS?: string;
 }
 
 // ────────────────────────────────────────────────────────────

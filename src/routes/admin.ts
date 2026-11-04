@@ -415,7 +415,7 @@ app.get('/settings', async (c) => {
   const raw = Object.fromEntries(results.map((r) => [r.key, r.value]));
 
   // 敏感项：不回传明文，只回传「是否已配置 + 尾号」，前端显示为占位符
-  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret', 'dns_api_key', 'dns_api_secret', 'mail_api_key', 'spaceship_api_key', 'spaceship_api_secret'];
+  const SENSITIVE = ['dnshe_api_key', 'dnshe_api_secret', 'dns_api_key', 'dns_api_secret', 'mail_api_key', 'spaceship_api_key', 'spaceship_api_secret', 'ai_api_key'];
   const items = { ...raw };
   for (const k of SENSITIVE) delete items[k];
 
@@ -470,6 +470,19 @@ app.get('/settings', async (c) => {
     // 当前生效的根域名（含后台导入的）
     rootDomains: listRoots(c.env).map((r) => r.domain),
 
+    // AI 自动审核（Agnes AI 等 OpenAI 兼容网关）
+    ai: {
+      enabled: String(raw.ai_review_enabled || '1').trim() === '1',
+      roots: String(raw.ai_review_roots || 'v-1.top').trim(),
+      url: String(raw.ai_api_url || c.env.AI_API_URL || 'https://apihub.agnes-ai.com/v1').trim(),
+      model: String(raw.ai_model || c.env.AI_MODEL || '').trim(),
+      keySet: !!(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
+      keyMasked: mask(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
+      fromEnv: !!String(c.env.AI_API_KEY || '').trim(),
+      ready: !!(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
+      dnsUnlimitedRoots: String(raw.dns_unlimited_roots || 'v-1.top').trim(),
+    },
+
     // 新域名申请开关
     applyPaused: String(raw.apply_paused || c.env.APPLY_PAUSED || '').trim() === '1',
     applyPausedFromEnv: String(c.env.APPLY_PAUSED || '').trim() === '1',
@@ -517,6 +530,22 @@ app.post('/settings', async (c) => {
   if (body.applyPausedMessage !== undefined) {
     await set('apply_paused_message', String(body.applyPausedMessage || '').trim().slice(0, 200));
   }
+
+  /* AI 自动审核：密钥只在显式提交新值时写入；前端显示掩码，空串不覆盖已有 Key。
+     也支持 Worker Secret AI_API_KEY（此时后台只读，避免两处配置打架）。 */
+  const cleanRoots = (v) => String(v ?? '')
+    .split(',').map((x) => x.trim().toLowerCase().replace(/^\.+|\.+$/g, ''))
+    .filter((x) => /^[a-z0-9][a-z0-9.-]{0,251}$/.test(x)).slice(0, 30).join(',');
+  if (body.aiEnabled !== undefined) await set('ai_review_enabled', body.aiEnabled ? '1' : '0');
+  if (body.aiRoots !== undefined) await set('ai_review_roots', cleanRoots(body.aiRoots));
+  if (body.aiDnsUnlimitedRoots !== undefined) await set('dns_unlimited_roots', cleanRoots(body.aiDnsUnlimitedRoots));
+  if (body.aiUrl !== undefined) {
+    const u = String(body.aiUrl || '').trim().replace(/\/+$/, '');
+    await set('ai_api_url', /^https:\/\//i.test(u) ? u.slice(0, 300) : 'https://apihub.agnes-ai.com/v1');
+  }
+  if (body.aiModel !== undefined) await set('ai_model', String(body.aiModel || '').trim().slice(0, 80));
+  if (String(body.aiApiKey || '').trim()) await set('ai_api_key', String(body.aiApiKey).trim().slice(0, 300));
+  else if (body.aiClearKey === true) await set('ai_api_key', '');
 
   // 同 IP 账号上限
   if (body.maxAccountsPerIp !== undefined && body.maxAccountsPerIp !== '') {

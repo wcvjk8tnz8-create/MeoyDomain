@@ -159,7 +159,9 @@ export async function mountDashboard(_root: HTMLElement | null): Promise<void> {
       <tr class="${rejected ? 'rejected' : ''}">
         <td><span class="fqdn"${rejected ? ' style="opacity:.75;text-decoration:line-through"' : ''}>${esc(s.fqdn)}</span>${note}</td>
         <td>${statusBadge(s.status)}${rejected ? '<div class="hint">不占配额</div>' : ''}</td>
-        <td class="nowrap" style="color:var(--muted)">.${esc(rootDomain)}</td>
+        <td class="nowrap" style="color:var(--muted)">.${esc(
+          s.root_domain || String(s.fqdn || '').replace(/^[^.]+\./, '') || rootDomain
+        )}</td>
         <td>${s.record_count}</td>
         <td class="nowrap" style="color:var(--muted)">${fmtTime(s.created_at)}</td>
         <td class="nowrap">${expiryHtml}</td>

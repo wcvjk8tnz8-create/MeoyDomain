@@ -42,6 +42,11 @@ CF_MOCK = "0"
 # R2 公开访问域名（留空则用默认 /api/avatar/<key> 代理读取）
 # 建议在 R2 桶设置里绑定自定义域（如 img.meoy.top），填到这里可直接外链，省 Worker 流量
 R2_PUBLIC_URL = ""
+# ── AI 自动审核（Agnes AI 等 OpenAI 兼容网关）──
+# 密钥请用 Secret 注入，绝对不要写进本文件（本文件会随代码库公开）：
+#   npx wrangler secret put AI_API_KEY
+# 也可以在「后台 → 站点设置 → AI 自动审核」里填写（只存数据库，后台只回掩码）。
+# 可选覆盖（Vars 或 Secret）：AI_API_URL、AI_MODEL、AI_REVIEW_ROOTS、DNS_UNLIMITED_ROOTS
 # 头像上传大小上限（KB）
 AVATAR_MAX_KB = "2048"
 
