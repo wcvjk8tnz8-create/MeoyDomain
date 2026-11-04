@@ -41,6 +41,7 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
     var tip = document.getElementById('applyTip');
     if (tip) {
       tip.className = 'alert a-warn';
+      tip.style.display = '';
       tip.innerHTML = '<b>新域名申请已暂停</b><br>' + esc(APPLY_MSG)
         + '<br><span style="opacity:.8;font-size:12px">已注册的域名、DNS 记录与续期不受影响。</span>';
     }
@@ -86,6 +87,7 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
     });
     closeRootMenu();
     updateRootTip(d);
+    try { window.dispatchEvent(new CustomEvent('terradata:root', { detail: d })); } catch {}
     var v = (document.getElementById('label') as HTMLInputElement)?.value.trim();
     if (v) runCheck(v);   // 换后缀立即重新查可用性
   }
@@ -101,6 +103,19 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       AI_ROOTS = Array.isArray(cfg.aiReviewRoots) ? cfg.aiReviewRoots : [];
       DNS_UNLIMITED = Array.isArray(cfg.dnsUnlimitedRoots) ? cfg.dnsUnlimitedRoots : [];
       updateRootTip(list[0] || '');
+
+      /* AI 状态可视化：说明「为什么这次没走 AI」——
+         常见原因是后台还没填 Key、开关被关、或当前账号是管理员（免审核）。 */
+      var aiTip = document.getElementById('aiStatusTip');
+      if (aiTip) {
+        var st = cfg.aiStatus || {};
+        var msg = '';
+        if (!st.ready) msg = '⚠ AI 自动审核未配置 API Key：申请会回落人工审核。';
+        else if (!st.enabled) msg = '⚠ AI 自动审核开关已关闭：申请会回落人工审核。';
+        else msg = '✓ AI 自动审核已就绪（' + esc(st.model || '自动探测模型') + '）；管理员账号免审核，不会触发 AI。';
+        aiTip.textContent = msg;
+        aiTip.style.display = '';
+      }
 
       var btn = document.getElementById('rootPickerBtn') as HTMLButtonElement;
       var span = document.getElementById('rootDomain');
@@ -136,6 +151,12 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
         (el as HTMLButtonElement).onclick = function(){ selectRoot(el.getAttribute('data-root')); };
       });
       btn.onclick = function(e){ e.stopPropagation(); toggleRootMenu(); };
+      // /register?label=foo&root=v-1.top：从 WHOIS / 落地页带后缀跳进来时保持选中
+      try {
+        var want = new URLSearchParams(location.search).get('root');
+        if (want && list.indexOf(want) >= 0) selectRoot(want);
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent('terradata:root', { detail: first })); } catch {}
       // 点外部 / Esc 关闭；监听随切页自动注销
       onDoc('click', function(e){
         if (!(e.target as HTMLElement)?.closest?.('#rootPicker')) closeRootMenu();
@@ -242,7 +263,12 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       document.getElementById('checkTip').innerHTML = '';
       document.getElementById('costBox').style.display = 'none';
       loadPending();
-      setTimeout(function(){ location.href = '/dashboard'; }, 900);
+      // 新版四步向导存在时停在第四步展示结果；没有时才沿用旧的自动跳转
+      if (typeof (window as any).__TD_WIZARD_DONE === 'function') {
+        (window as any).__TD_WIZARD_DONE(r);
+      } else {
+        setTimeout(function(){ location.href = '/dashboard'; }, 900);
+      }
     } catch (e) {
       toast(e.message, 'err');
     }

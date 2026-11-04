@@ -352,6 +352,10 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 <div><span class="dim">不限 DNS 记录数的根域名</span><input id="sAiDnsRoots" placeholder="v-1.top"></div>
               </div>
               <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。AI 未配置、超时或返回异常时，申请自动回落为人工审核，不会卡住用户。</div>
+              <div class="row" style="gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+                <button class="btn sm ghost" id="aiTestBtn" type="button">测试 AI 连接</button>
+                <span class="hint" id="aiTestResult" style="margin:0">先保存设置再测试；会真实调用一次模型并返回诊断。</span>
+              </div>
             </div>
             <div class="field">
               <label>滥用举报渠道（外部域名 WHOIS 展示）</label>
@@ -522,6 +526,23 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           await api.post('/api/admin/settings/reset-logo', {});
           toast('已恢复默认 Logo'); load();
         } catch (e) { toast(e.message, 'err'); }
+      };
+
+      /* AI 连接自检：真实调用一次 /models 与 /chat/completions，回报具体失败点 */
+      const aiTestBtn = document.getElementById('aiTestBtn');
+      if (aiTestBtn) aiTestBtn.onclick = async () => {
+        const out = document.getElementById('aiTestResult');
+        if (out) { out.textContent = '测试中…'; out.className = 'hint'; }
+        try {
+          const r = await api.post('/api/admin/ai-test', {});
+          if (out) {
+            out.className = 'hint';
+            out.innerHTML = r.ok
+              ? `<span class="badge ok">可用</span> 模型 <span class="mono">${esc(r.model)}</span> · ${r.latencyMs} ms · 返回「${esc(r.sample || '')}」`
+              : `<span class="badge warn">不可用</span> ${esc(r.message || '未知错误')}${r.detail ? '<br><span class="mono">' + esc(r.detail) + '</span>' : ''}`;
+          }
+          toast(r.ok ? 'AI 连接正常' : 'AI 连接失败：' + (r.message || ''), r.ok ? 'ok' : 'err');
+        } catch (e) { if (out) out.textContent = '测试失败：' + (e.message || e); }
       };
   
       // 有效期规则

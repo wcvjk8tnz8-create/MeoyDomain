@@ -101,6 +101,12 @@ async function pickModel(cfg: AiConfig, signal: AbortSignal): Promise<string> {
   return 'gpt-4o-mini';
 }
 
+/** 网关模型名不可控时的兜底列表：/models 探测失败或首个模型不支持 chat 时逐个重试 */
+const FALLBACK_MODELS = [
+  'gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo', 'deepseek-chat',
+  'qwen-turbo', 'claude-3-5-sonnet-20241022',
+];
+
 function parseVerdict(text: string): { approve: boolean; reason: string } | null {
   if (!text) return null;
   let s = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
@@ -109,20 +115,105 @@ function parseVerdict(text: string): { approve: boolean; reason: string } | null
   if (m) {
     try {
       const o = JSON.parse(m[0]);
-      if (typeof o.approve === 'boolean' || typeof o.approved === 'boolean') {
-        return {
-          approve: o.approve ?? o.approved,
-          reason: String(o.reason || o.message || '').slice(0, 160) || 'AI 审核完成',
-        };
+      const bool = [o.approve, o.approved, o.pass, o.allow].find((x) => typeof x === 'boolean');
+      if (bool !== undefined) {
+        return { approve: bool, reason: String(o.reason || o.message || '').slice(0, 160) || 'AI 审核完成' };
+      }
+      // 有些网关给字符串 "true"/"false"
+      const str = [o.approve, o.approved, o.result, o.decision].find((x) => typeof x === 'string');
+      if (str && /^(true|false|approve|reject|yes|no)$/i.test(String(str))) {
+        const yes = /^(true|approve|yes)$/i.test(String(str));
+        return { approve: yes, reason: String(o.reason || o.message || '').slice(0, 160) || 'AI 审核完成' };
       }
     } catch { /* 落到关键词判断 */ }
   }
   const low = s.toLowerCase();
   if (/(拒绝|不通过|违规|驳回|reject|deny|block)/.test(low))
     return { approve: false, reason: s.slice(0, 160) };
-  if (/(通过|同意|正常|可用|approve|approve|yes|ok)/.test(low))
+  if (/(通过|同意|正常|可用|approve|yes|ok|true)/.test(low))
     return { approve: true, reason: 'AI 审核通过' };
+  if (/^(true|false|yes|no)$/i.test(low))
+    return { approve: /^(true|yes)$/i.test(low), reason: 'AI 审核完成' };
   return null;
+}
+
+/** 发一次 chat/completions，返回可读文本与失败诊断 */
+async function chatOnce(cfg: AiConfig, model: string, prompt: string, signal: AbortSignal) {
+  const messages = [
+    { role: 'system', content: '你是严格、克制、只输出 JSON 的域名申请审核助手。' },
+    { role: 'user', content: prompt },
+  ];
+  const call = async (extra: Record<string, unknown>) => {
+    const res = await fetch(`${cfg.base}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+      body: JSON.stringify({ model, messages, ...extra }),
+      signal,
+    });
+    return { res, raw: await res.text().catch(() => '') };
+  };
+  let { res, raw } = await call({ temperature: 0, max_tokens: 160 });
+  // 部分网关不认 max_tokens / temperature，去掉后再试一次
+  if (!res.ok && res.status === 400) {
+    try { ({ res, raw } = await call({})); } catch { /* 保持原结果 */ }
+  }
+  if (!res.ok) return { text: '', status: res.status, err: raw.slice(0, 220) };
+  let d: any = {};
+  try { d = JSON.parse(raw); } catch { /* 非 JSON 直接当文本 */ }
+  const text = String(d?.choices?.[0]?.message?.content ?? d?.choices?.[0]?.text ?? d?.output ?? raw);
+  return { text, status: res.status, err: '' };
+}
+
+export interface AiTestResult {
+  ok: boolean;
+  model: string;
+  latencyMs: number;
+  sample: string;
+  message: string;
+  detail: string;
+}
+
+/** 后台「测试 AI 连接」：真实调用一次，回报具体失败点，绝不回传密钥 */
+export async function aiTest(env: any): Promise<AiTestResult> {
+  const cfg = await loadAiConfig(env);
+  const t0 = Date.now();
+  const base: AiTestResult = { ok: false, model: '', latencyMs: 0, sample: '', message: '', detail: '' };
+  if (!cfg.configured) {
+    return { ...base, message: '未配置 API Key（后台填一次，或用 Worker Secret AI_API_KEY）' };
+  }
+  if (!cfg.enabled) return { ...base, message: '自动审核开关已关闭' };
+
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const models: string[] = cfg.model ? [cfg.model] : [];
+    if (!models.length) {
+      try {
+        const r = await fetch(`${cfg.base}/models`, { headers: { Authorization: `Bearer ${cfg.key}` }, signal: ctl.signal });
+        const d: any = await r.json().catch(() => ({}));
+        const list = Array.isArray(d?.data) ? d.data : (Array.isArray(d?.models) ? d.models : []);
+        for (const x of list) { const id = typeof x === 'string' ? x : x?.id; if (id) models.push(String(id)); }
+      } catch { /* 探测失败继续用兜底名 */ }
+    }
+    for (const f of FALLBACK_MODELS) if (!models.includes(f)) models.push(f);
+
+    const prompt = '只输出 JSON：{"approve":true,"reason":"连接测试"}。不要解释。';
+    const tried: string[] = [];
+    for (const model of models.slice(0, 6)) {
+      try {
+        const r = await chatOnce(cfg, model, prompt, ctl.signal);
+        if (r.text) {
+          return { ...base, ok: true, model, latencyMs: Date.now() - t0, sample: r.text.trim().slice(0, 80) };
+        }
+        tried.push(`${model} → HTTP ${r.status}${r.err ? ' ' + r.err.replace(/[\n\r]/g, ' ') : ''}`);
+      } catch (e) {
+        tried.push(`${model} → ${String((e as Error)?.name || 'error')}`);
+      }
+    }
+    return { ...base, message: '所有候选模型均调用失败', detail: tried.join(' | ').slice(0, 400), latencyMs: Date.now() - t0 };
+  } catch (e) {
+    return { ...base, message: '连接异常（超时或网络不可达）', detail: String((e as Error)?.message || e).slice(0, 200) };
+  } finally { clearTimeout(timer); }
 }
 
 export interface ReviewInput {
@@ -141,9 +232,9 @@ export async function aiReview(env: any, input: ReviewInput): Promise<{ approve:
   if (!cfg) return null;
 
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 8000);
+  // 12 秒：/models 探测 + 最多 3 个候选模型，避免网关慢时整体降级
+  const timer = setTimeout(() => ctl.abort(), 12000);
   try {
-    const model = await pickModel(cfg, ctl.signal);
     const prompt = [
       '你是二级域名分发平台的审核助手。请判断下面这份子域名申请是否应当自动批准。',
       '',
@@ -157,27 +248,18 @@ export async function aiReview(env: any, input: ReviewInput): Promise<{ approve:
       '只输出 JSON，不要解释、不要 Markdown：{"approve":true 或 false,"reason":"不超过 40 字的中文理由"}',
     ].join('\n');
 
-    const res = await fetch(`${cfg.base}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.key}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: '你是严格、克制、只输出 JSON 的域名申请审核助手。' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0,
-        max_tokens: 160,
-      }),
-      signal: ctl.signal,
-    });
-    if (!res.ok) return null;
-    const d: any = await res.json().catch(() => ({}));
-    const text = d?.choices?.[0]?.message?.content ?? d?.choices?.[0]?.text ?? '';
-    return parseVerdict(String(text));
+    const probed = cfg.model ? '' : await pickModel(cfg, ctl.signal);
+    const candidates = cfg.model ? [cfg.model] : [probed, ...FALLBACK_MODELS];
+    for (const model of candidates.slice(0, 4)) {
+      if (ctl.signal.aborted) break;
+      try {
+        const r = await chatOnce(cfg, model, prompt, ctl.signal);
+        if (!r.text) continue;               // 该模型不可用，换下一个
+        const verdict = parseVerdict(r.text);
+        if (verdict) return verdict;
+      } catch { /* 超时或网络异常，换下一个 */ }
+    }
+    return null;
   } catch {
     return null;
   } finally {

@@ -925,3 +925,227 @@ body:has(.main) .site-foot { margin-left: var(--sb-w) !important; }
 }
 .nk-hero-meta b { color: hsl(var(--foreground)); font-weight: 650; margin-right: 4px; }
 @media (max-width: 900px) { .nk-hero-meta { gap: 16px; margin-top: 28px; } }
+
+/* ══════════════════════════════════════════════════════════════
+   20. 全站圆角（用户要求「所有东西都做成圆角」）
+   统一令牌 + 末尾权威覆盖，压过前面所有直角 / 2px / 3px 规则。
+   ══════════════════════════════════════════════════════════════ */
+:root { --radius: 14px; --radius-s: 10px; --radius-l: 20px; }
+
+.card, .stat-card, .quick, .modal-card, .box, .pane, .alert, .badge, .tag,
+.pill, .seg, .steps, .msg, .detail, .nk-suf, .nk-svc-card, .nk-res, .nk-tag,
+.nk-sbar, .nk-term, .auth-card, .side-mod, .quote, .todo, .checks,
+.notif-panel, .user-menu, .lang-switch, .root-picker-menu, .root-opt,
+.np-head, .np-item, .um-head, .um-body, .um-foot, .stat, .stat-grid .stat,
+table thead th:first-child, table tbody td:first-child,
+table thead th:last-child, table tbody td:last-child,
+input:not([type=checkbox]):not([type=radio]):not(.reg-label-input),
+select, textarea, .btn, .input, .textarea, .field input, .field select {
+  border-radius: var(--radius-s) !important;
+}
+.card, .modal-card, .stat-card, .quick, .detail, .notif-panel, .user-menu,
+.steps, .reg-steps, .reg-card, .reg-domain-box, .zx-metric, .zx-search,
+.nk-sbar, .nk-term, .whois-search, .checks, .box {
+  border-radius: var(--radius) !important;
+}
+.btn, .pill, .zx-pills a, .zx-nav-btn, .zx-nav-cta, .seg button,
+.tag, .badge, .lang-switch, .root-picker-btn, .root-opt, .np-item {
+  border-radius: 999px !important;
+}
+.nk-hot, .nk-s-tag, .nk-tag, .badge { border-radius: 6px !important; }
+.topbar, .sidebar, .home-top, .site-nav { border-radius: 0 !important; }
+.side-item, .side-item.on::before { border-radius: var(--radius-s) !important; }
+.acc, .acc-body, .reg-summary, .reg-notice, .reg-field-head { border-radius: var(--radius-s) !important; }
+
+/* ══════════ 21. 后缀选择器嵌入输入框（并修深色白块） ══════════
+   旧实现里 .root-opt 是 <button> 却没有显式背景，深色模式下落到浏览器
+   默认 buttonface（浅色），看起来就是一块白色；同时浮层定位飘到内容右侧。
+   这里把背景、层级、锚点全部写死，深浅两套都给实心色。 */
+.reg-domain-box {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 6px 8px 6px 18px;
+  border: 1px solid hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  box-shadow: 0 0 0 0 transparent;
+  transition: border-color .18s, box-shadow .18s;
+}
+.reg-domain-box:focus-within {
+  border-color: hsl(var(--primary)) !important;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / .14) !important;
+}
+.reg-label-input {
+  flex: 1 1 auto; min-width: 0;
+  border: none !important; outline: none !important; box-shadow: none !important;
+  background: transparent !important; color: hsl(var(--foreground)) !important;
+  font: 500 17px/1.5 var(--sans) !important; padding: 12px 0 !important;
+}
+.reg-label-input::placeholder { color: hsl(var(--muted-foreground)); font-weight: 500; }
+.reg-count, .reg-note-count span { font: 12px/1 var(--mono); color: hsl(var(--muted-foreground)); white-space: nowrap; }
+.root-picker { position: relative; flex: 0 0 auto; }
+.root-picker-btn {
+  min-width: 132px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+  padding: 0 16px;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 999px !important;
+  background: hsl(var(--secondary)) !important;
+  color: hsl(var(--foreground)) !important;
+  font: 700 15px/1 var(--mono) !important;
+  cursor: pointer; transition: background .18s, transform .18s;
+}
+.root-picker-btn:hover:not(:disabled) { background: hsl(var(--primary) / .12) !important; }
+.root-picker-btn.single { cursor: default; }
+.root-picker-btn[aria-expanded="true"] { background: hsl(var(--primary) / .16) !important; }
+.root-dot { opacity: .5; }
+.root-chev { width: 14px; height: 14px; margin-left: 8px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .2s; }
+.root-picker-btn[aria-expanded="true"] .root-chev { transform: rotate(180deg); }
+
+.root-picker-menu {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  min-width: 210px; z-index: 70; padding: 6px;
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 14px 36px hsl(215 25% 20% / .18) !important;
+  opacity: 0; visibility: hidden; transform: translateY(-6px) scale(.98);
+  transition: opacity .18s, transform .18s, visibility .18s;
+}
+.root-picker-menu.show { opacity: 1; visibility: visible; transform: none; }
+.root-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  width: 100%; padding: 11px 14px; margin: 0;
+  border: none !important;
+  background: transparent !important;
+  color: hsl(var(--foreground)) !important;
+  font: 600 14px/1.3 var(--mono) !important;
+  text-align: left; transition: background .15s, color .15s;
+}
+.root-opt:hover { background: hsl(var(--secondary)) !important; }
+.root-opt.on { background: hsl(var(--primary) / .14) !important; color: hsl(var(--primary)) !important; }
+.root-opt-free { font: 500 12px/1 var(--sans) !important; color: hsl(var(--muted-foreground)); }
+/* 深色：显式实心背景，杜绝 UA 默认 buttonface 造成的白块 */
+html[data-theme="dark"] .root-picker-menu { background: hsl(220 12% 13%) !important; border-color: hsl(220 10% 26%) !important; }
+html[data-theme="dark"] .root-opt { background: transparent !important; color: hsl(220 12% 92%) !important; }
+html[data-theme="dark"] .root-opt:hover { background: hsl(220 10% 20%) !important; }
+html[data-theme="dark"] .root-opt.on { background: hsl(220 100% 74% / .18) !important; color: hsl(220 100% 74%) !important; }
+html[data-theme="dark"] .root-picker-btn { background: hsl(220 10% 16%) !important; color: hsl(220 12% 92%) !important; }
+html[data-theme="dark"] .reg-domain-box { background: hsl(220 12% 11%) !important; }
+@media (max-width: 620px) {
+  .root-picker-btn { min-width: 104px; padding: 0 10px; font-size: 12px !important; }
+  .root-picker-menu { min-width: 175px; }
+}
+
+/* ══════════ 22. 注册页四步向导（参考 DnsNeko） ══════════ */
+.reg-wrap { max-width: 980px !important; margin: 0 auto !important; }
+.reg-steps {
+  display: flex; justify-content: space-between; position: relative;
+  margin: 24px 0 22px; padding: 20px 34px;
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+.reg-steps::before { content: ""; position: absolute; left: 12%; right: 12%; top: 35px; height: 2px; background: hsl(var(--border)); }
+.reg-step { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 0 12px; background: hsl(var(--card)); font-size: 14px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.reg-step i { width: 32px; height: 32px; border-radius: 50%; border: 2px solid hsl(var(--border)); display: grid; place-items: center; font-style: normal; font: 700 14px/1 var(--mono); background: hsl(var(--card)); transition: .25s; }
+.reg-step.active { color: hsl(var(--primary)); }
+.reg-step.active i { background: hsl(var(--primary)); border-color: hsl(var(--primary)); color: hsl(var(--primary-foreground)); box-shadow: 0 0 0 6px hsl(var(--primary) / .13); }
+.reg-step.done i { border-color: hsl(var(--success)); color: hsl(var(--success)); background: hsl(var(--success) / .1); }
+.reg-notice { border-radius: var(--radius-s) !important; padding: 12px 18px; margin-bottom: 14px; font-size: 13.5px; font-weight: 600; text-align: center; }
+.reg-notice.gray { background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); }
+.reg-notice.blue { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.reg-notice.blue b { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid currentColor; border-radius: 50%; margin-right: 8px; font-size: 12px; }
+.reg-pane { display: none; animation: fade .3s var(--ease); }
+.reg-pane.active { display: block; }
+.reg-card { padding: 24px !important; }
+.reg-field-head { display: flex; align-items: flex-start; gap: 14px; padding: 14px; margin-bottom: 16px; background: hsl(var(--secondary)); }
+.reg-field-head h3 { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+.reg-field-head em { font-style: normal; font-size: 11px; font-weight: 700; color: hsl(var(--destructive)); background: hsl(var(--destructive) / .1); padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
+.reg-field-head p { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin: 0; }
+.reg-ico { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 12px !important; display: grid; place-items: center; background: hsl(var(--primary) / .12); color: hsl(var(--primary)); font-size: 18px; }
+.reg-ico.warm { background: hsl(var(--warning) / .14); color: hsl(var(--warning)); }
+.reg-note { width: 100%; min-height: 128px; resize: vertical; padding: 14px 16px !important; }
+.reg-note-count { display: flex; justify-content: space-between; font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 6px; }
+.reg-acc .acc { border-top: 1px dashed hsl(var(--border)); padding: 13px 6px; font-weight: 650; }
+.reg-acc .acc-body { padding: 0 6px 14px 26px; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.85; }
+.reg-checks { display: grid; gap: 12px; padding: 16px; margin-top: 8px; background: hsl(var(--warning) / .07); border: 1px solid hsl(var(--warning) / .3); }
+.reg-checks label { display: flex; gap: 10px; align-items: center; font-size: 13.5px; cursor: pointer; }
+.reg-actions { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 24px; }
+.reg-actions .btn { min-width: 120px; }
+.reg-actions.center { justify-content: center; }
+.reg-summary { display: grid; gap: 0; border: 1px solid hsl(var(--border)); overflow: hidden; }
+.reg-summary > div { display: flex; justify-content: space-between; gap: 20px; padding: 15px 18px; border-bottom: 1px solid hsl(var(--border)); font-size: 14px; }
+.reg-summary > div:last-child { border-bottom: none; }
+.reg-summary span { color: hsl(var(--muted-foreground)); }
+.reg-summary b { font-weight: 650; text-align: right; word-break: break-all; }
+.reg-confirm { margin-top: 18px !important; }
+.reg-done { text-align: center; padding: 40px 24px !important; }
+.reg-done-ico { width: 64px; height: 64px; margin: 0 auto 18px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; color: hsl(var(--success)); background: hsl(var(--success) / .12); }
+.reg-done h3 { font-size: 22px; margin: 0 0 10px; }
+.reg-done .mono { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
+.reg-done .dim { color: hsl(var(--muted-foreground)); font-size: 13px; }
+.reg-faq { margin-top: 20px !important; }
+.reg-faq .acc { font-weight: 650; padding: 13px 4px; border-top: 1px dashed hsl(var(--border)); cursor: pointer; }
+.reg-faq .acc-body { display: block !important; padding: 0 4px 14px 22px; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.85; }
+@media (max-width: 700px) {
+  .reg-steps { padding: 16px 8px; }
+  .reg-step { font-size: 11px; padding: 0 4px; }
+  .reg-step i { width: 27px; height: 27px; font-size: 12px; }
+  .reg-notice { font-size: 12px; padding: 10px 12px; }
+  .reg-card { padding: 18px !important; }
+}
+
+/* ══════════ 23. 落地页 Zerexa 风格 ══════════ */
+.zx-hero { padding: 70px 0 60px !important; }
+.zx-kicker { font: 700 12px/1 var(--mono); letter-spacing: .13em; color: hsl(var(--muted-foreground)); margin-bottom: 22px; }
+.zx-kicker span { margin: 0 8px; opacity: .5; }
+.zx-title { font: 800 clamp(38px, 6.6vw, 82px)/1.12 var(--sans) !important; letter-spacing: -.045em !important; margin: 0 0 20px !important; color: hsl(var(--foreground)) !important; }
+.zx-title span { color: hsl(var(--muted-foreground)) !important; }
+.zx-sub { font-size: 16px !important; line-height: 1.85; color: hsl(var(--muted-foreground)); max-width: 780px; margin: 0 0 34px !important; }
+.zx-search { display: flex; align-items: center; gap: 0; width: 100%; max-width: 940px; border: 1px solid hsl(var(--border)) !important; background: hsl(var(--card)) !important; overflow: hidden; transition: border-color .2s, box-shadow .2s; }
+.zx-search:focus-within { border-color: hsl(var(--foreground)) !important; box-shadow: 0 0 0 3px hsl(var(--foreground) / .08) !important; }
+.zx-search > input { flex: 1 1 auto; min-width: 0; border: none !important; outline: none !important; box-shadow: none !important; background: transparent !important; padding: 20px 24px !important; font: 500 17px/1.4 var(--sans) !important; color: hsl(var(--foreground)) !important; }
+.zx-search > input::placeholder { color: hsl(var(--muted-foreground)); }
+.zx-root-wrap, .whois-root-wrap { position: relative; flex: 0 0 auto; display: flex; align-items: center; border-left: 1px solid hsl(var(--border)); }
+.zx-root-wrap select, .whois-root-wrap select {
+  appearance: none; -webkit-appearance: none;
+  border: none !important; outline: none !important; box-shadow: none !important;
+  background: transparent !important; color: hsl(var(--foreground)) !important;
+  font: 600 16px/1 var(--sans) !important; padding: 20px 44px 20px 22px !important;
+  cursor: pointer; max-width: 220px;
+}
+.zx-root-wrap svg, .whois-root-wrap svg { position: absolute; right: 18px; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; pointer-events: none; color: hsl(var(--muted-foreground)); }
+.zx-search-btn { flex: 0 0 auto; align-self: stretch; padding: 0 38px; border: none !important; border-radius: 0 !important; background: hsl(var(--foreground)) !important; color: hsl(var(--background)) !important; font: 700 16px/1 var(--sans) !important; cursor: pointer; transition: opacity .2s; }
+.zx-search-btn:hover { opacity: .82; }
+.zx-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 16px; max-width: 940px; }
+.zx-results:empty { display: none; }
+.zx-pills { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 46px; }
+.zx-pills a { padding: 11px 22px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 14px; font-weight: 650; text-decoration: none; transition: transform .18s, background .18s; }
+.zx-pills a:hover { transform: translateY(-2px); }
+.zx-pills a.on { background: hsl(var(--foreground)); color: hsl(var(--background)); border-color: hsl(var(--foreground)); }
+.zx-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; max-width: 1080px; }
+.zx-metric { display: flex; flex-direction: column; gap: 6px; padding: 22px 24px; border: 1px solid hsl(var(--border)) !important; background: hsl(var(--card)) !important; }
+.zx-m-lbl { font-size: 12.5px; color: hsl(var(--muted-foreground)); }
+.zx-metric b { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
+.zx-metric small { font-size: 11.5px; color: hsl(var(--muted-foreground)); }
+.zx-nav-btn, .zx-nav-cta { padding: 9px 18px !important; }
+@media (max-width: 860px) {
+  .zx-hero { padding: 48px 0 40px !important; }
+  .zx-title { font-size: clamp(34px, 9vw, 54px) !important; }
+  .zx-metrics { grid-template-columns: repeat(2, 1fr); }
+  .zx-search { flex-wrap: wrap; }
+  .zx-search > input { flex-basis: 100%; }
+  .zx-root-wrap { border-left: none; border-top: 1px solid hsl(var(--border)); flex: 1 1 auto; }
+  .zx-root-wrap select { width: 100%; }
+  .zx-search-btn { flex: 0 0 120px; border-top: 1px solid hsl(var(--border)); }
+}
+
+/* ══════════ 24. WHOIS 页搜索框 ══════════ */
+.whois-search { display: flex; align-items: stretch; gap: 0; border: 1px solid hsl(var(--border)) !important; background: hsl(var(--card)) !important; overflow: hidden; }
+.whois-search > input { flex: 1 1 auto; min-width: 0; border: none !important; outline: none !important; box-shadow: none !important; background: transparent !important; padding: 14px 18px !important; font: 500 15px/1.4 var(--sans) !important; }
+.whois-root-wrap select { font-size: 14px !important; padding: 14px 40px 14px 16px !important; }
+.whois-search .btn { border-radius: 0 !important; padding: 0 26px !important; }
+@media (max-width: 620px) {
+  .whois-search { flex-wrap: wrap; }
+  .whois-search > input { flex-basis: 100%; }
+  .whois-root-wrap { border-left: none; border-top: 1px solid hsl(var(--border)); flex: 1 1 auto; }
+  .whois-root-wrap select { width: 100%; }
+}

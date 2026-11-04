@@ -219,6 +219,67 @@ const DICT: Record<string, string> = {
   '二级域名分发控制台': 'Subdomain console', 'AI 自动审核': 'AI auto-review',
   '已配 Zone': 'Zone configured', '核心服务': 'Core Features', '解析服务': 'DNS Hosting',
 
+  /* 本轮新增：注册向导 / Zerexa 落地页 / WHOIS 根域名 / AI 自检 */
+  '使用须知': 'Before you start',
+  '确认信息': 'Review details', '提交注册': 'Submit',
+  '域名注册后不可自助注销，每账号有注册数量上限！注册前请确保你真正需要这个域名！':
+    'A registered domain cannot be self-deleted, and each account has a quota. Make sure you really need it.',
+  '请勿申请包含敏感、违规词汇的域名。申请提交后由系统审核，请耐心等待。':
+    'Do not request names containing sensitive or prohibited words. Requests are reviewed after submission.',
+  '请输入域名前缀，选择后缀': 'Enter a label and pick a suffix',
+  '输入域名前缀': 'Enter a label', '必填': 'Required', '必读': 'Read first',
+  '请简单描述您的使用用途': 'Briefly describe what you will use it for',
+  '请简单描述您的使用用途（必填）': 'Briefly describe what you will use it for (required)',
+  '管理员审核时会看到这段说明。': 'The reviewer will see this note.',
+  '我已阅读并同意使用须知': 'I have read and agree to the terms',
+  '我了解注册成功后无法自助注销': 'I understand a registered domain cannot be self-deleted',
+  '域名一经注册不可自助注销': 'Domains cannot be self-deleted',
+  '子域名注册成功后无法自行删除，请在提交前确认名称与后缀无误。':
+    'A subdomain cannot be deleted after registration. Double-check the label and suffix.',
+  '禁止用于违规用途': 'Prohibited use',
+  '严禁钓鱼、仿冒品牌、恶意程序、垃圾邮件、赌博与违法内容，违者立即停用并封禁账号。':
+    'Phishing, brand impersonation, malware, spam, gambling and illegal content are prohibited.',
+  '审核与 DNS 记录': 'Review & DNS',
+  '提交后进入审核；通过后到「DNS 记录」页按需添加解析，创建时不会自动写入任何记录。':
+    'Requests are reviewed; add DNS records yourself after approval. Nothing is created automatically.',
+  '注册前请先确认以下事项': 'Please confirm the following first',
+  '请核对后将提交注册申请': 'Check the details, then submit your request',
+  '（未填写）': '(not provided)', '申请已提交': 'Request submitted',
+  'AI 自动审核通过，已即时开通': 'Approved by AI and activated instantly',
+  '审核通过，已即时开通': 'Approved and activated instantly',
+  'AI 审核未通过，请返回修改用途说明': 'Rejected by AI — go back and revise the description',
+  '再注册一个': 'Register another', '查看我的域名 →': 'View my domains →',
+  '下一步 →': 'Next →', '← 上一步': '← Back',
+  '创建子域名不会自动写入任何 DNS 记录，审核通过后到「DNS 记录」页按需添加。':
+    'No DNS records are created automatically. Add them after approval.',
+
+  /* Zerexa 风格落地页 */
+  '属于你的': 'Your own', '专属子域名': 'subdomain, made simple',
+  '免费注册子域名，自行管理 DNS 记录。每个邮箱默认 5 个额度，管理员可在后台调整配额。':
+    'Free subdomains with full DNS control. 5 per email by default; admins can adjust the quota.',
+  '输入你想要的前缀': 'Enter the label you want',
+  '选择前缀并注册': 'Pick a label & register', '添加 TXT 验证': 'Add TXT verification',
+  '查看我的域名': 'View my domains', '管理控制台': 'Console',
+  '特性': 'Features', '价格': 'Pricing', '常见问题': 'FAQ',
+  '免费额度': 'Free quota', '5 个 / 邮箱': '5 / email', '可在后台调整': 'Adjustable in admin',
+  '开通时效': 'Provisioning', '审核后即时': 'Instant on approval', 'AI 后缀可秒批': 'AI suffixes approve in seconds',
+  '解析方式': 'DNS hosting', '完整 DNS': 'Full DNS',
+  '有效期': 'Validity', '365 天': '365 days', '到期前 180 天可续': 'Renew within 180 days of expiry',
+  '可选后缀': 'Available suffixes',
+  '为什么选择 TerraDomain': 'Why TerraDomain',
+  '免费额度、完整 DNS 与独立控制台，适合个人站点、Demo 和轻量服务。':
+    'Free quota, full DNS and a dedicated console — ideal for personal sites, demos and lightweight services.',
+  '可在下方切换根域名': 'Switch the root domain below',
+  '切换下拉即可查其它后缀': 'switch the dropdown to query another suffix',
+  '测试 AI 连接': 'Test AI connection',
+  '先保存设置再测试；会真实调用一次模型并返回诊断。':
+    'Save settings first. This calls the model once and returns diagnostics.',
+  '测试中…': 'Testing…', 'AI 连接正常': 'AI connection OK', '所有候选模型均调用失败': 'All candidate models failed',
+  '未配置 API Key（后台填一次，或用 Worker Secret AI_API_KEY）':
+    'No API key configured (set it in admin, or use the AI_API_KEY Worker Secret)',
+  '自动审核开关已关闭': 'Auto-review is switched off',
+  '连接异常（超时或网络不可达）': 'Connection failed (timeout or unreachable)',
+
   /* 页脚 */
   '界面模板 · 演示用途 · 所有内容均为占位': 'Template · Demo · Placeholder content',
 };
@@ -419,9 +480,18 @@ export function startI18n(): void {
         } else if (r.type === 'characterData' && r.target) {
           const t = r.target as Text;
           if (!isSkipped(t.parentElement)) {
-            if (!origText.has(t)) origText.set(t, t.data);
-            const from = origText.get(t)!;
-            const to = _lang === 'zh' ? from : translateText(from, 'en');
+            const saved = origText.get(t);
+            // 我们自己写入的译文会再次触发本回调：与预期完全一致时直接忽略，
+            // 否则会把英文当成新原文，切回中文就再也还原不了。
+            if (saved !== undefined) {
+              const expected = _lang === 'zh' ? saved : translateText(saved, 'en');
+              if (t.data === expected) continue;
+            }
+            // 页面代码（React / legacy 控制器）主动改写了文本：
+            // 把新值认定为新原文再翻译，绝不把它拉回旧值。
+            // 旧实现会无条件恢复 saved，导致选中的根域名被改回默认后缀。
+            origText.set(t, t.data);
+            const to = _lang === 'zh' ? t.data : translateText(t.data, 'en');
             if (t.data !== to) t.data = to;
           }
         }

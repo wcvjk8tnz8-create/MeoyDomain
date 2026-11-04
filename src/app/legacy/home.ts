@@ -51,7 +51,14 @@ export async function mountHome(_root: HTMLElement | null): Promise<void> {
         ? cfg.rootDomains
         : (cfg.rootDomain ? [cfg.rootDomain] : []);
       RT = Array.isArray(cfg.recordTypes) ? cfg.recordTypes : [];
-      if (ROOTS[0]) document.getElementById('qRoot').textContent = ROOTS[0];
+      /* qRoot 现在是下拉框：列出全部已配置根域名，可切换查询其它后缀 */
+      const sel = document.getElementById('qRoot') as HTMLSelectElement | null;
+      if (sel) {
+        sel.innerHTML = ROOTS.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join('')
+          || '<option value="">—</option>';
+        const want = new URLSearchParams(location.search).get('root');
+        if (want && ROOTS.indexOf(want) >= 0) sel.value = want;
+      }
       renderSuffix(ROOTS);
       renderTags();
       try {
@@ -77,7 +84,9 @@ export async function mountHome(_root: HTMLElement | null): Promise<void> {
     if (!label) { box.innerHTML = '<div class="nk-res-empty">请输入域名前缀</div>'; return; }
     box.innerHTML = '<div class="nk-res-empty">查询中…</div>';
   
-    const jobs = ROOTS.map((root) =>
+    const sel = document.getElementById('qRoot') as HTMLSelectElement | null;
+    const picked = (sel && sel.value && ROOTS.indexOf(sel.value) >= 0) ? sel.value : ROOTS[0];
+    const jobs = (picked ? [picked] : ROOTS).map((root) =>
       api.get('/api/whois?name=' + encodeURIComponent(label + '.' + root))
         .then((d) => ({ root, data: d.result || d, err: null }))
         .catch((err) => ({ root, data: null, err: err.message || '查询失败' }))
@@ -92,7 +101,7 @@ export async function mountHome(_root: HTMLElement | null): Promise<void> {
         <div class="nk-res-name mono">${esc((label + '.' + root).toUpperCase())}</div>
         <div class="nk-res-state">${esc(txt)}</div>
         <div class="nk-res-act">${free
-          ? `<a class="btn sm primary" href="/dashboard?label=${encodeURIComponent(label)}">立即注册</a>`
+          ? `<a class="btn sm primary" href="/register?label=${encodeURIComponent(label)}&root=${encodeURIComponent(root)}">立即注册</a>`
           : `<span class="nk-res-dim">域名不可用</span>`}</div>
       </div>`;
     }).join('');

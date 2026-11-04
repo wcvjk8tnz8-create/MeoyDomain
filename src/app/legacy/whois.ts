@@ -11,9 +11,14 @@ export async function mountWhois(_root: HTMLElement | null): Promise<void> {
   let rootDomain = '';
   
   async function doQuery() {
-    const name = document.getElementById('q').value.trim();
+    const raw = document.getElementById('q').value.trim();
     const box = document.getElementById('result');
-    if (!name) { box.style.display = 'none'; return toast('请输入要查询的域名', 'err'); }
+    if (!raw) { box.style.display = 'none'; return toast('请输入要查询的域名', 'err'); }
+    /* 只写前缀时按页面选中的根域名拼成完整 FQDN；
+       输入含点号的完整域名则原样查询（可查任意外部域名 / 其它根域名）。 */
+    const sel = document.getElementById('whoisRootSel') as HTMLSelectElement | null;
+    const picked = sel && sel.value ? sel.value : '';
+    const name = raw.includes('.') || !picked ? raw : `${raw}.${picked}`;
     try {
       const r = await api.get('/api/whois?name=' + encodeURIComponent(name));
       // 外部域名（可查任意域名，含 DNSHE / .com 等）
@@ -50,7 +55,10 @@ export async function mountWhois(_root: HTMLElement | null): Promise<void> {
         ${r.reclaimable ? '<div class="hint" style="margin-top:8px">这是你此前被驳回的申请，可直接重新提交。</div>' : ''}
       `;
       const btn = document.getElementById('goApply');
-      if (btn) btn.onclick = () => location.href = '/dashboard?apply=' + encodeURIComponent(r.label);
+      if (btn) btn.onclick = () => {
+        const rt = encodeURIComponent(String(r.rootDomain || picked || rootDomain || ''));
+        location.href = '/register?label=' + encodeURIComponent(r.label) + (rt ? '&root=' + rt : '');
+      };
     } catch (e) {
       box.style.display = '';
       box.innerHTML = `<div class="alert danger" style="margin:0">${esc(e.message)}</div>`;
@@ -197,8 +205,22 @@ export async function mountWhois(_root: HTMLElement | null): Promise<void> {
     try {
       const cfg = await api.get('/api/config');
       rootDomain = cfg.rootDomain || '';
-      document.getElementById('rootSuffix').textContent = '.' + rootDomain;
-      document.getElementById('rootTip').textContent = `查询 ${rootDomain} 下二级子域名的注册状态`;
+      const list = Array.isArray(cfg.rootDomains) && cfg.rootDomains.length
+        ? cfg.rootDomains : (rootDomain ? [rootDomain] : []);
+      const sel = document.getElementById('whoisRootSel') as HTMLSelectElement | null;
+      if (sel) {
+        sel.innerHTML = list.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join('')
+          || '<option value="">—</option>';
+        const want = new URLSearchParams(location.search).get('root');
+        if (want && list.indexOf(want) >= 0) sel.value = want;
+        sel.onchange = () => { if (document.getElementById('q').value.trim()) doQuery(); };
+      }
+      const suffix = document.getElementById('rootSuffix');
+      if (suffix) suffix.textContent = '.' + rootDomain;
+      const tip = document.getElementById('rootTip');
+      if (tip) tip.textContent = list.length > 1
+        ? `查询 ${list.join(' / ')} 下二级子域名的注册状态（可在下方切换根域名）`
+        : `查询 ${rootDomain} 下二级子域名的注册状态`;
     } catch {}
     try { await api.get('/api/auth/me'); isLoggedIn = true; } catch { isLoggedIn = false; }
   

@@ -10,6 +10,7 @@ import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColum
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
 import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList, setDnsBackend } from '../lib/rootStore.js';
+import { aiTest } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -500,6 +501,20 @@ app.get('/settings', async (c) => {
       expiry: await expiryRules(c.env),
     },
   });
+});
+
+/* AI 自动审核连接自检：真实调用一次模型，回报模型名 / 延迟 / 具体失败点。
+   只回诊断信息，不回密钥；需管理员权限（/api/admin/* 已统一鉴权）。 */
+app.post('/ai-test', async (c) => {
+  try {
+    const r = await aiTest(c.env);
+    await audit(c, c.get('user')?.id, 'admin.ai-test', 'ai',
+      r.ok ? `可用 · ${r.model} · ${r.latencyMs}ms` : `失败 · ${r.message}`);
+    return ok(c, r);
+  } catch (e) {
+    return ok(c, { ok: false, model: '', latencyMs: 0, sample: '',
+      message: '自检异常', detail: String((e as Error)?.message || e).slice(0, 200) });
+  }
 });
 
 app.post('/settings', async (c) => {

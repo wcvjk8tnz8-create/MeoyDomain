@@ -1,6 +1,7 @@
 import { listRoots } from './lib/roots.js';
 import { mergeRootEnv } from './lib/rootStore.js';
 import { DEFAULT_MESSAGE } from './lib/applyGate.js';
+import { loadAiConfig } from './lib/aiReview.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -120,6 +121,8 @@ app.get('/api/config', async (c) => {
     && String(c.env.MAIL_API_KEY || '').trim());
   const verifyRequired =
     String(c.env.MAIL_VERIFY_REQUIRED || s.mail_verify_required || '0').trim() === '1';
+  // AI 状态只给标志位，绝不下发地址与密钥
+  const ai = await loadAiConfig(c.env).catch(() => null);
   return ok(c, {
     rootDomain: c.env.ROOT_DOMAIN,
     rootDomains: listRoots(c.env).map((r) => r.domain),
@@ -138,6 +141,12 @@ app.get('/api/config', async (c) => {
     // 仅名单，不含任何 AI 接口地址或密钥
     aiReviewRoots: String(s.ai_review_roots || 'v-1.top').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
     dnsUnlimitedRoots: String(s.dns_unlimited_roots || 'v-1.top').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
+    aiStatus: ai ? {
+      enabled: ai.enabled,
+      ready: ai.configured,
+      roots: ai.roots,
+      model: ai.model || '自动探测',
+    } : { enabled: false, ready: false, roots: [], model: '自动探测' },
     // 邮箱验证码：mailOk 表示邮件服务已配置（可发送），verifyRequired 表示后台开了注册验证
     mailOk,
     mailVerifyRequired: verifyRequired,

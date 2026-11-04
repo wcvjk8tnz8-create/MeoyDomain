@@ -313,9 +313,12 @@ const createMine = async (c) => {
   }
 
   const detail = [status];
-  if (isAdmin) detail.push('管理员免审核');
+  if (isAdmin) detail.push('管理员免审核，AI 不触发');
   else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · ${ai.reason}`);
-  else if (cost > 0) detail.push(`消耗 ${cost} 分${short ? '（单字域名）' : ''}`);
+  else {
+    detail.push('AI 未触发（未配置 Key / 不在自动审核名单 / 模型调用失败）');
+    if (cost > 0) detail.push(`消耗 ${cost} 分${short ? '（单字域名）' : ''}`);
+  }
   if (isReserved) detail.push('保留域名');
   await audit(c, u.id, 'subdomain.create', fqdn, detail.join(' · '));
   // 注意：创建子域名时不会写入任何 DNS 记录，用户需要时再自行添加
@@ -325,6 +328,7 @@ const createMine = async (c) => {
     status,
     aiReviewed: !!ai,
     aiReason: ai ? String(ai.reason || '') : '',
+    aiSkip: isAdmin ? 'admin' : c.env.REQUIRE_APPROVAL !== '1' ? 'review-off' : ai ? null : 'unavailable',
     reserved: isReserved,
     cost: isAdmin ? 0 : (aiRejected ? 0 : cost),
     short,

@@ -26,20 +26,21 @@ export default function WhoisPage() {
         <h1>WHOIS 查询</h1>
         <div className="sub" id="rootTip">查询某个二级子域名的注册状态</div>
         <div className="hint" id="hostTip" style={{margin: "0 0 12px"}}></div>
-      
+
         <div className="card">
-          <div className="row" style={{alignItems: "flex-end", flexWrap: "nowrap"}}>
-            <div style={{flex: "1", minWidth: "180px"}}>
-              <label>域名</label>
-              <div className="row" style={{gap: "0", flexWrap: "nowrap"}}>
-                <input id="q" placeholder="me" style={{borderRadius: "var(--radius-s) 0 0 var(--radius-s)", borderRight: "none"}} autocomplete="off" />
-                <span className="mono" id="rootSuffix" style={{padding: "0 11px", background: "rgba(0,229,255,.08)", border: "1px solid var(--line)", borderRadius: "0 var(--radius-s) var(--radius-s) 0", display: "flex", alignItems: "center", whiteSpace: "nowrap", color: "var(--c1)", fontSize: "12px"}}>.meoy.top</span>
-              </div>
+          <label>域名</label>
+          <div className="whois-search">
+            <input id="q" placeholder="me" autocomplete="off" spellCheck={false} aria-label="域名前缀或完整域名" />
+            <div className="whois-root-wrap" data-no-i18n>
+              <select id="whoisRootSel" aria-label="选择根域名"></select>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
             </div>
-            <button className="btn primary" id="btnQuery" style={{flex: "0 0 auto"}}>查询</button>
+            <button className="btn primary" id="btnQuery">查询</button>
           </div>
-          <div className="hint" style={{marginTop: "6px"}}>
-            只写前缀（如 <span className="mono">me</span>）查本站子域名；
+          {/* 兼容旧控制器：保留隐藏节点，避免 null 引用 */}
+          <span id="rootSuffix" className="mono" style={{display: "none"}}></span>
+          <div className="hint" style={{marginTop: "8px"}}>
+            只写前缀（如 <span className="mono">me</span>）时按右侧选中的根域名查询，<b>切换下拉即可查其它后缀</b>；
             输入完整域名（如 <span className="mono">example.com</span>、<span className="mono">foo.de5.net</span>）可查<b>任意域名</b>。
           </div>
         </div>
