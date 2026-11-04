@@ -6,8 +6,12 @@
  *      公开接口 /api/config 与后台 GET 都只回显掩码。
  *   2. AI 只作为「免人工审核」的判定器：仅对 ai_review_roots 里列出的根域名生效。
  *   3. 失败即降级：没配 Key、超时、模型报错、返回无法解析 —— 一律回落人工审核。
- *   4. OpenAI 兼容协议。Agnes AI 的模型名是 agnes-2.5-flash 这类，不能用
- *      gpt-4o-mini 之类的别名（网关会直接报 model not found）。
+ *   4. 端点策略：后台填的「接口地址」默认就是**完整请求地址**，先直接 POST 它
+ *      （例如 https://apihub.agnes-ai.com/v1）。只有该地址不通时才回落
+ *      /chat/completions、/responses 这些官方子路径；成功的端点会被记住，
+ *      之后不再重复探测。后台可切「强制直连」彻底不调用子路径。
+ *   5. Agnes 官方模型清单会变（现默认 agnes-3.0-flash），不能用
+ *      gpt-4o-mini 之类的别名，也别用已下线的旧 ID（会报 model not found）。
  *
  * 链路：后台填地址 + Key → 辅助探测 /models（失败也有内置官方清单可选）→
  *      管理员选定一个模型 → 审核时直接把中文提示词发给该模型 → PASS / REJECT。
@@ -19,7 +23,7 @@ import { normalizeDomain, parseRootList } from './roots.js';
 
 const KEYS = [
   'ai_review_enabled', 'ai_review_roots', 'ai_api_url', 'ai_api_key', 'ai_model',
-  'dns_unlimited_roots',
+  'ai_api_endpoint', 'ai_endpoint_mode', 'dns_unlimited_roots',
 ];
 
 export const DEFAULT_AI_BASE = 'https://apihub.agnes-ai.com/v1';
@@ -27,12 +31,20 @@ export const DEFAULT_AI_ROOTS = 'v-1.top';
 
 /** Agnes AI 官方 chat 模型清单（来自官方 MODEL_CATALOG 与接入文档）。
  *  即使网关 /models 不可用，也能直接从这里选，审核不会因此瘫痪。 */
+/** 官方 MODEL_CATALOG / API Reference 当前列出的文本模型，按优先级排列。
+ *  旧清单以 agnes-2.5-flash 打头，官方现行默认已是 agnes-3.0-flash；
+ *  用下线 ID 会直接 model not found —— 这是「审核不到」的常见真因。 */
 export const AGNES_CHAT_MODELS = [
-  'agnes-2.5-flash',
+  'agnes-3.0-flash',
+  'agnes-3.0-pro',
+  'agnes-2.5-pro',
   'agnes-2.0-flash',
+  'agnes-2.5-flash',
   'agnes-1.5-flash',
   'agnes-2.5-pro-beta',
 ];
+
+export type EndpointMode = 'auto' | 'direct' | 'standard';
 
 export interface AiConfig {
   enabled: boolean;
@@ -40,6 +52,10 @@ export interface AiConfig {
   base: string;
   key: string;
   model: string;
+  /** 上次调用成功的完整端点；下次优先复用，避免每次审核都打多次请求 */
+  endpoint: string;
+  /** auto=先直连地址本身、失败回落子路径；direct=只直连；standard=只用官方子路径 */
+  mode: EndpointMode;
   unlimitedRoots: string[];
   configured: boolean;
 }
@@ -51,6 +67,7 @@ export type AiSkipReason =
 
 export interface AiDiag {
   applies: boolean;
+  endpoint: string;
   skipReason: AiSkipReason | null;
   skipText: string;
   root: string;
@@ -104,6 +121,9 @@ export async function loadAiConfig(env: any): Promise<AiConfig> {
     base,
     key,
     model: m.ai_model || envStr(env, 'AI_MODEL'),
+    endpoint: (m.ai_api_endpoint || envStr(env, 'AI_API_ENDPOINT')).trim(),
+    mode: (['auto', 'direct', 'standard'].includes(m.ai_endpoint_mode)
+      ? m.ai_endpoint_mode : 'auto') as EndpointMode,
     unlimitedRoots: parseRootList(unlimitedRaw),
     configured: !!key,
   };
@@ -332,36 +352,114 @@ export function parseVerdict(text: string): { approve: boolean; reason: string }
   return null;
 }
 
-/** 发一次 chat/completions，返回可读文本与失败诊断 */
-async function chatOnce(cfg: AiConfig, model: string, prompt: string, signal: AbortSignal) {
+/**
+ * 生成候选请求地址（按优先级）。
+ *
+ * 后台「接口地址」填的是什么，就先 POST 什么 —— 例如填
+ * https://apihub.agnes-ai.com/v1，就先直接请求 /v1，不额外拼 /chat/completions。
+ * 只有它不通（或用户选了 standard）才尝试官方子路径。
+ * 上次成功的端点排最前，成功一次后后续审核只发一个请求。
+ */
+export function endpointCandidates(cfg: Pick<AiConfig, 'base' | 'endpoint' | 'mode'>): string[] {
+  const b = String(cfg.base || DEFAULT_AI_BASE).trim().replace(/\/+$/, '');
+  const remembered = String(cfg.endpoint || '').trim().replace(/\/+$/, '');
+  const list: string[] = [];
+
+  if (cfg.mode === 'direct') {
+    list.push(remembered || b);              // 只打地址本身，绝不调用子路径
+  } else if (cfg.mode === 'standard') {
+    list.push(`${b}/chat/completions`, `${b}/responses`);
+  } else {
+    if (remembered) list.push(remembered);
+    list.push(b);                            // 用户填的 /v1 本体
+    list.push(`${b}/chat/completions`, `${b}/responses`);
+    if (!/\/v\d+$/.test(b)) {              // base 没带版本号时补一组
+      list.push(`${b}/v1`, `${b}/v1/chat/completions`);
+    }
+  }
+  return [...new Set(list.filter(Boolean))].slice(0, 6);
+}
+
+/** 不同端点吃不同的请求体：直连地址全带上，官方子路径按各自规范发 */
+function requestBody(url: string, model: string, prompt: string, extra: Record<string, unknown>) {
   const messages = [
     { role: 'system', content: '你是二级域名分发平台的审核助手，请按用户给出的规则给出明确结论。' },
     { role: 'user', content: prompt },
   ];
-  const call = async (extra: Record<string, unknown>) => {
-    const res = await fetch(`${cfg.base}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
-      body: JSON.stringify({ model, messages, ...extra }),
-      signal,
-    });
-    return { res, raw: await res.text().catch(() => '') };
-  };
-  let { res, raw } = await call({ temperature: 0, max_tokens: 160 });
-  // 部分网关不认 max_tokens / temperature，去掉后再试一次
-  if (!res.ok && res.status === 400) {
-    try { ({ res, raw } = await call({})); } catch { /* 保持原结果 */ }
+  if (/\/responses\b/.test(url)) return { model, input: prompt, ...extra };
+  if (/\/chat\/completions\b/.test(url)) return { model, messages, ...extra };
+  // 直连 /v1 之类的聚合入口：三种字段都给，网关挑自己认的那个
+  return { model, messages, prompt, input: prompt, ...extra };
+}
+
+/** 兼容 chat/completions、responses 以及聚合入口的各种返回形状 */
+function extractText(d: any, raw: string): string {
+  const cand = [
+    d?.choices?.[0]?.message?.content,
+    d?.choices?.[0]?.text,
+    d?.output_text,
+    d?.output?.[0]?.content?.[0]?.text,
+    d?.output?.[0]?.text,
+    typeof d?.output === 'string' ? d.output : undefined,
+    d?.text, d?.response, d?.content, d?.result,
+    typeof d?.data === 'string' ? d.data : undefined,
+  ];
+  for (const x of cand) if (x != null && String(x).trim()) return String(x);
+  return raw;
+}
+
+export interface ChatAttempt { url: string; status: number; err: string }
+
+/** 逐个候选端点发一次请求，第一个成功的立即返回 */
+async function chatOnce(cfg: AiConfig, model: string, prompt: string, signal: AbortSignal) {
+  const attempts: ChatAttempt[] = [];
+  let lastStatus = 0;
+  for (const url of endpointCandidates(cfg)) {
+    const call = async (extra: Record<string, unknown>) => {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+        body: JSON.stringify(requestBody(url, model, prompt, extra)),
+        signal,
+      });
+      return { res, raw: await res.text().catch(() => '') };
+    };
+    try {
+      let { res, raw } = await call({ temperature: 0, max_tokens: 160 });
+      // 部分网关不认 max_tokens / temperature，去掉后再试一次同一地址
+      if (!res.ok && res.status === 400) {
+        try { ({ res, raw } = await call({})); } catch { /* 保持原结果 */ }
+      }
+      if (res.ok) {
+        let d: any = {};
+        try { d = JSON.parse(raw); } catch { /* 非 JSON 直接当文本 */ }
+        return { text: extractText(d, raw), status: res.status, err: '', url, attempts };
+      }
+      lastStatus = res.status;
+      attempts.push({ url, status: res.status, err: scrub(raw, cfg.key) });
+    } catch (e) {
+      attempts.push({ url, status: 0, err: String((e as Error)?.name || e) });
+    }
   }
-  if (!res.ok) return { text: '', status: res.status, err: scrub(raw, cfg.key) };
-  let d: any = {};
-  try { d = JSON.parse(raw); } catch { /* 非 JSON 直接当文本 */ }
-  const text = String(d?.choices?.[0]?.message?.content ?? d?.choices?.[0]?.text ?? d?.output ?? raw);
-  return { text, status: res.status, err: '' };
+  const last = attempts[attempts.length - 1];
+  return { text: '', status: lastStatus, err: last?.err || '', url: '', attempts };
+}
+
+/** 记住成功端点（best-effort，写不进也不影响本次结果） */
+async function rememberEndpoint(env: any, url: string): Promise<void> {
+  if (!url) return;
+  try {
+    await env.DB.prepare(
+      "INSERT INTO settings(key, value) VALUES ('ai_api_endpoint', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    ).bind(url).run();
+  } catch { /* 表未就绪时忽略 */ }
 }
 
 export interface AiTestResult {
   ok: boolean;
   model: string;
+  /** 实际打通的完整请求地址（直连 /v1 成功时就是 /v1） */
+  endpoint: string;
   latencyMs: number;
   sample: string;
   message: string;
@@ -376,7 +474,7 @@ export async function aiTest(env: any): Promise<AiTestResult> {
   const cfg = await loadAiConfig(env).catch(() => null);
   const t0 = Date.now();
   const blank: AiTestResult = {
-    ok: false, model: '', latencyMs: 0, sample: '', message: '', detail: '',
+    ok: false, model: '', endpoint: '', latencyMs: 0, sample: '', message: '', detail: '',
     attempts: [], keySet: !!cfg?.configured, base: cfg?.base || DEFAULT_AI_BASE,
   };
   if (!cfg?.configured) {
@@ -401,15 +499,18 @@ export async function aiTest(env: any): Promise<AiTestResult> {
       try {
         const r = await chatOnce(cfg, model, prompt, ctl.signal);
         if (r.text) {
+          await rememberEndpoint(c.env, r.url);
           const v = parseVerdict(r.text);
           return {
-            ...blank, ok: true, model, latencyMs: Date.now() - t0, attempts,
+            ...blank, ok: true, model, endpoint: r.url, latencyMs: Date.now() - t0,
+            attempts: [...attempts, ...r.attempts.map((a) => `${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`)],
             sample: r.text.trim().slice(0, 80),
             message: v ? (v.approve ? '✓ 审核返回 PASS（通过）' : '✓ 审核返回 REJECT（驳回）')
               : '模型可调用，但回复无法解析（实际审核会回落人工）',
           };
         }
         attempts.push(`${model} → HTTP ${r.status}${r.err ? ' · ' + r.err.slice(0, 120) : ''}`);
+        for (const a of r.attempts) attempts.push(`  ${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`);
       } catch (e) {
         attempts.push(`${model} → ${String((e as Error)?.name || 'error')}`);
       }
@@ -444,6 +545,7 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
   const cfg = await loadAiConfig(env).catch(() => null);
   const diag: AiDiag = {
     applies: false,
+    endpoint: cfg?.endpoint || cfg?.base || '',
     skipReason: null,
     skipText: '',
     root,
@@ -480,12 +582,14 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
         const r = await chatOnce(cfg, model, prompt, ctl.signal);
         if (!r.text) {
           diag.attempts.push(`${model} → HTTP ${r.status}${r.err ? ' · ' + r.err.slice(0, 90) : ''}`);
+          for (const a of r.attempts) diag.attempts.push(`  ${a.url} → HTTP ${a.status}`);
           continue;
         }
+        await rememberEndpoint(env, r.url);
         gotReply = true;
         const verdict = parseVerdict(r.text);
         if (verdict) {
-          diag.attempts.push(`${model} → ${verdict.approve ? 'PASS' : 'REJECT'}`);
+          diag.attempts.push(`${model} → ${verdict.approve ? 'PASS' : 'REJECT'} · ${r.url}`);
           return { verdict: { ...verdict, model }, diag };
         }
         diag.attempts.push(`${model} → 回复无法解析：${r.text.trim().slice(0, 60)}`);

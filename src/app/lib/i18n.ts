@@ -162,6 +162,13 @@ const DICT: Record<string, string> = {
   '# 查询子域名状态（公开接口）': '# Query a subdomain (public API)',
   '# 返回示例': '# Example response',
 
+  /* AI 端点设置 */
+  '接口地址': 'API URL', '端点模式': 'Endpoint mode', '审核模型': 'Review model',
+  '强制直连': 'Direct only', '标准 OpenAI': 'Standard OpenAI', '自动': 'Auto',
+  '自动：先直连 /v1，不通才回落子路径': 'Auto: POST /v1 first, fall back only on failure',
+  '强制直连：只 POST /v1，不调用 /chat/completions': 'Direct: POST /v1 only, never call /chat/completions',
+  '标准 OpenAI：POST /v1/chat/completions': 'Standard OpenAI: POST /v1/chat/completions',
+
   /* 域名列表 / 注册页 */
   '域名关键字': 'Search domains', '域名': 'Domain', '根域名': 'Root Domain',
   '记录数': 'Records', '注册时间': 'Created', '到期时间': 'Expires',
@@ -291,6 +298,11 @@ const DICT: Record<string, string> = {
    整句精确命中才会翻译；命中不了就由下方安全网保留全中文，
    绝不用子串替换把它们切成「Sign up入口…ViewPoints消耗」这种夹生话。 */
 const FULL_SENTENCES: Record<string, string> = {
+  '默认直接 POST 你填的地址；不通才回落 /chat/completions。成功的地址会被记住。':
+    'POSTs the address you entered directly. Falls back to /chat/completions only if it fails; the working endpoint is remembered.',
+  '填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-3.0-flash）。':
+    'Saving the URL and key probes /models automatically. If probing fails, just pick an official Agnes model from the dropdown (e.g. agnes-3.0-flash).',
+
   '勾选后即为本站可用根域名。若要用 Cloudflare 做 DNS 解析，请把该域名 NS 指向 Cloudflare 并填入对应 Zone ID（也可稍后在环境变量配置）。':
     'Checked domains become available root domains here. To use Cloudflare DNS, point the nameservers to Cloudflare and enter the matching Zone ID (or configure it later via environment variables).',
   '封禁后该用户立即下线、无法登录，其全部子域名停用。':

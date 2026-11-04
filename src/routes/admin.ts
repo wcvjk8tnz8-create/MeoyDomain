@@ -11,7 +11,7 @@ import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColum
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
 import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList, setDnsBackend } from '../lib/rootStore.js';
-import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS, rootInAiList } from '../lib/aiReview.js';
+import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS, rootInAiList, endpointCandidates } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -482,6 +482,9 @@ app.get('/settings', async (c) => {
       model: String(raw.ai_model || c.env.AI_MODEL || '').trim(),
       modelSelected: !!String(raw.ai_model || c.env.AI_MODEL || '').trim(),
       keySet: !!(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
+      endpoint: String(raw.ai_api_endpoint || c.env.AI_API_ENDPOINT || '').trim(),
+      mode: ['auto','direct','standard'].includes(String(raw.ai_endpoint_mode || '').trim())
+        ? String(raw.ai_endpoint_mode).trim() : 'auto',
       keyMasked: mask(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
       fromEnv: !!String(c.env.AI_API_KEY || '').trim(),
       ready: !!(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
@@ -544,9 +547,17 @@ app.post('/ai-diagnose', async (c) => {
     const probe = cfg.configured ? await probeAiModels(c.env) : null;
     const test = cfg.configured ? await aiTest(c.env) : null;
     const allRoots = listRoots(c.env).map((r) => r.domain);
+    const MODE_TEXT: Record<string, string> = {
+      auto: '自动（先直连地址本身，失败回落子路径）',
+      direct: '强制直连（不调用 /chat/completions）',
+      standard: '标准 OpenAI（/chat/completions）',
+    };
     const lines = [
       `API Key：${cfg.configured ? '已配置' : '未配置'}`,
-      `接口地址：${cfg.base}`,
+      `接口地址（填写值）：${cfg.base}`,
+      `端点模式：${MODE_TEXT[cfg.mode] || MODE_TEXT.auto}`,
+      `已记住的成功端点：${cfg.endpoint || '（尚未成功调用过）'}`,
+      `候选请求地址：${endpointCandidates(cfg).join(' → ')}`,
       `当前模型：${cfg.model || '（未选，审核时用 ' + AGNES_CHAT_MODELS[0] + '）'}`,
       `自动审核开关：${cfg.enabled ? '开启' : '关闭'}`,
       `作用根域名：${cfg.roots.join(', ') || '（无）'}${cfg.roots.includes('*') ? '  ← * 表示所有根域名' : ''}`,
@@ -557,14 +568,15 @@ app.post('/ai-diagnose', async (c) => {
         (d) => `  ${d} → ${rootInAiList(cfg, d) ? '✓ 会触发' : '✗ 不在名单，申请会走人工审核'}`,
       ),
       `/models：${probe ? (probe.source === 'gateway' ? '网关返回 ' + probe.models.length + ' 个' : '不可用，已回落内置清单') : '未检测'}`,
-      `chat/completions：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
+      `实际打通地址：${test?.ok ? test.endpoint : '（无）'}`,
+      `审核调用：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
     ];
     const blockers = [];
     if (!cfg.configured) blockers.push('未配置 API Key');
     if (!cfg.enabled) blockers.push('自动审核开关未开启');
     const matched = allRoots.filter((d) => rootInAiList(cfg, d));
     if (!matched.length) blockers.push(`AI 名单（${cfg.roots.join(', ') || '空'}）没有覆盖任何当前根域名`);
-    if (cfg.configured && !test?.ok) blockers.push('chat/completions 调用失败');
+    if (cfg.configured && !test?.ok) blockers.push('审核接口调用失败');
     lines.push(blockers.length
       ? `结论：AI 不会自动审核 → ${blockers.join('；')}`
       : '结论：配置齐全，普通用户在名单内根域名申请会由 AI 自动判定');
@@ -644,6 +656,13 @@ app.post('/settings', async (c) => {
     const u = String(body.aiUrl || '').trim().replace(/\/+$/, '');
     await set('ai_api_url', /^https:\/\//i.test(u) ? u.slice(0, 300) : 'https://apihub.agnes-ai.com/v1');
   }
+  if (body.aiEndpointMode !== undefined) {
+    const m = String(body.aiEndpointMode || '').trim();
+    await set('ai_endpoint_mode', ['auto','direct','standard'].includes(m) ? m : 'auto');
+    // 换模式或改地址时清掉旧的成功端点，让它重新挑一次
+    await set('ai_api_endpoint', '');
+  }
+  if (body.aiUrl !== undefined) await set('ai_api_endpoint', '');
   if (body.aiModel !== undefined) await set('ai_model', String(body.aiModel || '').trim().slice(0, 80));
   if (String(body.aiApiKey || '').trim()) await set('ai_api_key', String(body.aiApiKey).trim().slice(0, 300));
   else if (body.aiClearKey === true) await set('ai_api_key', '');

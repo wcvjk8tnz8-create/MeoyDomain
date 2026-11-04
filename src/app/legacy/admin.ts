@@ -339,7 +339,15 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 <span>启用自动审核（仅对下方根域名生效；通过后无需管理员同意）</span>
               </label>
               <div class="grid2">
-                <div><span class="dim">接口地址</span><input id="sAiUrl" placeholder="https://apihub.agnes-ai.com/v1"></div>
+                <div>
+                  <span class="dim">接口地址（会直接 POST 这个地址）</span>
+                  <input id="sAiUrl" placeholder="https://apihub.agnes-ai.com/v1">
+                  <select id="sAiEndpointMode" style="margin-top:6px">
+                    <option value="auto">自动：先直连 /v1，不通才回落子路径</option>
+                    <option value="direct">强制直连：只 POST /v1，不调用 /chat/completions</option>
+                    <option value="standard">标准 OpenAI：POST /v1/chat/completions</option>
+                  </select>
+                </div>
                 <div>
                   <span class="dim">审核模型（探测后自动选择，可改选）</span>
                   <input id="sAiModel" placeholder="保存后自动探测 /models">
@@ -357,12 +365,12 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               </div>
               <div class="hint"><b>注意：名单里的根域名必须和你实际申请时选的后缀一致</b>；只填了 <span class="mono">v-1.top</span> 时，在 <span class="mono">meoy.top</span> 下申请不会触发 AI。想对所有后缀生效就填 <span class="mono">*</span>。另外 AI 已不再依赖全局「需要审核」开关，即使设为免审核也会照常判定。</div>
               <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。审核时会把「AI，你好，你现在要帮我审核一个子域名申请，域名是…，理由：…」发给下面选定的模型，按 <span class="mono">PASS / REJECT</span> 判定。AI 未配置、超时或返回异常时，申请自动回落为人工审核。</div>
-              <div class="hint" id="aiModelHint" style="margin:6px 0 0">填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-2.5-flash）。</div>
+              <div class="hint" id="aiModelHint" style="margin:6px 0 0">填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-3.0-flash）。</div>
               <div class="row" style="gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
                 <button class="btn sm" id="aiProbeBtn" type="button">探测模型</button>
                 <button class="btn sm ghost" id="aiTestBtn" type="button">用此模型测试审核</button>
                 <button class="btn sm ghost" id="aiDiagBtn" type="button">一键诊断</button>
-                <span class="hint" id="aiTestResult" style="margin:0">/models 探测失败不影响审核，可直接从清单选 agnes-2.5-flash。</span>
+                <span class="hint" id="aiTestResult" style="margin:0">默认直接 POST 你填的地址；不通才回落 /chat/completions。成功的地址会被记住。</span>
               </div>
               <pre class="mono" id="aiDiagOut" style="display:none;white-space:pre-wrap;font-size:12px;line-height:1.7;background:var(--surface-2,#f6f8fc);padding:12px;border-radius:10px;margin:10px 0 0;max-height:260px;overflow:auto"></pre>
             </div>
@@ -496,6 +504,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         const payload: Record<string, string> = {};
         if (useTyped) {
           payload.aiUrl = (document.getElementById('sAiUrl') as HTMLInputElement)?.value.trim() || '';
+          payload.aiEndpointMode = (document.getElementById('sAiEndpointMode') as HTMLSelectElement)?.value || 'auto';
           const k = (document.getElementById('sAiKey') as HTMLInputElement)?.value.trim() || '';
           if (k && !k.startsWith('••')) payload.aiApiKey = k;
         }
@@ -586,6 +595,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             applyPausedMessage: document.getElementById('sApplyPausedMsg').value,
             aiEnabled: document.getElementById('sAiEnabled').checked,
             aiUrl: document.getElementById('sAiUrl').value,
+            aiEndpointMode: (document.getElementById('sAiEndpointMode') as HTMLSelectElement)?.value || 'auto',
             aiModel: document.getElementById('sAiModel').value,
             aiApiKey: document.getElementById('sAiKey').value,
             aiRoots: document.getElementById('sAiRoots').value,
@@ -700,6 +710,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         const en = document.getElementById('sAiEnabled');
         if (en) en.checked = !!a.enabled;
         setv('sAiUrl', a.url);
+        const modeEl = document.getElementById('sAiEndpointMode') as HTMLSelectElement | null;
+        if (modeEl) modeEl.value = a.mode || 'auto';
         setv('sAiModel', a.model);
         setv('sAiRoots', a.roots);
         setv('sAiDnsRoots', a.dnsUnlimitedRoots);
