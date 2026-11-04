@@ -333,19 +333,19 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 填写后上传的头像直接外链到该地址，可省 Worker 流量。当前状态：<span id="r2Hint" class="dim">读取中…</span></div>
             </div>
             <div class="field">
-              <label>AI 自动审核（Agnes AI · OpenAI 兼容）</label>
+              <label>AI 自动审核（自定义 OpenAI 兼容网关）</label>
               <label class="check" style="margin:0 0 8px">
                 <input type="checkbox" id="sAiEnabled">
                 <span>启用自动审核（仅对下方根域名生效；通过后无需管理员同意）</span>
               </label>
               <div class="grid2">
                 <div>
-                  <span class="dim">接口地址（会直接 POST 这个地址）</span>
+                  <span class="dim">接口地址 / Base URL（如 https://host/v1）</span>
                   <input id="sAiUrl" placeholder="https://apihub.agnes-ai.com/v1">
                   <select id="sAiEndpointMode" style="margin-top:6px">
-                    <option value="auto">自动：先直连 /v1，不通才回落子路径</option>
-                    <option value="direct">强制直连：只 POST /v1，不调用 /chat/completions</option>
-                    <option value="standard">标准 OpenAI：POST /v1/chat/completions</option>
+                    <option value="auto">自动：优先 /chat/completions，失败再试其它端点</option>
+                    <option value="direct">强制直连：只 POST 填写地址本身（多数网关会 404）</option>
+                    <option value="standard">标准 OpenAI：只试 /chat/completions 与 /responses</option>
                   </select>
                 </div>
                 <div>
@@ -365,12 +365,12 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               </div>
               <div class="hint"><b>注意：名单里的根域名必须和你实际申请时选的后缀一致</b>；只填了 <span class="mono">v-1.top</span> 时，在 <span class="mono">meoy.top</span> 下申请不会触发 AI。想对所有后缀生效就填 <span class="mono">*</span>。另外 AI 已不再依赖全局「需要审核」开关，即使设为免审核也会照常判定。</div>
               <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。审核时会把「AI，你好，你现在要帮我审核一个子域名申请，域名是…，理由：…」发给下面选定的模型，按 <span class="mono">PASS / REJECT</span> 判定。AI 未配置、超时或返回异常时，申请自动回落为人工审核。</div>
-              <div class="hint" id="aiModelHint" style="margin:6px 0 0">填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-3.0-flash）。</div>
+              <div class="hint" id="aiModelHint" style="margin:6px 0 0">填好地址与 Key 后点「保存」会自动探测 /models，请从返回的清单里选模型（大小写要一致）。Base URL 本身不是端点，直接 POST 通常返回 404。</div>
               <div class="row" style="gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
                 <button class="btn sm" id="aiProbeBtn" type="button">探测模型</button>
                 <button class="btn sm ghost" id="aiTestBtn" type="button">用此模型测试审核</button>
                 <button class="btn sm ghost" id="aiDiagBtn" type="button">一键诊断</button>
-                <span class="hint" id="aiTestResult" style="margin:0">默认直接 POST 你填的地址；不通才回落 /chat/completions。成功的地址会被记住。</span>
+                <span class="hint" id="aiTestResult" style="margin:0">每个端点独立超时，成功的地址会被记住后续复用。诊断会列出网关返回的真实模型清单。</span>
               </div>
               <pre class="mono" id="aiDiagOut" style="display:none;white-space:pre-wrap;font-size:12px;line-height:1.7;background:var(--surface-2,#f6f8fc);padding:12px;border-radius:10px;margin:10px 0 0;max-height:260px;overflow:auto"></pre>
             </div>
@@ -643,7 +643,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         const box = document.getElementById('aiDiagOut');
         if (!box) return;
         box.style.display = '';
-        box.textContent = '诊断中…（会真实请求网关，最多约 20 秒）';
+        box.textContent = '诊断中…（会真实请求网关，最多约 45 秒）';
         try {
           const r = await api.post('/api/admin/ai-diagnose', {});
           box.textContent = (r.lines || []).join('\n');

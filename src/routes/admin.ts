@@ -539,8 +539,8 @@ app.post('/ai-models', async (c) => {
   }
 });
 
-/* 一键诊断：一次讲清 Key / 地址 / /models / chat/completions 各自的状态。
-   /models 失败不影响结论 —— 只要 chat/completions 能通，审核就能跑。 */
+/* 一键诊断：一次讲清 Key / 地址 / 端点 / 模型 / 实际调用各自的状态。
+   会把网关 /models 的真实清单列出来，便于核对管理员填的模型名大小写。 */
 app.post('/ai-diagnose', async (c) => {
   try {
     const cfg = await loadAiConfig(c.env);
@@ -568,6 +568,8 @@ app.post('/ai-diagnose', async (c) => {
         (d) => `  ${d} → ${rootInAiList(cfg, d) ? '✓ 会触发' : '✗ 不在名单，申请会走人工审核'}`,
       ),
       `/models：${probe ? (probe.source === 'gateway' ? '网关返回 ' + probe.models.length + ' 个' : '不可用，已回落内置清单') : '未检测'}`,
+      `网关模型清单：${(probe?.models || []).slice(0, 20).join(', ') || '（无）'}`,
+      `当前模型是否在网关清单中：${test?.modelInCatalog === false ? '✗ 不在 —— 请从上面的清单里改选（大小写必须一致）' : (test?.modelInCatalog ? '✓ 在' : '未检测')}`,
       `实际打通地址：${test?.ok ? test.endpoint : '（无）'}`,
       `审核调用：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
     ];
@@ -576,6 +578,8 @@ app.post('/ai-diagnose', async (c) => {
     if (!cfg.enabled) blockers.push('自动审核开关未开启');
     const matched = allRoots.filter((d) => rootInAiList(cfg, d));
     if (!matched.length) blockers.push(`AI 名单（${cfg.roots.join(', ') || '空'}）没有覆盖任何当前根域名`);
+    if (!cfg.model) blockers.push('后台未选定审核模型');
+    if (cfg.model && test?.modelInCatalog === false) blockers.push('模型名不在网关 /models 清单里');
     if (cfg.configured && !test?.ok) blockers.push('审核接口调用失败');
     lines.push(blockers.length
       ? `结论：AI 不会自动审核 → ${blockers.join('；')}`
@@ -590,12 +594,14 @@ app.post('/ai-diagnose', async (c) => {
     return ok(c, {
       ok: !!test?.ok, lines, keySet: cfg.configured, base: cfg.base,
       model: cfg.model, modelFromCatalog: !cfg.model,
+      gatewayModels: probe?.models || [], modelInCatalog: !!test?.modelInCatalog,
       probeSource: probe?.source || '', testOk: !!test?.ok,
     });
   } catch (e) {
     return ok(c, {
       ok: false, lines: ['诊断异常：' + String((e as Error)?.message || e).slice(0, 200)],
       keySet: false, base: '', model: '', modelFromCatalog: true, probeSource: '', testOk: false,
+      gatewayModels: [], modelInCatalog: false,
     });
   }
 });

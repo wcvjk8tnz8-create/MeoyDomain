@@ -298,6 +298,25 @@ const DICT: Record<string, string> = {
    整句精确命中才会翻译；命中不了就由下方安全网保留全中文，
    绝不用子串替换把它们切成「Sign up入口…ViewPoints消耗」这种夹生话。 */
 const FULL_SENTENCES: Record<string, string> = {
+  'AI 自动审核（自定义 OpenAI 兼容网关）':
+    'AI auto-review (custom OpenAI-compatible gateway)',
+  '接口地址 / Base URL（如 https://host/v1）':
+    'API URL / Base URL (e.g. https://host/v1)',
+  '自动：优先 /chat/completions，失败再试其它端点':
+    'Auto: try /chat/completions first, then other endpoints',
+  '强制直连：只 POST 填写地址本身（多数网关会 404）':
+    'Direct: POST the entered URL itself (most gateways return 404)',
+  '标准 OpenAI：只试 /chat/completions 与 /responses':
+    'Standard OpenAI: /chat/completions and /responses only',
+  '填好地址与 Key 后点「保存」会自动探测 /models，请从返回的清单里选模型（大小写要一致）。Base URL 本身不是端点，直接 POST 通常返回 404。':
+    'Saving the URL and key probes /models. Pick a model from the returned list (case-sensitive). A Base URL is not an endpoint — POSTing to it usually returns 404.',
+  '每个端点独立超时，成功的地址会被记住后续复用。诊断会列出网关返回的真实模型清单。':
+    'Each endpoint has its own timeout; the working address is remembered and reused. Diagnosis lists the models actually returned by the gateway.',
+  '诊断中…（会真实请求网关，最多约 45 秒）':
+    'Diagnosing… (makes real gateway calls, up to ~45s)',
+  '后台未选定审核模型；请先点「探测模型」并从网关清单里选一个':
+    'No review model selected. Probe models first, then pick one from the gateway list',
+
   '默认直接 POST 你填的地址；不通才回落 /chat/completions。成功的地址会被记住。':
     'POSTs the address you entered directly. Falls back to /chat/completions only if it fails; the working endpoint is remembered.',
   '填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-3.0-flash）。':
