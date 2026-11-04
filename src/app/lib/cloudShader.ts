@@ -1,7 +1,7 @@
 /* ============================================================
    Cloud Shader —— 天空蓝云层背景（WebGL，纯原生，无依赖）
 
-   起因： Aceternity 的 cloud-shader 是 React + Tailwind 组件，
+   起因：早期试过第三方云层组件但依赖不兼容，改为自绘 WebGL 体积云，
         本项目是原生 HTML/CSS/JS（Cloudflare Workers），无法直接复用，
         且其 registry 在当前网络下不可访问（403）。
    因此这里用同样的思路手写：全屏 quad + FBM 噪声体积云 + 时间动画。

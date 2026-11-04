@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ══════════════════════════════════════════════════════════
+   TerraDomain 权威层
+   历史上有两份 CSS（3568 + 1194 行）反复覆盖，同一个 .sidebar
+   被定义 16 次、.topbar 13 次、.btn 10 次 —— 定位偏移、透明弹窗、
+   直角/圆角反复横跳、表格被裁都源于此。合并后的组件表每选择器
+   只有一条规则，这里再把骨架与视觉一次性收口，之后不再叠加。
+   ══════════════════════════════════════════════════════════ */
+:root {
+  --sb-w: 264px;
+  --sb-w-mini: 72px;
+  --top-h: 64px;
+  --radius: 16px;
+  --shadow: 0 10px 30px rgba(79, 155, 255, .12), 0 2px 6px rgba(79, 155, 255, .06);
+}
+
+/* ── 骨架：三件套共用同一组尺寸，杜绝「侧栏 208 / 顶栏 224」错位 ── */
+.sidebar {
+  position: fixed !important;
+  top: 0 !important; left: 0; bottom: 0;
+  width: var(--sb-w) !important;
+  height: 100vh;
+  z-index: 250;
+  transform: none !important;
+}
+.topbar {
+  position: fixed !important;
+  top: 0; left: var(--sb-w) !important; right: 0;
+  height: var(--top-h) !important;
+  z-index: 300;
+}
+.main {
+  margin-left: var(--sb-w) !important;
+  padding: calc(var(--top-h) + 20px) 24px 40px !important;
+}
+.side-brand { min-height: var(--top-h); }
+@media (max-width: 1000px) {
+  .sidebar { width: var(--sb-w-mini) !important; }
+  .topbar { left: var(--sb-w-mini) !important; }
+  .main { margin-left: var(--sb-w-mini) !important; }
+}
+
+/* ── 圆角与层次：去掉文档风的直角细线，恢复柔和浮起 ── */
+.card, .pane, .tablewrap, .modal-card, .notice, .auth-card, .reg-card {
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+.btn {
+  background: linear-gradient(135deg, #4f9bff, #7cb8ff) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 999px !important;
+  box-shadow: 0 6px 16px rgba(79, 155, 255, .28) !important;
+  font-weight: 700 !important;
+}
+.btn.ghost, .btn.sm.ghost {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+.btn:hover:not(:disabled) { transform: translateY(-2px); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.input, .textarea, select.input {
+  border-radius: var(--radius) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+}
+.input:focus, .textarea:focus {
+  border-color: hsl(var(--primary)) !important;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / .14) !important;
+}
+.tab { border-radius: 999px !important; border-bottom: 0 !important; }
+.pill, .badge, .tag { border-radius: 999px !important; }
+
+/* ── 具体问题修复 ── */
+/* 1. 统计卡白字白底：此前 .stat-card 写死 color:#fff 但背景是白色 */
+.stat-card, .stat, .stat-card .stat-k, .stat-card .stat-v, .stat-card small, .stat h2 { color: hsl(var(--foreground)) !important; }
+.stat-card .stat-v, .stat h2 { font-weight: 800; }
+/* 2. 通知弹窗：跟随主题，不再写死 #fff（深色下会是一块白板） */
+.notif-panel, .np-head, .np-body, .np-empty {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+  backdrop-filter: none !important;
+  isolation: isolate;
+}
+.notif-panel { box-shadow: var(--shadow) !important; border: 1px solid hsl(var(--border)) !important; }
+/* 3. 表格详情列：横向可拖 + 长文本折行，不再被裁掉右半截 */
+.tablewrap { overflow: auto !important; -webkit-overflow-scrolling: touch; max-width: 100%; }
+table th, table td { white-space: normal; overflow-wrap: anywhere; word-break: break-word; vertical-align: top; }
+td.cell-detail { max-width: 340px; min-width: 120px; line-height: 1.6; }
+/* 4. 后缀选项：button 默认 buttonface 在深色下是一块白 */
+.root-opt, .root-picker-menu, .root-picker-btn {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+.root-opt:hover, .root-opt.active { background: hsl(var(--secondary)) !important; }
+/* 5. 侧栏文字对比度（深色下曾被硬编码深灰压住） */
+.side-item, .side-label, .nav, .group {
+  color: hsl(var(--foreground) / .82) !important;
+}
+.side-item.active { color: #fff !important; background: hsl(var(--primary)) !important; }
+/* 6. 弹窗与浮层始终不透明 */
+.mask { background: rgba(20, 28, 50, .45) !important; }
+.modal, .modal-card { background: hsl(var(--card)) !important; border-radius: var(--radius) !important; }
+/* 7. 深色下阴影转深，避免糊成死黑 */
+[data-theme="dark"] { --shadow: 0 10px 30px rgba(0, 0, 0, .40), 0 2px 6px rgba(0, 0, 0, .28); }
+[data-theme="dark"] .btn { background: linear-gradient(135deg, #3b82f6, #6366f1) !important; }
+
+/* ── 动效保留：只动 transform / opacity，reduced-motion 全关 ── */
+@media (prefers-reduced-motion: no-preference) {
+  .card, .stat-card, .btn, .side-item { transition: transform .2s ease, box-shadow .2s ease !important; }
+  .card:hover, .stat-card:hover { transform: translateY(-2px); }
+}

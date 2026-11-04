@@ -666,7 +666,7 @@ export const SPARKS = [
 ];
 
 /** 挂载 v2 装饰：精灵图 / 闪光 / 猫娘吉祥物（只挂载一次）
-    文档风主题（theme-doc.css）下跳过闪光与吉祥物：它们已被 CSS 隐藏，
+    当前主题下跳过闪光与吉祥物：它们已被样式层隐藏，
     再插入 DOM 只是白白增加节点。 */
 export function mountDecor() {
   if (document.getElementById('nekoSprite')) return;

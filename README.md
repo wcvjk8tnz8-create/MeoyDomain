@@ -535,16 +535,9 @@ Worker 的 `SPA_PATHS` 白名单把这些路径统一回落到 `index.html`，�
 > 以下为**历史记录**：当时项目还是原生 HTML/CSS/JS，现已迁移到 React + TypeScript；
 > 结论（手写着色器）保留，但「无 React」的前提已不成立。
 
-**关于 `npx shadcn@latest add @aceternity/cloud-shader`**：当时装不了，两个原因
+**样式**：Tailwind CSS 3（PostCSS）+ 一份合并后的组件表。早期版本叠加过两套手写 CSS（同名 `.sidebar` 被定义 16 次），已收敛为 `src/app/styles/components.css`（每选择器一条规则）+ `src/app/styles/index.css`（Tailwind 指令与权威层）。主题令牌通过 `tailwind.config.js` 映射，深色自动跟随 `data-theme`。
 
-1. **registry 被挡**：`ui.shadcn.com/r/registries.json` 与 `ui.aceternity.com/registry/*`
-   在当前网络下均返回 403（`No policy rule matched the request`）。
-2. **框架不匹配**：`shadcn info` 显示本项目是 `Manual`（无 React、无 Tailwind、
-   无 `components.json`），而该组件是 React + Tailwind 的 TSX，本项目的原生
-   HTML/CSS/JS（Cloudflare Workers）无法直接运行。
-
-因此按同样的思路手写了一份：全屏 quad + FBM 噪声体积云 + 时间动画，
-配色在深/浅主题下各一套。
+早期曾试过第三方云层组件，但 registry 被网络策略挡住、且需要 React + Tailwind 运行时，与当时的原生结构不兼容，因此改为自绘 WebGL 体积云（FBM 噪声 + 时间动画，深浅主题各一套配色）。
 
 **在任意页面启用**：加一个容器即可
 
