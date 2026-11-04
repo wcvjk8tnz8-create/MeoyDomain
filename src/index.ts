@@ -2,6 +2,7 @@ import { listRoots } from './lib/roots.js';
 import { mergeRootEnv } from './lib/rootStore.js';
 import { DEFAULT_MESSAGE } from './lib/applyGate.js';
 import { loadAiConfig } from './lib/aiReview.js';
+import { parseRootCosts } from './lib/points.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -113,7 +114,7 @@ app.get('/api/avatar/:key', async (c) => {
 // 公开配置（含站点品牌，登录页也要用）
 app.get('/api/config', async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from','apply_paused','apply_paused_message','ai_review_roots','dns_unlimited_roots')"
+    "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from','apply_paused','apply_paused_message','ai_review_roots','dns_unlimited_roots','root_point_costs','domain_cost','short_domain_cost','short_domain_len')"
   ).all();
   const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
   // 注册是否需要邮箱验证码（后台开启且邮件服务已配置时才真正启用）
@@ -126,6 +127,13 @@ app.get('/api/config', async (c) => {
   return ok(c, {
     rootDomain: c.env.ROOT_DOMAIN,
     rootDomains: listRoots(c.env).map((r) => r.domain),
+    // 注册页后缀菜单据此显示每个后缀的积分（0 = Free，未配置 = 按全局规则）
+    rootPointCosts: parseRootCosts(s.root_point_costs),
+    pointRules: {
+      domainCost: Number(s.domain_cost || 5) || 0,
+      shortCost: Number(s.short_domain_cost || 35) || 0,
+      shortLen: Number(s.short_domain_len || 1) || 1,
+    },
     allowSignup: c.env.ALLOW_SIGNUP !== '0',
     requireApproval: c.env.REQUIRE_APPROVAL === '1',
     applyPaused: String(c.env.APPLY_PAUSED || s.apply_paused || '').trim() === '1',

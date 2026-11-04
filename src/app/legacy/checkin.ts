@@ -45,7 +45,7 @@ export async function mountCheckin(_root: HTMLElement | null): Promise<void> {
         <tbody>${d.logs.map((l) => `<tr>
           <td class="mono" style="color:${l.delta > 0 ? 'var(--ok)' : 'var(--danger)'}">${l.delta > 0 ? '+' : ''}${l.delta}</td>
           <td class="mono">${l.balance}</td>
-          <td>${esc(l.reason || '')}${l.detail ? ' <span style="color:var(--muted)">' + esc(l.detail) + '</span>' : ''}</td>
+          <td class="cell-detail" title="${esc([l.reason, l.detail].filter(Boolean).join(' · '))}">${esc(l.reason || '')}${l.detail ? ' <span style="color:var(--muted)">' + esc(l.detail) + '</span>' : ''}</td>
           <td class="nowrap" style="color:var(--muted)">${fmtTime(l.created_at)}</td>
         </tr>`).join('')}</tbody></table>`;
     } catch (e) { toast(e.message, 'err'); }

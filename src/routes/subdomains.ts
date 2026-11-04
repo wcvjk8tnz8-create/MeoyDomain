@@ -92,10 +92,11 @@ app.get('/check', async (c) => {
   const isAdmin = !!(u && u.role === 'admin');
   const rules = await pointRules(c.env);
   const label = String(c.req.query('label') || '').toLowerCase();
-  const { cost, short } = domainCost(
+  const { cost, short, rootOverride } = domainCost(
     label,
-    { domainCost: rules.domainCost, shortCost: rules.shortCost, shortLen: rules.shortLen },
-    isAdmin
+    { domainCost: rules.domainCost, shortCost: rules.shortCost, shortLen: rules.shortLen, rootCosts: rules.rootCosts },
+    isAdmin,
+    String(c.req.query('root') || '')
   );
   let points = UNLIMITED_POINTS;
   if (u && !isAdmin) points = await ensurePoints(c.env.DB, u.id, rules);
@@ -109,7 +110,9 @@ app.get('/check', async (c) => {
     status: r.status,
     cost: isAdmin ? 0 : cost,
     short,
+    rootOverride: !!rootOverride,
     points,
+    isAdmin: !!isAdmin,
     unlimited: isAdmin || u === null ? isAdmin : false,
     enough: isAdmin || !u || points < 0 || points >= cost,
   });
@@ -222,12 +225,13 @@ const createMine = async (c) => {
   if (u.quota >= 0 && (used?.n || 0) >= u.quota)
     return fail(c, `已达上限，每个账号最多持有 ${u.quota} 个子域名`);
 
-  // 积分校验：普通域名一个价，单字域名更贵；管理员不消耗
+  // 积分校验：普通域名一个价，单字域名更贵；可按根域名覆盖（含 0 免费）；管理员不消耗
   const rules = await pointRules(c.env);
-  const { cost, short } = domainCost(
+  const { cost, short, rootOverride } = domainCost(
     v.label,
-    { domainCost: rules.domainCost, shortCost: rules.shortCost, shortLen: rules.shortLen },
-    isAdmin
+    { domainCost: rules.domainCost, shortCost: rules.shortCost, shortLen: rules.shortLen, rootCosts: rules.rootCosts },
+    isAdmin,
+    reqRoot
   );
   let points = UNLIMITED_POINTS;
   if (!isAdmin) {
@@ -315,9 +319,10 @@ const createMine = async (c) => {
   const detail = [status];
   if (isAdmin) detail.push('管理员免审核，AI 不触发');
   else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · 模型 ${ai.model || '自动探测'} · ${ai.reason}`);
-  else {
-    detail.push('AI 未触发（未配置 Key / 不在自动审核名单 / 模型调用失败）');
-    if (cost > 0) detail.push(`消耗 ${cost} 分${short ? '（单字域名）' : ''}`);
+  else detail.push('AI 未触发（未配置 Key / 不在自动审核名单 / 模型调用失败）');
+  if (!isAdmin && !aiRejected) {
+    if (cost === 0) detail.push(rootOverride ? `${reqRoot} 单独设为 0 分（免费）` : '积分为 0，免费开通');
+    else detail.push(`消耗 ${cost} 分${short && !rootOverride ? '（单字域名）' : ''}`);
   }
   if (isReserved) detail.push('保留域名');
   await audit(c, u.id, 'subdomain.create', fqdn, detail.join(' · '));

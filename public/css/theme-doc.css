@@ -1149,3 +1149,46 @@ html[data-theme="dark"] .reg-domain-box { background: hsl(220 12% 11%) !importan
   .whois-root-wrap { border-left: none; border-top: 1px solid hsl(var(--border)); flex: 1 1 auto; }
   .whois-root-wrap select { width: 100%; }
 }
+
+/* ══════════ 25. 表格详情列：不再被裁掉右半截 ══════════
+   根因：style.css 后段有多套 .tablewrap { overflow:hidden }，把最初
+   .tablewrap { overflow-x:auto } 覆盖掉了。表格一旦宽于容器，右侧
+   「详情 / 备注 / 原因」列直接被切掉，且无法横向拖动 —— 审计日志、
+   积分流水、域名列表等所有页面都中招。
+   这里做两层兜底：
+     1) 恢复横向滚动（保底，超宽表格总能拖到最右）
+     2) 单元格允许折行 + 长串强制断行，详情列优先就地显示全文
+*/
+.tablewrap {
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.tablewrap table { width: 100%; }
+
+/* 通用：所有表格的长文本就地折行，而不是把整行撑出屏幕 */
+table th, table td,
+.tablewrap table th, .tablewrap table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+}
+/* 时间 / ID / 操作按钮这类确实不能断行的，保留原行为 */
+table .nowrap, .tablewrap .nowrap, table td.nowrap, table th.nowrap {
+  white-space: nowrap;
+}
+/* 详情 / 备注 / 原因列：限制宽度并折行，保证全文可见 */
+td.cell-detail, .tablewrap td.cell-detail,
+table td:last-child:not(.nowrap), .tablewrap td:last-child:not(.nowrap) {
+  max-width: 340px;
+  min-width: 120px;
+  line-height: 1.6;
+}
+td.cell-detail { color: hsl(var(--muted-foreground)); }
+/* 徽章与等宽文本不强制断行，但允许在超长时折行 */
+table .badge, .tablewrap .badge { white-space: nowrap; }
+table .mono, .tablewrap .mono { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  td.cell-detail, table td:last-child:not(.nowrap) { max-width: 220px; }
+}

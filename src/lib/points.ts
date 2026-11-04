@@ -2,11 +2,39 @@
 //  积分
 //  - 每日签到领取（默认 +5）
 //  - 申请子域名消耗（普通 5 分，单字域名 35 分）
+//  - 可按根域名单独设置消耗积分，允许 0（该后缀免费）
 //  - 管理员无限（points = -1）
 //  - 老用户的已有子域名不追溯扣分
 // ============================================================
 
+import { normalizeDomain } from './roots.js';
+
 export const UNLIMITED_POINTS = -1;
+
+/** 解析「按根域名的积分覆盖」：meoy.top:5,v-1.top:0
+ *  只接受合法域名 + 0~100000 的整数；非法项静默跳过。 */
+export function parseRootCosts(raw) {
+  const map = {};
+  for (const seg of String(raw || '').split(',')) {
+    const i = String(seg || '').search(/[:=]/);
+    if (i <= 0) continue;
+    const d = normalizeDomain(seg.slice(0, i));
+    const s = String(seg.slice(i + 1)).trim();
+    if (!d || !/^[a-z0-9.-]+$/i.test(d) || !/^\d+$/.test(s)) continue;
+    const n = Number(s);
+    if (Number.isFinite(n) && n >= 0 && n <= 100000) map[d] = n;
+  }
+  return map;
+}
+
+/** 序列化回 settings；空对象返回空串（等于关闭所有覆盖） */
+export function serializeRootCosts(map) {
+  return Object.entries(map || {})
+    .filter(([d, n]) => d && Number.isFinite(Number(n)))
+    .map(([d, n]) => `${normalizeDomain(d)}:${Number(n)}`)
+    .filter((s) => !s.startsWith(':'))
+    .join(',');
+}
 
 /** 读取用户积分；从未初始化则按 initial_points 初始化 */
 export async function getPoints(db, userId, initial = 10) {
@@ -109,10 +137,20 @@ export async function recordCheckin(db, userId, day, points) {
 
 /**
  * 域名消耗：单字（长度 <= shortLen）用高价，其余用普通价。
+ * 若该根域名在 rootCosts 里有显式配置（可为 0 = 免费），则直接覆盖最终价，
+ * 不再叠加单字加价 —— 这样「某个后缀免费」可以稳定生效。
  * 管理员返回 0（不消耗）。
  */
-export function domainCost(label, { domainCost = 5, shortCost = 35, shortLen = 1 } = {}, isAdmin = false) {
-  if (isAdmin) return { cost: 0, short: false };
+export function domainCost(
+  label,
+  { domainCost = 5, shortCost = 35, shortLen = 1, rootCosts = {} } = {},
+  isAdmin = false,
+  root = '',
+) {
+  if (isAdmin) return { cost: 0, short: false, rootOverride: false };
   const short = String(label || '').length <= Number(shortLen);
-  return { cost: short ? Number(shortCost) : Number(domainCost), short };
+  const key = normalizeDomain(root);
+  const override = key ? rootCosts[key] : undefined;
+  if (override !== undefined) return { cost: Number(override), short, rootOverride: true };
+  return { cost: short ? Number(shortCost) : Number(domainCost), short, rootOverride: false };
 }

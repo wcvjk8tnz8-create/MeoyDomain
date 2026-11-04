@@ -9,6 +9,7 @@ import {
   hasCheckedIn,
   recordCheckin,
   domainCost,
+  parseRootCosts,
 } from '../lib/points.js';
 
 const app = new Hono();
@@ -17,7 +18,7 @@ const app = new Hono();
 export async function pointRules(env) {
   const rows = await env.DB.prepare(
     `SELECT key, value FROM settings WHERE key IN
-     ('checkin_points','domain_cost','short_domain_cost','short_domain_len','initial_points')`
+     ('checkin_points','domain_cost','short_domain_cost','short_domain_len','initial_points','root_point_costs')`
   ).all();
   const m = {};
   for (const r of rows.results || []) m[r.key] = r.value;
@@ -31,6 +32,7 @@ export async function pointRules(env) {
     shortCost: Math.max(0, num('short_domain_cost', 35)),
     shortLen: Math.max(1, num('short_domain_len', 1)),
     initial: Math.max(0, num('initial_points', 10)),
+    rootCosts: parseRootCosts(m.root_point_costs),
   };
 }
 

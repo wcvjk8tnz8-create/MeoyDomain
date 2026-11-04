@@ -1,4 +1,5 @@
-import { listRoots } from '../lib/roots.js';
+import { listRoots, normalizeDomain } from '../lib/roots.js';
+import { serializeRootCosts, parseRootCosts } from '../lib/points.js';
 import { Hono } from 'hono';
 import { ok, fail, now, audit } from '../lib/util.js';
 import { notify } from '../lib/notify.js';
@@ -470,6 +471,8 @@ app.get('/settings', async (c) => {
     },
     // 当前生效的根域名（含后台导入的）
     rootDomains: listRoots(c.env).map((r) => r.domain),
+    // 按根域名的积分覆盖（0 = 免费；未列出的后缀按全局规则）
+    rootPointCosts: parseRootCosts(raw.root_point_costs),
 
     // AI 自动审核（Agnes AI 等 OpenAI 兼容网关）
     ai: {
@@ -718,6 +721,32 @@ app.post('/settings', async (c) => {
   if (!(await numRule('short_domain_cost', body.shortDomainCost, 0, 100000, '单字域名消耗积分'))) return fail(c, c.__ruleErr);
   if (!(await numRule('short_domain_len', body.shortDomainLen, 1, 10, '单字域名长度上限'))) return fail(c, c.__ruleErr);
   if (!(await numRule('initial_points', body.initialPoints, 0, 10000, '新用户初始积分'))) return fail(c, c.__ruleErr);
+
+  /* 按根域名单独设置申请积分：{ 'v-1.top': 0, 'meoy.top': '' }
+     · 0 = 该后缀免费（普通用户也不扣分）
+     · 留空 = 删除覆盖，回落上方全局规则（含单字加价）
+     · 只接受当前生效的根域名，避免写入野值 */
+  if (body.rootPointCosts !== undefined) {
+    const active = (await effectiveRootList(c.env)).map((r) => r.domain);
+    const allowed = new Set(active);
+    const input = body.rootPointCosts && typeof body.rootPointCosts === 'object'
+      ? body.rootPointCosts : {};
+    const next = {};
+    for (const [raw, val] of Object.entries(input)) {
+      const d = normalizeDomain(String(raw || '').toLowerCase());
+      const s = String(val ?? '').trim();
+      if (!allowed.has(d) || s === '') continue;
+      if (!/^\d+$/.test(s)) return fail(c, `根域名 ${d} 的积分必须是 0 或正整数`);
+      const n = Number(s);
+      if (!Number.isFinite(n) || n < 0 || n > 100000) return fail(c, `根域名 ${d} 的积分需在 0-100000 之间`);
+      next[d] = Math.floor(n);
+    }
+    await set('root_point_costs', serializeRootCosts(next));
+    await audit(c, u.id, 'admin.root-point-costs', 'site',
+      Object.keys(next).length
+        ? Object.entries(next).map(([d, n]) => `${d}:${n}`).join(',')
+        : '全部恢复全局规则');
+  }
 
   // 全局中文字体（正文 / 标题）：拉丁与数字始终用 Redaction 35，这里只决定中文用哪个字体
   const FONTS = ['system', 'noto', 'lxgw', 'zcool'];

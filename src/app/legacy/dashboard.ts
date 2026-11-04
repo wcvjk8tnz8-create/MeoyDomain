@@ -297,7 +297,7 @@ export async function mountDashboard(_root: HTMLElement | null): Promise<void> {
           <tr>
             <td class="mono" style="color:${l.delta >= 0 ? 'var(--ok)' : 'var(--danger)'}">${l.delta >= 0 ? '+' : ''}${l.delta}</td>
             <td class="mono">${l.balance}</td>
-            <td>${esc(reasonText[l.reason] || l.reason)}${l.detail ? ` · ${esc(l.detail)}` : ''}</td>
+            <td class="cell-detail" title="${esc([reasonText[l.reason] || l.reason, l.detail].filter(Boolean).join(' · '))}">${esc(reasonText[l.reason] || l.reason)}${l.detail ? ` · ${esc(l.detail)}` : ''}</td>
             <td class="right nowrap" style="color:var(--muted)">${fmtTime(l.created_at)}</td>
           </tr>`).join('')}
         </tbody>

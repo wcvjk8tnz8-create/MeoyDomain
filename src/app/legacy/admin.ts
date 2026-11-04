@@ -402,6 +402,18 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               <div class="hint">「单字域名长度上限」= ${esc(s.short_domain_len || '1')}（长度不超过该值即按单字计价）。管理员不消耗积分。老用户首次进入按已有域名数补偿，已有域名不受影响。</div>
             </div>
             <div class="field">
+              <label>按根域名设置申请积分</label>
+              <div class="grid2" id="rootCostsBox">
+                ${(Array.isArray(d.rootDomains) ? d.rootDomains : []).map(function(r){
+                  var rc = d.rootPointCosts || {};
+                  var has = Object.prototype.hasOwnProperty.call(rc, r);
+                  return '<div><span class="dim">.' + esc(String(r).toUpperCase()) + '</span>'
+                    + '<input class="root-cost-input" data-root="' + esc(r) + '" type="number" min="0" max="100000" step="1" value="' + esc(has ? String(rc[r]) : '') + '" placeholder="留空 = 按全局规则"></div>';
+                }).join('') || '<div class="hint">当前没有生效的根域名</div>'}
+              </div>
+              <div class="hint">可为 <b>0</b>（该后缀免费，普通用户也不扣分）；留空则按上方全局规则（含单字加价）。填写后该后缀下所有申请统一按此积分计算，单字域名不再额外加价。两个后缀可以分别设成不同数值、也可以一个免费一个收费。</div>
+            </div>
+            <div class="field">
               <label>全局字体（中文字体）</label>
               <div class="grid2">
                 <div>
@@ -541,6 +553,13 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             initialPoints: document.getElementById('sInitial').value,
             domainCost: document.getElementById('sCost').value,
             shortDomainCost: document.getElementById('sShortCost').value,
+            rootPointCosts: (function(){
+              var o = {};
+              document.querySelectorAll('#rootCostsBox .root-cost-input').forEach(function(el){
+                o[el.getAttribute('data-root')] = (el as HTMLInputElement).value.trim();
+              });
+              return o;
+            })(),
             dnsApiUrl: document.getElementById('sDnsUrl').value,
             dnsApiKey: document.getElementById('sDnsKey').value,
             dnsApiSecret: document.getElementById('sDnsSecret').value,
@@ -872,7 +891,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           <td class="mono" style="color:var(--muted)">${esc(a.email || '系统')}</td>
           <td><span class="badge">${esc(a.action)}</span></td>
           <td class="mono">${esc(a.target || '')}</td>
-          <td style="color:var(--muted)">${esc(a.detail || '')}</td>
+          <td class="cell-detail" title="${esc(a.detail || '')}">${esc(a.detail || '')}</td>
         </tr>`).join('');
     }
   }

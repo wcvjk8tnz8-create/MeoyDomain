@@ -11,6 +11,8 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
   var ROOTS = [];
   var AI_ROOTS = [];
   var DNS_UNLIMITED = [];
+  var ROOT_COSTS = {};
+  var POINT_RULES = { domainCost: 5, shortCost: 35, shortLen: 1 };
   var checkTimer = 0;
 
   /* 当前后缀的规则提示：AI 自动审核 / DNS 记录不限 */
@@ -102,7 +104,17 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       ROOTS = list;
       AI_ROOTS = Array.isArray(cfg.aiReviewRoots) ? cfg.aiReviewRoots : [];
       DNS_UNLIMITED = Array.isArray(cfg.dnsUnlimitedRoots) ? cfg.dnsUnlimitedRoots : [];
+      ROOT_COSTS = (cfg.rootPointCosts && typeof cfg.rootPointCosts === 'object') ? cfg.rootPointCosts : {};
+      if (cfg.pointRules) POINT_RULES = cfg.pointRules;
       updateRootTip(list[0] || '');
+
+      /* 每个后缀在菜单里直接标出消耗积分：0 = Free，未配置 = 按全局规则 */
+      function costLabel(d){
+        var has = Object.prototype.hasOwnProperty.call(ROOT_COSTS, d);
+        var n = has ? Number(ROOT_COSTS[d]) : Number(POINT_RULES.domainCost || 0);
+        if (!Number.isFinite(n)) n = 0;
+        return n === 0 ? 'Free' : (n + ' 分');
+      }
 
       /* AI 状态可视化：说明「为什么这次没走 AI」——
          常见原因是后台还没填 Key、开关被关、或当前账号是管理员（免审核）。 */
@@ -146,7 +158,7 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
         return '<button type="button" class="root-opt' + (i === 0 ? ' on' : '') + '" role="option"'
           + ' data-root="' + esc(d) + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '">'
           + '<span class="root-opt-name">.' + esc(d.toUpperCase()) + '</span>'
-          + '<span class="root-opt-free">Free</span></button>';
+          + '<span class="root-opt-free">' + esc(costLabel(d)) + '</span></button>';
       }).join('');
       menu.querySelectorAll('.root-opt').forEach(function(el){
         (el as HTMLButtonElement).onclick = function(){ selectRoot(el.getAttribute('data-root')); };
@@ -181,13 +193,15 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       if (r.available && r.cost > 0) {
         costBox.style.display = '';
         costBox.innerHTML = '<div class="alert ' + (r.enough ? 'a-info' : 'a-red') + '" style="margin-top:14px">'
-          + (r.short ? '<b>单字域名</b> · ' : '')
+          + (r.short && !r.rootOverride ? '<b>单字域名</b> · ' : '')
           + '本次消耗 <b>' + r.cost + '</b> 分 · 当前余额 <b>' + (r.points ?? 0) + '</b> 分'
           + (r.enough ? '' : '<br>积分不足，可前往签到地每日领取')
           + '</div>';
       } else if (r.available) {
         costBox.style.display = '';
-        costBox.innerHTML = '<div class="alert a-info" style="margin-top:14px">管理员申请不消耗积分</div>';
+        costBox.innerHTML = '<div class="alert a-info" style="margin-top:14px">'
+          + (r.isAdmin ? '管理员申请不消耗积分' : (r.rootOverride ? '该后缀已设为 0 分，本次免费' : '本次不消耗积分'))
+          + '</div>';
       } else {
         costBox.style.display = 'none';
       }
