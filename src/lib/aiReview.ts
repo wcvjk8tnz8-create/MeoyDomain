@@ -520,7 +520,7 @@ export interface AiTestResult {
 }
 
 /** 后台「用此模型测试审核」：候选模型优先取网关 /models 的真实清单。
- *  之前回退的全是 agnes-*/gpt-* 通用名，对自定义网关一个都不认，
+ *  之前回退的全是 agnes 系列 / gpt 系列这类通用名，对自定义网关一个都不认，
  *  于是「所有候选模型均调用失败」几乎是必然结果。 */
 export async function aiTest(env: any): Promise<AiTestResult> {
   const cfg = await loadAiConfig(env).catch(() => null);
