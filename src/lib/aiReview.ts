@@ -4,15 +4,15 @@
  * 设计原则：
  *   1. 密钥绝不写进代码库。只从后台 settings 或 Worker Secret（AI_API_KEY）读取，
  *      公开接口 /api/config 与后台 GET 都只回显掩码。
- *   2. AI 只作为「免人工审核」的判定器：仅对 ai_review_roots 里列出的根域名生效，
- *      其它根域名仍走原有的 REQUIRE_APPROVAL 规则。
- *   3. 失败即降级：没配 Key、超时、模型报错、返回无法解析 —— 一律回落为
- *      pending 人工审核，绝不因为 AI 故障把用户申请卡死或误批准。
- *   4. OpenAI 兼容协议（/models + /chat/completions），Agnes AI 等网关通用。
+ *   2. AI 只作为「免人工审核」的判定器：仅对 ai_review_roots 里列出的根域名生效。
+ *   3. 失败即降级：没配 Key、超时、模型报错、返回无法解析 —— 一律回落人工审核。
+ *   4. OpenAI 兼容协议。Agnes AI 的模型名是 agnes-2.5-flash 这类，不能用
+ *      gpt-4o-mini 之类的别名（网关会直接报 model not found）。
  *
- * 审核链路（后台填好地址与 Key 之后）：
- *   自动探测 /models → 自动选定一个模型（管理员可在下拉里改选）→
- *   用「AI，你好…域名是…理由：…」这段中文提示词送审 → 解析 PASS / REJECT。
+ * 链路：后台填地址 + Key → 辅助探测 /models（失败也有内置官方清单可选）→
+ *      管理员选定一个模型 → 审核时直接把中文提示词发给该模型 → PASS / REJECT。
+ * 关键：探测只是「选模型的辅助」，绝不是审核的前置条件。审核时若已选定模型，
+ *      一次 /models 都不请求，避免网关不支持 /models 时整个审核链路瘫痪。
  */
 
 import { normalizeDomain, parseRootList } from './roots.js';
@@ -23,8 +23,16 @@ const KEYS = [
 ];
 
 export const DEFAULT_AI_BASE = 'https://apihub.agnes-ai.com/v1';
-/** 默认走 AI 审核 / 不限 DNS 记录数的根域名 */
 export const DEFAULT_AI_ROOTS = 'v-1.top';
+
+/** Agnes AI 官方 chat 模型清单（来自官方 MODEL_CATALOG 与接入文档）。
+ *  即使网关 /models 不可用，也能直接从这里选，审核不会因此瘫痪。 */
+export const AGNES_CHAT_MODELS = [
+  'agnes-2.5-flash',
+  'agnes-2.0-flash',
+  'agnes-1.5-flash',
+  'agnes-2.5-pro-beta',
+];
 
 export interface AiConfig {
   enabled: boolean;
@@ -67,7 +75,6 @@ export async function loadAiConfig(env: any): Promise<AiConfig> {
   };
 }
 
-/** 该根域名是否免除「单个子域名最多 N 条 DNS 记录」限制 */
 export async function dnsUnlimited(env: any, rootDomain: string): Promise<boolean> {
   const d = normalizeDomain(rootDomain);
   if (!d) return false;
@@ -75,7 +82,6 @@ export async function dnsUnlimited(env: any, rootDomain: string): Promise<boolea
   return cfg.unlimitedRoots.includes(d);
 }
 
-/** 该根域名是否启用 AI 自动审核 */
 export async function aiAppliesTo(env: any, rootDomain: string): Promise<AiConfig | null> {
   const d = normalizeDomain(rootDomain);
   const cfg = await loadAiConfig(env);
@@ -83,28 +89,64 @@ export async function aiAppliesTo(env: any, rootDomain: string): Promise<AiConfi
   return cfg;
 }
 
-/* ---------- 模型探测与选择 ---------- */
+/* ---------- 模型探测（辅助，非必需） ---------- */
+
+export interface ProbeAttempt {
+  url: string;
+  status: number;
+  sample: string;
+  ms: number;
+}
 
 export interface ModelProbe {
-  ok: boolean;
+  ok: boolean;                    // 是否拿到了可用模型清单（含内置回落）
   models: string[];
+  source: 'gateway' | 'catalog'; // gateway = /models 返回；catalog = 内置官方清单
   message: string;
   detail: string;
+  attempts: ProbeAttempt[];
 }
 
 function modelIds(d: any): string[] {
-  const list = Array.isArray(d?.data) ? d.data
-    : Array.isArray(d?.models) ? d.models
-      : Array.isArray(d) ? d : [];
+  // 兼容 {data:[...]}, {models:[...]}, 纯数组, {data:{models:[...]}} 等形状
+  const raw = Array.isArray(d) ? d
+    : Array.isArray(d?.data) ? d.data
+      : Array.isArray(d?.models) ? d.models
+        : Array.isArray(d?.data?.models) ? d.data.models
+          : Array.isArray(d?.result) ? d.result : [];
   const out: string[] = [];
-  for (const x of list) {
-    const id = typeof x === 'string' ? x : String(x?.id || x?.name || '');
+  for (const x of raw) {
+    const id = typeof x === 'string' ? x : String(x?.id || x?.name || x?.model || '');
     if (id && !out.includes(id)) out.push(id);
   }
   return out.slice(0, 100);
 }
 
-/** 拉取网关 /models。override 允许后台用「刚填、还没保存」的地址与 Key 先探测一次。 */
+/** 模型名是否适合 chat/completions（排除图像 / 视频 / 嵌入 / 语音类） */
+function isChatModel(id: string): boolean {
+  return !/(image|video|embed|rerank|whisper|tts|audio|speech|moderation|dall|vision|draw|music)/i.test(id);
+}
+
+/** 脱敏：响应片段里若出现完整 Key，替换为掩码 */
+function scrub(s: string, key: string): string {
+  let out = String(s || '').slice(0, 300);
+  if (key && out.includes(key)) out = out.split(key).join('sk-••••');
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+/** 生成候选 URL：/models 在不同网关上的挂载位置并不一致 */
+function modelUrls(base: string): string[] {
+  const urls = [`${base}/models`];
+  if (/\/v\d+$/.test(base)) urls.push(`${base.replace(/\/v\d+$/, '')}/models`);
+  else urls.push(`${base}/v1/models`);
+  return [...new Set(urls)];
+}
+
+/**
+ * 拉取网关 /models。失败时**不返回空清单**，而是回落内置官方模型清单，
+ * 并把每一步的 URL / 状态码 / 响应片段都带回去供后台诊断。
+ * override 允许用「刚填、还没保存」的地址与 Key 先探测一次。
+ */
 export async function probeAiModels(
   env: any,
   override: { base?: string; key?: string } = {},
@@ -112,33 +154,56 @@ export async function probeAiModels(
   const cfg = await loadAiConfig(env).catch(() => null);
   const base = String(override.base || cfg?.base || DEFAULT_AI_BASE).trim().replace(/\/+$/, '');
   const key = String(override.key || cfg?.key || '').trim();
+
+  const fallback = (message: string, detail: string, attempts: ProbeAttempt[]): ModelProbe => ({
+    ok: true, models: [...AGNES_CHAT_MODELS], source: 'catalog',
+    message: `${message}（已回落内置 Agnes 官方模型清单，可直接选用）`,
+    detail, attempts,
+  });
+
   if (!key) {
-    return { ok: false, models: [], message: '未配置 API Key，请先填写并保存', detail: '' };
-  }
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 10000);
-  try {
-    const res = await fetch(`${base}/models`, {
-      headers: { Authorization: `Bearer ${key}` },
-      signal: ctl.signal,
-    });
-    const raw = await res.text().catch(() => '');
-    if (!res.ok) {
-      return { ok: false, models: [], message: `/models 返回 HTTP ${res.status}`, detail: raw.slice(0, 300) };
-    }
-    let d: any = {};
-    try { d = JSON.parse(raw); } catch { /* 非 JSON 直接判失败 */ }
-    const models = modelIds(d);
-    if (!models.length) {
-      return { ok: false, models: [], message: '/models 没有返回可用模型', detail: raw.slice(0, 200) };
-    }
-    return { ok: true, models, message: `探测到 ${models.length} 个模型`, detail: '' };
-  } catch (e) {
     return {
-      ok: false, models: [], message: '无法连接 /models（超时或网络不可达）',
-      detail: String((e as Error)?.message || e).slice(0, 200),
+      ok: false, models: [], source: 'catalog',
+      message: '未配置 API Key，请先填写并保存', detail: '', attempts: [],
     };
-  } finally { clearTimeout(timer); }
+  }
+
+  const attempts: ProbeAttempt[] = [];
+  for (const url of modelUrls(base)) {
+    const t0 = Date.now();
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 6000);
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+        signal: ctl.signal,
+      });
+      const raw = await res.text().catch(() => '');
+      attempts.push({ url, status: res.status, sample: scrub(raw, key), ms: Date.now() - t0 });
+      if (res.ok) {
+        let d: any = {};
+        try { d = JSON.parse(raw); } catch { /* 非 JSON */ }
+        const list = modelIds(d);
+        if (list.length) {
+          return {
+            ok: true, models: list, source: 'gateway',
+            message: `网关返回 ${list.length} 个模型`, detail: '', attempts,
+          };
+        }
+      }
+    } catch (e) {
+      attempts.push({
+        url, status: 0, sample: String((e as Error)?.name || e), ms: Date.now() - t0,
+      });
+    } finally { clearTimeout(timer); }
+  }
+
+  const last = attempts[attempts.length - 1];
+  return fallback(
+    `/models 不可用（HTTP ${last?.status || 0}）`,
+    last ? `${last.url} → ${last.status} ${last.sample}` : '网络不可达',
+    attempts,
+  );
 }
 
 export interface ModelChoice {
@@ -147,12 +212,7 @@ export interface ModelChoice {
   inList: boolean;
 }
 
-/**
- * 从探测结果里确定审核用模型：
- *   - 已选模型仍在列表中 → 保留管理员的选择
- *   - 已选模型不在列表中但非空 → 也保留（有些网关 /models 列不全，允许手填）
- *   - 尚未选择 → 自动挑第一个非 embedding 类模型并写入 settings
- */
+/** 从清单里挑一个 chat 模型；管理员已选的保留（手填允许） */
 export async function chooseModel(env: any, models: string[]): Promise<ModelChoice> {
   let cur = '';
   try {
@@ -161,22 +221,24 @@ export async function chooseModel(env: any, models: string[]): Promise<ModelChoi
   } catch { /* 表未就绪 */ }
   if (cur) return { selected: cur, autoPicked: false, inList: models.includes(cur) };
 
-  const usable = models.filter((m) => !/embed|rerank|whisper|tts|image|moderation|dall|vision/i.test(m));
-  const picked = (usable[0] || models[0] || '').slice(0, 80);
+  const chat = models.filter(isChatModel);
+  const pool = chat.length ? chat : AGNES_CHAT_MODELS;
+  // 优先官方 flash 系列，其次任意 chat 模型
+  const picked = (pool.find((m) => /agnes-.*flash/i.test(m)) || pool[0] || AGNES_CHAT_MODELS[0]).slice(0, 80);
   if (picked) {
     try {
       await env.DB.prepare(
         "INSERT INTO settings(key, value) VALUES ('ai_model', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
       ).bind(picked).run();
-    } catch { /* 写不进也不影响本次探测结果 */ }
+    } catch { /* 写不进也不影响本次结果 */ }
   }
-  return { selected: picked, autoPicked: !!picked, inList: true };
+  return { selected: picked, autoPicked: !!picked, inList: models.includes(picked) };
 }
 
-/** 未显式配置模型时的兜底名（探测失败也不至于完全没有候选） */
+/** 兜底候选：Agnes 官方模型优先，再试通用名（适配其它 OpenAI 兼容网关） */
 const FALLBACK_MODELS = [
-  'gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo', 'deepseek-chat',
-  'qwen-turbo', 'claude-3-5-sonnet-20241022',
+  ...AGNES_CHAT_MODELS,
+  'gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo', 'deepseek-chat', 'qwen-turbo',
 ];
 
 /* ---------- 提示词与结果解析 ---------- */
@@ -188,7 +250,6 @@ export interface ReviewInput {
   note: string;
 }
 
-/** 审核提示词：主体句式按需求固定，后面只补判定规则与输出格式 */
 export function buildReviewPrompt(input: ReviewInput): string {
   const note = String(input.note || '').trim() || '（申请人未填写）';
   return [
@@ -201,11 +262,9 @@ export function buildReviewPrompt(input: ReviewInput): string {
   ].join('\n');
 }
 
-/** 兼容 JSON、PASS/REJECT、中文结论、纯 true/false 四种回复 */
 export function parseVerdict(text: string): { approve: boolean; reason: string } | null {
   if (!text) return null;
   let s = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-  // 优先取第一个 JSON 对象（旧网关可能仍回 JSON）
   const m = s.match(/\{[\s\S]*?\}/);
   if (m) {
     try {
@@ -216,12 +275,13 @@ export function parseVerdict(text: string): { approve: boolean; reason: string }
       }
       const str = [o.approve, o.approved, o.result, o.decision].find((x) => typeof x === 'string');
       if (str && /^(true|false|approve|reject|yes|no)$/i.test(String(str))) {
-        const yes = /^(true|approve|yes)$/i.test(String(str));
-        return { approve: yes, reason: String(o.reason || o.message || '').slice(0, 160) || 'AI 审核完成' };
+        return {
+          approve: /^(true|approve|yes)$/i.test(String(str)),
+          reason: String(o.reason || o.message || '').slice(0, 160) || 'AI 审核完成',
+        };
       }
     } catch { /* 落到关键词判断 */ }
   }
-  // 新提示词约定的一行式结论；先 REJECT 后 PASS，避免「不通过」被当成「通过」
   const first = s.split(/[\r\n]/)[0].trim();
   const no = /^(reject|deny|block|驳回|拒绝|不通过|不同意|不予通过)\s*[:：,，\-]?\s*(.*)$/i.exec(first);
   if (no) return { approve: false, reason: (no[2] || first).trim().slice(0, 160) || 'AI 审核未通过' };
@@ -258,7 +318,7 @@ async function chatOnce(cfg: AiConfig, model: string, prompt: string, signal: Ab
   if (!res.ok && res.status === 400) {
     try { ({ res, raw } = await call({})); } catch { /* 保持原结果 */ }
   }
-  if (!res.ok) return { text: '', status: res.status, err: raw.slice(0, 220) };
+  if (!res.ok) return { text: '', status: res.status, err: scrub(raw, cfg.key) };
   let d: any = {};
   try { d = JSON.parse(raw); } catch { /* 非 JSON 直接当文本 */ }
   const text = String(d?.choices?.[0]?.message?.content ?? d?.choices?.[0]?.text ?? d?.output ?? raw);
@@ -272,57 +332,72 @@ export interface AiTestResult {
   sample: string;
   message: string;
   detail: string;
+  attempts: string[];
+  keySet: boolean;
+  base: string;
 }
 
-/** 后台「测试 AI 连接」：用选定的模型 + 真实审核提示词跑一次，不回传密钥 */
+/** 后台「用此模型测试审核」：真实打一次 chat/completions，把每个候选的失败原因都带回来 */
 export async function aiTest(env: any): Promise<AiTestResult> {
-  const cfg = await loadAiConfig(env);
+  const cfg = await loadAiConfig(env).catch(() => null);
   const t0 = Date.now();
-  const blank: AiTestResult = { ok: false, model: '', latencyMs: 0, sample: '', message: '', detail: '' };
-  if (!cfg.configured) {
+  const blank: AiTestResult = {
+    ok: false, model: '', latencyMs: 0, sample: '', message: '', detail: '',
+    attempts: [], keySet: !!cfg?.configured, base: cfg?.base || DEFAULT_AI_BASE,
+  };
+  if (!cfg?.configured) {
     return { ...blank, message: '未配置 API Key（后台填一次，或用 Worker Secret AI_API_KEY）' };
   }
   if (!cfg.enabled) return { ...blank, message: '自动审核开关已关闭' };
 
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 15000);
+  const attempts: string[] = [];
   try {
-    let model = cfg.model;
-    if (!model) {
-      const p = await probeAiModels(env);
-      if (p.ok) model = (await chooseModel(env, p.models)).selected;
-    }
-    model = model || FALLBACK_MODELS[0];
+    // 已选模型优先；未选时用官方清单，绝不等待 /models
+    const candidates = [
+      cfg.model || '',
+      ...FALLBACK_MODELS.filter((x) => x && x !== cfg.model),
+    ].filter(Boolean).slice(0, 5);
     const prompt = buildReviewPrompt({
       fqdn: 'demo.v-1.top', label: 'demo', root: 'v-1.top', note: '个人博客，用于展示作品集',
     });
-    const r = await chatOnce(cfg, model, prompt, ctl.signal);
-    if (r.text) {
-      const v = parseVerdict(r.text);
-      return {
-        ...blank, ok: true, model, latencyMs: Date.now() - t0,
-        sample: r.text.trim().slice(0, 80),
-        message: v ? (v.approve ? '审核返回：PASS（通过）' : '审核返回：REJECT（驳回）')
-          : '模型可调用，但回复无法解析（实际审核会回落人工）',
-      };
+    for (const model of candidates) {
+      if (ctl.signal.aborted) break;
+      try {
+        const r = await chatOnce(cfg, model, prompt, ctl.signal);
+        if (r.text) {
+          const v = parseVerdict(r.text);
+          return {
+            ...blank, ok: true, model, latencyMs: Date.now() - t0, attempts,
+            sample: r.text.trim().slice(0, 80),
+            message: v ? (v.approve ? '✓ 审核返回 PASS（通过）' : '✓ 审核返回 REJECT（驳回）')
+              : '模型可调用，但回复无法解析（实际审核会回落人工）',
+          };
+        }
+        attempts.push(`${model} → HTTP ${r.status}${r.err ? ' · ' + r.err.slice(0, 120) : ''}`);
+      } catch (e) {
+        attempts.push(`${model} → ${String((e as Error)?.name || 'error')}`);
+      }
     }
     return {
-      ...blank, model, latencyMs: Date.now() - t0,
-      message: `模型 ${model} 调用失败 · HTTP ${r.status}`,
-      detail: r.err.slice(0, 300),
+      ...blank, latencyMs: Date.now() - t0, attempts,
+      message: '所有候选模型均调用失败',
+      detail: attempts[0] || '',
     };
   } catch (e) {
     return {
       ...blank, message: '连接异常（超时或网络不可达）',
       detail: String((e as Error)?.message || e).slice(0, 200),
-      latencyMs: Date.now() - t0,
+      latencyMs: Date.now() - t0, attempts,
     };
   } finally { clearTimeout(timer); }
 }
 
 /**
  * 调用 AI 判定申请是否可自动批准。
- * @returns approve=true 自动开通；false 自动驳回；null 表示不可用（回落人工审核）
+ * 已选定模型时**不请求 /models**，直接送审；未选时用官方清单兜底。
+ * @returns approve=true 自动开通；false 自动驳回；null 回落人工审核
  */
 export async function aiReview(
   env: any, input: ReviewInput,
@@ -331,34 +406,23 @@ export async function aiReview(
   if (!cfg) return null;
 
   const ctl = new AbortController();
-  // 12 秒：/models 探测 + 最多 3 个候选模型，避免网关慢时整体降级
   const timer = setTimeout(() => ctl.abort(), 12000);
   try {
     const prompt = buildReviewPrompt(input);
-
-    // 选定的模型优先；模型未配置时先探测并自动选一个，失败才走兜底名
-    let model = cfg.model;
-    let probed: string[] = [];
-    if (!model) {
-      const p = await probeAiModels(env);
-      if (p.ok) {
-        probed = p.models;
-        model = (await chooseModel(env, p.models)).selected;
-      }
-    }
+    // 探测只发生在「后台选模型」阶段；审核链路不依赖 /models
+    const selected = cfg.model || AGNES_CHAT_MODELS[0];
     const candidates = [
-      model,
-      ...probed.filter((x) => x && x !== model).slice(0, 2),
-      ...FALLBACK_MODELS,
-    ].filter(Boolean);
+      selected,
+      ...FALLBACK_MODELS.filter((x) => x !== selected),
+    ].slice(0, 4);
 
-    for (const candidate of candidates.slice(0, 4)) {
+    for (const model of candidates) {
       if (ctl.signal.aborted) break;
       try {
-        const r = await chatOnce(cfg, candidate, prompt, ctl.signal);
-        if (!r.text) continue;               // 该模型不可用，换下一个
+        const r = await chatOnce(cfg, model, prompt, ctl.signal);
+        if (!r.text) continue;
         const verdict = parseVerdict(r.text);
-        if (verdict) return { ...verdict, model: candidate };
+        if (verdict) return { ...verdict, model };
       } catch { /* 超时或网络异常，换下一个 */ }
     }
     return null;

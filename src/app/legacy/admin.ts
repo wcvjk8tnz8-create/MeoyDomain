@@ -356,12 +356,14 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 <div><span class="dim">不限 DNS 记录数的根域名</span><input id="sAiDnsRoots" placeholder="v-1.top"></div>
               </div>
               <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。审核时会把「AI，你好，你现在要帮我审核一个子域名申请，域名是…，理由：…」发给下面选定的模型，按 <span class="mono">PASS / REJECT</span> 判定。AI 未配置、超时或返回异常时，申请自动回落为人工审核。</div>
-              <div class="hint" id="aiModelHint" style="margin:6px 0 0">尚未探测模型。填好地址与 Key 后点「保存」，会自动探测 /models 并选定一个模型。</div>
+              <div class="hint" id="aiModelHint" style="margin:6px 0 0">填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-2.5-flash）。</div>
               <div class="row" style="gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
                 <button class="btn sm" id="aiProbeBtn" type="button">探测模型</button>
                 <button class="btn sm ghost" id="aiTestBtn" type="button">用此模型测试审核</button>
-                <span class="hint" id="aiTestResult" style="margin:0">会用真实审核提示词调用一次选定的模型。</span>
+                <button class="btn sm ghost" id="aiDiagBtn" type="button">一键诊断</button>
+                <span class="hint" id="aiTestResult" style="margin:0">/models 探测失败不影响审核，可直接从清单选 agnes-2.5-flash。</span>
               </div>
+              <pre class="mono" id="aiDiagOut" style="display:none;white-space:pre-wrap;font-size:12px;line-height:1.7;background:var(--surface-2,#f6f8fc);padding:12px;border-radius:10px;margin:10px 0 0;max-height:260px;overflow:auto"></pre>
             </div>
             <div class="field">
               <label>滥用举报渠道（外部域名 WHOIS 展示）</label>
@@ -488,22 +490,25 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         try {
           const r = await api.post('/api/admin/ai-models', payload);
           if (!aiModelList) return;
-          if (!r.ok) {
-            aiModelList.innerHTML = '<option value="">探测失败，可手动填写模型名</option>';
-            if (aiModelHint) aiModelHint.textContent = r.message + (r.detail ? ' · ' + r.detail : '');
-            return;
-          }
+          // 网关 /models 挂了也照样给内置官方清单，不让下拉变空
+          const list: string[] = (r.models && r.models.length ? r.models : (r.chatModels || []));
           const cur = (aiModelInput?.value || '').trim();
-          const chosen = String(r.selected || '') || cur;
-          const list: string[] = r.models || [];
+          const chosen = String(r.selected || '') || cur || (r.chatModels || [])[0] || '';
           aiModelList.innerHTML = '<option value="">— 手动填写 —</option>'
             + list.map((m: string) => `<option value="${esc(m)}"${m === chosen ? ' selected' : ''}>${esc(m)}</option>`).join('');
-          if (aiModelInput && chosen) aiModelInput.value = chosen;
+          if (aiModelInput && chosen && !cur) aiModelInput.value = chosen;
+          const src = r.source === 'gateway' ? '网关 /models' : '内置 Agnes 官方清单';
           if (aiModelHint) {
-            aiModelHint.innerHTML = `✓ ${esc(r.message)}，审核模型 <b>${esc(chosen || '未选定')}</b>`
+            aiModelHint.innerHTML = (r.ok ? '✓ ' : '⚠ ')
+              + esc(r.message || '探测异常') + `（来源：${src}），审核模型 <b>${esc(chosen || '未选定')}</b>`
               + (r.autoPicked ? '（已自动选择并保存）' : '')
-              + (r.inList === false && chosen ? '；当前模型不在列表中，可从下拉改选' : '')
+              + (r.inList === false && chosen ? '；当前模型不在清单中，可从下拉改选' : '')
               + '。改选后点「保存」生效。';
+          }
+          const at = (r.attempts || []) as { url: string; status: number; sample: string }[];
+          if (at.length && r.source !== 'gateway' && aiModelHint) {
+            const last = at[at.length - 1];
+            aiModelHint.innerHTML += `<br><span class="dim">/models 诊断：${esc(last.url)} → HTTP ${last.status} · ${esc(String(last.sample || '').slice(0, 140))}</span>`;
           }
         } catch (e) {
           if (aiModelHint) aiModelHint.textContent = '探测失败：' + ((e as any).message || e);
@@ -582,7 +587,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         } catch (e) { toast(e.message, 'err'); }
       };
 
-      /* AI 连接自检：真实调用一次 /models 与 /chat/completions，回报具体失败点 */
+      /* AI 连接自检：真实调用 chat/completions，回报每个候选模型的具体失败点 */
       const aiTestBtn = document.getElementById('aiTestBtn');
       if (aiTestBtn) aiTestBtn.onclick = async () => {
         const out = document.getElementById('aiTestResult');
@@ -591,12 +596,29 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           const r = await api.post('/api/admin/ai-test', {});
           if (out) {
             out.className = 'hint';
+            const tried = (r.attempts || []) as string[];
             out.innerHTML = r.ok
               ? `<span class="badge ok">可用</span> 模型 <span class="mono">${esc(r.model)}</span> · ${r.latencyMs} ms · 返回「${esc(r.sample || '')}」`
-              : `<span class="badge warn">不可用</span> ${esc(r.message || '未知错误')}${r.detail ? '<br><span class="mono">' + esc(r.detail) + '</span>' : ''}`;
+              : `<span class="badge warn">不可用</span> ${esc(r.message || '未知错误')}`
+                + (r.detail ? '<br><span class="mono">' + esc(r.detail) + '</span>' : '')
+                + (tried.length ? '<br><span class="dim">逐个模型：' + esc(tried.join(' | ').slice(0, 400)) + '</span>' : '');
           }
-          toast(r.ok ? 'AI 连接正常' : 'AI 连接失败：' + (r.message || ''), r.ok ? 'ok' : 'err');
+          toast(r.ok ? 'AI 审核可用' : 'AI 审核不可用：' + (r.message || ''), r.ok ? 'ok' : 'err');
         } catch (e) { if (out) out.textContent = '测试失败：' + (e.message || e); }
+      };
+
+      /* 一键诊断：Key / 地址 / /models / chat 各自状态一次列清 */
+      const aiDiagBtn = document.getElementById('aiDiagBtn');
+      if (aiDiagBtn) aiDiagBtn.onclick = async () => {
+        const box = document.getElementById('aiDiagOut');
+        if (!box) return;
+        box.style.display = '';
+        box.textContent = '诊断中…（会真实请求网关，最多约 20 秒）';
+        try {
+          const r = await api.post('/api/admin/ai-diagnose', {});
+          box.textContent = (r.lines || []).join('\n');
+          toast(r.ok ? 'AI 审核链路可用' : '诊断完成，请查看下方明细', r.ok ? 'ok' : 'err');
+        } catch (e) { box.textContent = '诊断失败：' + ((e as any).message || e); }
       };
   
       // 有效期规则

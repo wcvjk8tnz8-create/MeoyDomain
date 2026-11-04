@@ -10,7 +10,7 @@ import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColum
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
 import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList, setDnsBackend } from '../lib/rootStore.js';
-import { aiTest, probeAiModels, chooseModel } from '../lib/aiReview.js';
+import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -517,15 +517,54 @@ app.post('/ai-models', async (c) => {
     let choice = blank;
     if (p.ok) choice = await chooseModel(c.env, p.models);
     await audit(c, c.get('user')?.id, 'admin.ai-models', 'ai',
-      p.ok ? `${p.models.length} 个模型 · 选用 ${choice.selected || '（未选）'}` : `失败 · ${p.message}`);
+      `${p.source === 'gateway' ? '网关清单' : '内置清单'} · ${p.models.length} 个模型 · 选用 ${choice.selected || '（未选）'}`);
     return ok(c, {
       ok: p.ok, models: p.models, message: p.message, detail: p.detail,
+      source: p.source, attempts: p.attempts,
+      chatModels: AGNES_CHAT_MODELS,
       selected: choice.selected, autoPicked: choice.autoPicked, inList: choice.inList,
     });
   } catch (e) {
     return ok(c, {
       ok: false, models: [], message: '模型探测异常',
       detail: String((e as Error)?.message || e).slice(0, 200), ...blank,
+      source: 'catalog', attempts: [], chatModels: AGNES_CHAT_MODELS,
+    });
+  }
+});
+
+/* 一键诊断：一次讲清 Key / 地址 / /models / chat/completions 各自的状态。
+   /models 失败不影响结论 —— 只要 chat/completions 能通，审核就能跑。 */
+app.post('/ai-diagnose', async (c) => {
+  try {
+    const cfg = await loadAiConfig(c.env);
+    const probe = cfg.configured ? await probeAiModels(c.env) : null;
+    const test = cfg.configured ? await aiTest(c.env) : null;
+    const lines = [
+      `API Key：${cfg.configured ? '已配置' : '未配置'}`,
+      `接口地址：${cfg.base}`,
+      `当前模型：${cfg.model || '（未选，审核时用 ' + AGNES_CHAT_MODELS[0] + '）'}`,
+      `自动审核开关：${cfg.enabled ? '开启' : '关闭'}`,
+      `作用根域名：${cfg.roots.join(', ') || '（无）'}`,
+      `/models：${probe ? (probe.source === 'gateway' ? '网关返回 ' + probe.models.length + ' 个' : '不可用，已回落内置清单') : '未检测'}`,
+      `chat/completions：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
+    ];
+    if (test?.attempts?.length) lines.push('候选模型逐项：' + test.attempts.join(' | ').slice(0, 500));
+    if (probe?.attempts?.length) {
+      lines.push('/models 请求明细：');
+      for (const a of probe.attempts) lines.push(`  ${a.url} → HTTP ${a.status} (${a.ms}ms) ${a.sample.slice(0, 120)}`);
+    }
+    await audit(c, c.get('user')?.id, 'admin.ai-diagnose', 'ai',
+      test?.ok ? `可用 · ${test.model}` : `不可用 · ${test?.message || '未配置 Key'}`);
+    return ok(c, {
+      ok: !!test?.ok, lines, keySet: cfg.configured, base: cfg.base,
+      model: cfg.model, modelFromCatalog: !cfg.model,
+      probeSource: probe?.source || '', testOk: !!test?.ok,
+    });
+  } catch (e) {
+    return ok(c, {
+      ok: false, lines: ['诊断异常：' + String((e as Error)?.message || e).slice(0, 200)],
+      keySet: false, base: '', model: '', modelFromCatalog: true, probeSource: '', testOk: false,
     });
   }
 });
