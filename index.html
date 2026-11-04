@@ -18,6 +18,10 @@
     (function(){try{var k='meoy_theme',v=localStorage.getItem(k);
     if(v!=='dark'&&v!=='light'){v=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
     if(v==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+    /* 语言预置：同步设置 lang / data-lang，供 CSS 与辅助技术使用 */
+    (function(){try{var v=localStorage.getItem('terradata_lang')==='en'?'en':'zh';
+    document.documentElement.setAttribute('lang',v==='en'?'en':'zh-CN');
+    document.documentElement.setAttribute('data-lang',v);}catch(e){}})();
   </script>
 </head>
 <body>

@@ -6,6 +6,7 @@
  */
 import type { LegacyCtx } from './types';
 import { mountMotionStandalone } from './motion';
+import { startI18n } from './i18n';
 
 /* SPA 切页清理注册表：document / window 事件与定时器都登记在这里 */
 let cleanups: Array<() => void> = [];
@@ -45,13 +46,15 @@ export function navigate(path: string) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-/* 每次切页后重新扫描动效/装饰/页脚/主题按钮 */
+/* 每次切页后重新扫描动效/装饰/页脚/主题按钮/语言 */
 export function refreshRuntime() {
   try { mountDecor(); } catch {}
   try { mountMotion(); } catch {}
   try { mountSiteFooter(); } catch {}
   try { (window as any).MeoyTheme?.remount?.(); } catch {}
   try { mountMotionStandalone(); } catch {}
+  // 语言常驻监听只需启动一次；每次切页补挂顶栏切换器并翻译新 DOM
+  try { startI18n(); } catch (e) { console.warn('[i18n]', e); }
 }
 
 // 前端通用工具：接口封装、提示、渲染辅助、壁纸切换

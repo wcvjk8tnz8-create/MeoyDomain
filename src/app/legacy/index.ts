@@ -2,16 +2,20 @@
  * Login 页面控制器（由 index.html 内联脚本平移）
  * 外部符号由 runtime 提供；DOM 查询作用于当前挂载的页面。
  */
-import { api, toast, loadBranding, applyBranding, wallpaperSwitchHtml } from '../lib/runtime';
+import { api, toast, loadBranding, applyBranding } from '../lib/runtime';
 
 import type { LegacyCtx } from '../lib/types';
 
 export async function mountLogin(_root: HTMLElement | null): Promise<void> {
   
-  document.getElementById('bgsw').innerHTML = wallpaperSwitchHtml();
+  // 登录页顶栏不再放壁纸切换器（新版式留白优先）。
+  // 兼容旧结构：若页面里仍有 #bgsw，保持为空即可，不再注入任何按钮。
+  const bgsw = document.getElementById('bgsw');
+  if (bgsw) bgsw.innerHTML = '';
   loadBranding().then((b) => {
     applyBranding(b);
-    document.getElementById('navLogo').src = b.logoUrl;
+    const navLogo = document.getElementById('navLogo') as HTMLImageElement | null;
+    if (navLogo) navLogo.src = b.logoUrl;
   });
   
   const tabLogin = document.getElementById('tabLogin'), tabReg = document.getElementById('tabReg');

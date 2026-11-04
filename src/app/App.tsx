@@ -1,5 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import { navigate } from './lib/runtime';
+import { startI18n } from './lib/i18n';
 import LoginPage from './pages/Login';
 import HomePage from './pages/Home';
 import DashboardPage from './pages/Dashboard';
@@ -105,6 +106,8 @@ export default function App() {
 
   useEffect(() => {
     mountPageVisuals(key);
+    // 语言切换器与翻译在每次切页后补挂（内部幂等）
+    try { startI18n(); } catch { /* 不影响页面功能 */ }
   }, [key]);
 
   const Page = ROUTES[key] || LoginPage;

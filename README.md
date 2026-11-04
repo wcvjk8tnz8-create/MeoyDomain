@@ -754,3 +754,33 @@ npx wrangler secret put AI_API_KEY
 
 **根域名归属**：域名列表的「根域名」列取库里的 `root_domain`，缺失时从
 `fqdn` 去掉首段反推（`lol.v-1.top` → `v-1.top`），不再写死默认根域名。
+
+
+---
+
+## 中英文切换（全站）
+
+`src/app/lib/i18n.ts`。顶栏有 **中 / EN** 切换器，控制台、落地页、登录页三种
+顶栏都会自动注入；也可按 `Alt + L` 快速切换。
+
+**为什么是运行时 DOM 翻译**：项目里有 14 个 React 页面加上一批用
+`innerHTML` 动态渲染的 legacy 控制器。逐个组件改 `t()` 会漏掉异步表格、
+弹窗、Toast 和后端返回的中文提示。现在在 DOM 层统一拦截：
+
+- `translateText()` 纯函数：精确短语匹配 → 带数字句式（正则）→ 长键优先子串替换
+- 340 条词典覆盖导航、表单、表格、状态、按钮、落地页与登录页
+- `MutationObserver` 监听 `childList` / `characterData`：异步表格、Toast、
+  SPA 切页后的新节点自动翻译
+- 原文按 `WeakMap<Text, string>` 保存，切回中文是精确还原，不靠反向字典
+- 邮箱、URL、纯域名、代码块、`<kbd>`、`data-no-i18n` 区域一律跳过
+
+**默认中文**：不会跟随浏览器语言自动变英文，只有用户点过切换才生效；
+选择存 `localStorage.terradata_lang`，`<html lang>` / `data-lang` 由
+`index.html` 里的同步脚本预置，刷新不闪。
+
+## 登录页与落地页版式
+
+- 登录页改为「左侧品牌陈述 + 右侧表单卡片」，移除原先右侧四块堆砌的说明模块，
+  顶栏也不再放壁纸切换器；登录 / 注册 / 找回密码三个面板的全部 DOM id 保留
+- 落地页 Hero 移除 Miku 插画（`public/img/neko.jpg`、`neko.svg` 已删除），
+  改为纯文字标题 + 细线指标条；`nk-hero-in` 收成单列

@@ -29,10 +29,10 @@ export default function HomePage() {
             <span><b data-site-name>TerraDomain</b><i>二级域名分发</i></span>
           </a>
           <nav className="home-nav">
-            <a href="/terms">Language</a>
+            <a href="#search">查找域名</a>
             <a href="/">登录</a>
             <a href="/">注册</a>
-            <a className="btn sm primary" href="/whois">关于</a>
+            <a className="btn sm primary" href="/whois">WHOIS</a>
           </nav>
         </div>
       </header>
@@ -42,15 +42,18 @@ export default function HomePage() {
         <div className="nk-wrap">
           <div className="nk-hero-in">
             <div className="nk-hero-txt">
+              <div className="nk-kicker">FREE SUBDOMAINS <span>/</span> DNS HOSTING</div>
               <h1 className="nk-h1">免费域名注册</h1>
               <p className="nk-lead">永久免费的二级域名注册与 DNS 解析管理。<br />即刻部署，几分钟即可上线你的服务。</p>
               <div className="nk-cta">
                 <a className="btn primary" href="/">立即开始</a>
                 <a className="btn" href="#search">查找可用域名</a>
               </div>
-            </div>
-            <div className="nk-hero-art">
-              <img src="/img/neko.jpg" alt="Miku" width="900" height="750" />
+              <div className="nk-hero-meta">
+                <span>12+ 种记录类型</span>
+                <span>全球 Anycast 解析</span>
+                <span>永久免费</span>
+              </div>
             </div>
           </div>
         </div>
