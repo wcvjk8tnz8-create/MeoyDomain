@@ -170,6 +170,9 @@ const DICT: Record<string, string> = {
   '我的积分': 'My Points', '管理员不限积分': 'Unlimited points',
   '管理员申请子域名不消耗积分。': 'Admin accounts do not spend points on new subdomains.',
   '明细': 'Details',
+  '注册入口已独立为单独页面：可先检查名称是否可用、查看积分消耗，再提交申请。':
+    'Registration has its own page: check availability, review the point cost, then submit.',
+  // 兼容旧文案里的顿号写法（历史版本用过），避免标点差异再次导致整句匹配失败
   '注册入口已独立为单独页面：可先检查名称是否可用、查看积分消耗、再提交申请。':
     'Registration has its own page: check availability, review the point cost, then submit.',
   '前往注册 →': 'Go to register →', '注册须知': 'Before you register',
@@ -284,6 +287,54 @@ const DICT: Record<string, string> = {
   '界面模板 · 演示用途 · 所有内容均为占位': 'Template · Demo · Placeholder content',
 };
 
+/* 完整句子整译：这些是界面上会整段显示的说明文案。
+   整句精确命中才会翻译；命中不了就由下方安全网保留全中文，
+   绝不用子串替换把它们切成「Sign up入口…ViewPoints消耗」这种夹生话。 */
+const FULL_SENTENCES: Record<string, string> = {
+  '勾选后即为本站可用根域名。若要用 Cloudflare 做 DNS 解析，请把该域名 NS 指向 Cloudflare 并填入对应 Zone ID（也可稍后在环境变量配置）。':
+    'Checked domains become available root domains here. To use Cloudflare DNS, point the nameservers to Cloudflare and enter the matching Zone ID (or configure it later via environment variables).',
+  '封禁后该用户立即下线、无法登录，其全部子域名停用。':
+    'Banning signs the user out immediately, blocks sign-in, and disables all their subdomains.',
+  '超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响。':
+    'Accounts over the per-IP limit can be banned in bulk on the Same IP Accounts page. Admins are unaffected.',
+  '发件人需先在服务商处完成域名验证（SPF / DKIM）。':
+    'Verify the sender domain with your provider first (SPF / DKIM).',
+  '未配置邮件服务时，忘记密码验证码功能不可用（会提示联系管理员）。':
+    'Password-reset codes are unavailable until a mail provider is configured (users will be told to contact an admin).',
+  '填好地址与 Key 后点「保存」会自动探测 /models；探测不到也没关系，可直接从下拉选 Agnes 官方模型（如 agnes-2.5-flash）。':
+    'Saving the URL and key probes /models automatically. If probing fails, just pick an official Agnes model from the dropdown (e.g. agnes-2.5-flash).',
+  '/models 探测失败不影响审核，可直接从清单选 agnes-2.5-flash。':
+    'A failed /models probe does not block review — pick agnes-2.5-flash from the list.',
+  '查询外部域名并识别到托管平台时，结果下方会展示「滥用与违规举报通道」区块。':
+    'When an external lookup identifies the hosting platform, an abuse reporting section appears below the result.',
+  '全局生效：前台、WHOIS、管理后台、条款页全部应用。拉丁字母与数字始终使用 Redaction 35（像素感），中文字体只接管中文字符。切换后刷新页面即可看到。':
+    'Applies site-wide: landing page, WHOIS, admin panel and terms. Latin letters and digits keep Redaction 35; the Chinese font only covers Chinese characters. Refresh to see the change.',
+  '本人与管理员始终可见完整地址，不受此项影响。':
+    'The owner and admins always see the full address regardless of this setting.',
+  '在 Spaceship → API Manager 创建 Key（需 domains 读取权限）。本站只读取域名列表，不注册、不续费、不改 NS。':
+    'Create a key in Spaceship → API Manager (needs domains read access). This site only lists domains — no registration, renewal or NS changes.',
+  '已注册域名的 DNS 记录、续期、转移等全部不受影响':
+    'DNS records, renewals and transfers of existing domains are unaffected',
+  '已由环境变量 APPLY_PAUSED 强制开启，后台不可修改。':
+    'Forced on by the APPLY_PAUSED environment variable; cannot be changed here.',
+  '当前为 MOCK 模式：DNS 记录只写入内存，不会真正调用 Cloudflare。':
+    'MOCK mode: DNS records are kept in memory only; Cloudflare is not called.',
+  'DNS 记录按各根域名配置的后端实时同步（Cloudflare / Spaceship）。':
+    'DNS records sync to the backend configured per root domain (Cloudflare / Spaceship).',
+  '已保存，刷新页面后生效': 'Saved. Refresh the page to apply.',
+  '诊断中…（会真实请求网关，最多约 20 秒）':
+    'Diagnosing… (makes real gateway calls, up to ~20s)',
+  '诊断完成，请查看下方明细': 'Diagnosis complete — see details below',
+  '未配置，头像走 /api/avatar/<key> 代理读取（桶无需公开）':
+    'Not configured; avatars are served through /api/avatar/<key> (bucket can stay private).',
+  '未配置。填写 API Key / Secret 并保存后即可自动发现域名。':
+    'Not configured. Add the API key / secret and save to discover domains automatically.',
+  '删除该子域名并清空其 DNS 记录？':
+    'Delete this subdomain and clear all its DNS records?',
+  '注意：名单里的根域名必须和你实际申请时选的后缀一致':
+    'Note: the roots listed here must match the suffix users actually apply under',
+};
+
 /* 带数字 / 变量的句式（优先于子串替换） */
 const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^第 (\d+) \/ (\d+) 页 · 共 (\d+) 个$/, m => `Page ${m[1]} / ${m[2]} · ${m[3]} total`],
@@ -313,6 +364,7 @@ export function translateText(raw: string, to: Lang = currentLang()): string {
   if (!t || !/[\u4e00-\u9fa5]/.test(t)) return raw;
 
   if (DICT[t]) return lead + DICT[t] + trail;
+  if (FULL_SENTENCES[t]) return lead + FULL_SENTENCES[t] + trail;
   for (const [re, fn] of PATTERNS) {
     const m = t.match(re);
     if (m) return lead + fn(m) + trail;
@@ -324,7 +376,12 @@ export function translateText(raw: string, to: Lang = currentLang()): string {
   for (const k of LONG_KEYS) {
     if (out.includes(k)) out = out.split(k).join(DICT[k]);
   }
-  return out === t ? raw : lead + out + trail;
+  if (out === t) return raw;
+  /* 关键：只翻了半句就停手，会产出「Sign up入口…ViewPoints消耗…Submit request」
+     这种中英夹生。宁可整句保留中文，也不能把句子切碎拼贴。
+     完整句子的翻译一律走上面的 DICT 整句词条 / PATTERNS 句式。 */
+  if (/[\u4e00-\u9fa5]/.test(out)) return raw;
+  return lead + out + trail;
 }
 
 /* ───────────────────────── 状态 ───────────────────────── */
