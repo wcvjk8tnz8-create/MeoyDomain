@@ -340,7 +340,11 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               </label>
               <div class="grid2">
                 <div><span class="dim">接口地址</span><input id="sAiUrl" placeholder="https://apihub.agnes-ai.com/v1"></div>
-                <div><span class="dim">模型（留空自动探测）</span><input id="sAiModel" placeholder="留空读取 /models"></div>
+                <div>
+                  <span class="dim">审核模型（探测后自动选择，可改选）</span>
+                  <input id="sAiModel" placeholder="保存后自动探测 /models">
+                  <select id="sAiModelList" style="margin-top:6px"><option value="">— 尚未探测 —</option></select>
+                </div>
               </div>
               <div class="field" style="margin:8px 0 0">
                 <span class="dim">API Key</span>
@@ -351,10 +355,12 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 <div><span class="dim">自动审核的根域名</span><input id="sAiRoots" placeholder="v-1.top"></div>
                 <div><span class="dim">不限 DNS 记录数的根域名</span><input id="sAiDnsRoots" placeholder="v-1.top"></div>
               </div>
-              <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。AI 未配置、超时或返回异常时，申请自动回落为人工审核，不会卡住用户。</div>
+              <div class="hint">密钥只存数据库或 Worker Secret <span class="mono">AI_API_KEY</span>，不会写进代码库；后台与公开接口都只回显掩码。审核时会把「AI，你好，你现在要帮我审核一个子域名申请，域名是…，理由：…」发给下面选定的模型，按 <span class="mono">PASS / REJECT</span> 判定。AI 未配置、超时或返回异常时，申请自动回落为人工审核。</div>
+              <div class="hint" id="aiModelHint" style="margin:6px 0 0">尚未探测模型。填好地址与 Key 后点「保存」，会自动探测 /models 并选定一个模型。</div>
               <div class="row" style="gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
-                <button class="btn sm ghost" id="aiTestBtn" type="button">测试 AI 连接</button>
-                <span class="hint" id="aiTestResult" style="margin:0">先保存设置再测试；会真实调用一次模型并返回诊断。</span>
+                <button class="btn sm" id="aiProbeBtn" type="button">探测模型</button>
+                <button class="btn sm ghost" id="aiTestBtn" type="button">用此模型测试审核</button>
+                <span class="hint" id="aiTestResult" style="margin:0">会用真实审核提示词调用一次选定的模型。</span>
               </div>
             </div>
             <div class="field">
@@ -466,6 +472,52 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             </div>
           </td>
         </tr>`;
+      /* AI 模型探测：填好地址 / Key → 拉 /models → 自动选定一个 → 下拉改选。
+         useTyped=true 时把「还没保存」的 Key 临时带上去探测，但不写进数据库。 */
+      const aiModelHint = document.getElementById('aiModelHint');
+      const aiModelList = document.getElementById('sAiModelList') as HTMLSelectElement | null;
+      const aiModelInput = document.getElementById('sAiModel') as HTMLInputElement | null;
+      const probeModels = async (useTyped: boolean) => {
+        const payload: Record<string, string> = {};
+        if (useTyped) {
+          payload.aiUrl = (document.getElementById('sAiUrl') as HTMLInputElement)?.value.trim() || '';
+          const k = (document.getElementById('sAiKey') as HTMLInputElement)?.value.trim() || '';
+          if (k && !k.startsWith('••')) payload.aiApiKey = k;
+        }
+        if (aiModelHint) aiModelHint.textContent = '正在探测模型…';
+        try {
+          const r = await api.post('/api/admin/ai-models', payload);
+          if (!aiModelList) return;
+          if (!r.ok) {
+            aiModelList.innerHTML = '<option value="">探测失败，可手动填写模型名</option>';
+            if (aiModelHint) aiModelHint.textContent = r.message + (r.detail ? ' · ' + r.detail : '');
+            return;
+          }
+          const cur = (aiModelInput?.value || '').trim();
+          const chosen = String(r.selected || '') || cur;
+          const list: string[] = r.models || [];
+          aiModelList.innerHTML = '<option value="">— 手动填写 —</option>'
+            + list.map((m: string) => `<option value="${esc(m)}"${m === chosen ? ' selected' : ''}>${esc(m)}</option>`).join('');
+          if (aiModelInput && chosen) aiModelInput.value = chosen;
+          if (aiModelHint) {
+            aiModelHint.innerHTML = `✓ ${esc(r.message)}，审核模型 <b>${esc(chosen || '未选定')}</b>`
+              + (r.autoPicked ? '（已自动选择并保存）' : '')
+              + (r.inList === false && chosen ? '；当前模型不在列表中，可从下拉改选' : '')
+              + '。改选后点「保存」生效。';
+          }
+        } catch (e) {
+          if (aiModelHint) aiModelHint.textContent = '探测失败：' + ((e as any).message || e);
+        }
+      };
+      const aiProbeBtn = document.getElementById('aiProbeBtn');
+      if (aiProbeBtn) aiProbeBtn.onclick = () => probeModels(true);
+      if (aiModelList) aiModelList.onchange = () => {
+        if (aiModelInput) aiModelInput.value = aiModelList.value;
+        if (aiModelHint) aiModelHint.textContent = aiModelList.value
+          ? `已选 ${aiModelList.value}，点「保存」后生效。`
+          : '可在上方输入框手动填写模型名，然后保存。';
+      };
+
       const preview = () => {
         tb.querySelector('.logo-preview').src = document.getElementById('sLogo').value.trim() || '/img/logo.jpg';
       };
@@ -515,6 +567,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             aiDnsUnlimitedRoots: document.getElementById('sAiDnsRoots').value,
           });
           toast('已保存，刷新页面后生效');
+          // 保存后自动探测 /models 并选定一个模型（可在下拉里改选后再次保存）
+          probeModels(false);
           // 立即刷新导航 Logo
           brandPromise = null;
           const b = await loadBranding();
@@ -618,6 +672,13 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           if (hint) hint.innerHTML = '<span class="badge ok">已启用</span> 当前 Key ' + esc(a.keyMasked || '') + '。需更换时填入新 Key，留空保持原值。';
         } else {
           if (hint) hint.innerHTML = '未配置 Key：AI 不会调用，申请照常进入人工审核。也可用 <span class="mono">npx wrangler secret put AI_API_KEY</span> 配置。';
+        }
+        // 已经配好 Key 时，打开设置页顺带核对一次模型列表（不改变管理员已选的模型）
+        if (a.ready) {
+          if (aiModelHint && a.model) {
+            aiModelHint.innerHTML = `当前审核模型 <b>${esc(a.model)}</b>，正在核对可用模型列表…`;
+          }
+          probeModels(false);
         }
       }
 

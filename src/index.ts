@@ -145,8 +145,9 @@ app.get('/api/config', async (c) => {
       enabled: ai.enabled,
       ready: ai.configured,
       roots: ai.roots,
-      model: ai.model || '自动探测',
-    } : { enabled: false, ready: false, roots: [], model: '自动探测' },
+      model: ai.model || '',
+      modelSelected: !!ai.model,
+    } : { enabled: false, ready: false, roots: [], model: '', modelSelected: false },
     // 邮箱验证码：mailOk 表示邮件服务已配置（可发送），verifyRequired 表示后台开了注册验证
     mailOk,
     mailVerifyRequired: verifyRequired,

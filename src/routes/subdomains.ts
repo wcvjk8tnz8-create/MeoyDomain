@@ -314,7 +314,7 @@ const createMine = async (c) => {
 
   const detail = [status];
   if (isAdmin) detail.push('管理员免审核，AI 不触发');
-  else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · ${ai.reason}`);
+  else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · 模型 ${ai.model || '自动探测'} · ${ai.reason}`);
   else {
     detail.push('AI 未触发（未配置 Key / 不在自动审核名单 / 模型调用失败）');
     if (cost > 0) detail.push(`消耗 ${cost} 分${short ? '（单字域名）' : ''}`);
@@ -328,6 +328,7 @@ const createMine = async (c) => {
     status,
     aiReviewed: !!ai,
     aiReason: ai ? String(ai.reason || '') : '',
+    aiModel: ai ? String(ai.model || '') : '',
     aiSkip: isAdmin ? 'admin' : c.env.REQUIRE_APPROVAL !== '1' ? 'review-off' : ai ? null : 'unavailable',
     reserved: isReserved,
     cost: isAdmin ? 0 : (aiRejected ? 0 : cost),

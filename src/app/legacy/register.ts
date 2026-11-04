@@ -112,7 +112,8 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
         var msg = '';
         if (!st.ready) msg = '⚠ AI 自动审核未配置 API Key：申请会回落人工审核。';
         else if (!st.enabled) msg = '⚠ AI 自动审核开关已关闭：申请会回落人工审核。';
-        else msg = '✓ AI 自动审核已就绪（' + esc(st.model || '自动探测模型') + '）；管理员账号免审核，不会触发 AI。';
+        else if (!st.modelSelected) msg = '⚠ AI 尚未选定模型：请在后台「站点设置 → 探测模型」选一个，否则申请可能回落人工审核。';
+        else msg = '✓ AI 自动审核已就绪，审核模型 ' + esc(st.model) + '；管理员账号免审核，不会触发 AI。';
         aiTip.textContent = msg;
         aiTip.style.display = '';
       }

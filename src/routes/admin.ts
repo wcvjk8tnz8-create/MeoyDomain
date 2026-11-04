@@ -10,7 +10,7 @@ import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColum
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
 import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList, setDnsBackend } from '../lib/rootStore.js';
-import { aiTest } from '../lib/aiReview.js';
+import { aiTest, probeAiModels, chooseModel } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -477,6 +477,7 @@ app.get('/settings', async (c) => {
       roots: String(raw.ai_review_roots || 'v-1.top').trim(),
       url: String(raw.ai_api_url || c.env.AI_API_URL || 'https://apihub.agnes-ai.com/v1').trim(),
       model: String(raw.ai_model || c.env.AI_MODEL || '').trim(),
+      modelSelected: !!String(raw.ai_model || c.env.AI_MODEL || '').trim(),
       keySet: !!(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
       keyMasked: mask(raw.ai_api_key || String(c.env.AI_API_KEY || '').trim()),
       fromEnv: !!String(c.env.AI_API_KEY || '').trim(),
@@ -503,7 +504,33 @@ app.get('/settings', async (c) => {
   });
 });
 
-/* AI 自动审核连接自检：真实调用一次模型，回报模型名 / 延迟 / 具体失败点。
+/* AI 模型探测：填好地址与 Key 后自动拉取 /models，并自动选定一个模型。
+   body 可带「尚未保存」的 aiUrl / aiApiKey 用于即时探测；响应不回传任何密钥。 */
+app.post('/ai-models', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const blank = { selected: '', autoPicked: false, inList: false };
+  try {
+    const p = await probeAiModels(c.env, {
+      base: String(body.aiUrl || '').trim(),
+      key: String(body.aiApiKey || '').trim(),
+    });
+    let choice = blank;
+    if (p.ok) choice = await chooseModel(c.env, p.models);
+    await audit(c, c.get('user')?.id, 'admin.ai-models', 'ai',
+      p.ok ? `${p.models.length} 个模型 · 选用 ${choice.selected || '（未选）'}` : `失败 · ${p.message}`);
+    return ok(c, {
+      ok: p.ok, models: p.models, message: p.message, detail: p.detail,
+      selected: choice.selected, autoPicked: choice.autoPicked, inList: choice.inList,
+    });
+  } catch (e) {
+    return ok(c, {
+      ok: false, models: [], message: '模型探测异常',
+      detail: String((e as Error)?.message || e).slice(0, 200), ...blank,
+    });
+  }
+});
+
+/* AI 自动审核连接自检：用选定模型 + 真实审核提示词跑一次，回报模型名 / 延迟 / 具体失败点。
    只回诊断信息，不回密钥；需管理员权限（/api/admin/* 已统一鉴权）。 */
 app.post('/ai-test', async (c) => {
   try {
@@ -534,8 +561,9 @@ app.post('/settings', async (c) => {
   const anno = String(body.announcement ?? '').trim().slice(0, 300);
 
   if (name) await set('site_name', name);
-  await set('logo_url', logo || '/img/logo.jpg');
-  await set('favicon_url', favicon || '/favicon.ico');
+  // 只在本次请求确实提交了该字段时写入，避免只提交 AI 等单项设置时把 Logo 重置成默认
+  if (body.logoUrl !== undefined) await set('logo_url', logo || '/img/logo.jpg');
+  if (body.faviconUrl !== undefined) await set('favicon_url', favicon || '/favicon.ico');
   if (body.announcement !== undefined) await set('announcement', anno);
 
   // 新域名申请开关（暂停后普通用户无法提交申请，管理员仍可自建）
