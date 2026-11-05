@@ -1,0 +1,312 @@
+/* ══════════════════════════════════════════════════════════
+   TerraDomain 移动端 / 多屏幕比例 权威层
+
+   为什么单独一份且最后加载：
+   components.css 里有 17 组互相打架的断点（720 / 860 / 900 /
+   1000 / 760 / 620 …），index.css 又用 !important 把 .sidebar
+   的 transform 钉成 none —— 结果手机上抽屉打不开、仍占着 72px、
+   顶栏从 72px 起、.main 又被三处 padding 反复覆盖。这里不删历史
+   规则，只在最后用同等 !important 一次性收口。
+
+   覆盖的屏幕形态：
+   · 21:9 竖屏（9:21，如 Xperia 384×896）：窄而长 → 抽屉 + 收紧横向
+   · 20:9 / 19.5:9 主流长屏（390×844 / 412×915）
+   · 18:9 / 16:9（360×740 / 360×640）
+   · 21:9 横屏（约 876×384）：宽而矮 → 压缩顶栏、浮层可滚动
+   · 折叠屏外屏（约 320×900）、超窄小屏（≤360px）
+   · 平板 / 折叠展开（768～1000px）→ 72px 图标侧栏常驻
+   ══════════════════════════════════════════════════════════ */
+
+:root {
+  /* 刘海 / 挖孔 / 底部手势条；需 viewport-fit=cover 才有非零值 */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --top-h-m: 52px;   /* 手机竖屏顶栏 */
+  --top-h-l: 44px;   /* 横屏矮视口顶栏 */
+}
+
+html {
+  -webkit-text-size-adjust: 100%;   /* 横竖屏切换时禁止安卓自动放大字号 */
+  text-size-adjust: 100%;
+}
+html, body {
+  max-width: 100%;
+  overflow-x: clip;                 /* 防长域名/装饰把整页横向撑出滚动条 */
+}
+button, a, input, select, textarea {
+  touch-action: manipulation;       /* 去掉 300ms 点击延迟 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── 1. 安全区 + 动态视口高度（所有设备） ──────────────────────
+   100dvh 会随 iOS 地址栏收放变化，避免固定侧栏/遮罩底部被裁；
+   老浏览器不认 dvh 会丢弃该声明，自动回落到原有的 100vh。 */
+@supports (padding: env(safe-area-inset-top)) {
+  .topbar {
+    height: calc(var(--top-h) + var(--safe-t)) !important;
+    padding-top: var(--safe-t) !important;
+  }
+  .sidebar {
+    height: 100dvh !important;
+    padding-top: calc(16px + var(--safe-t)) !important;
+    padding-bottom: calc(26px + var(--safe-b)) !important;
+  }
+  .main {
+    padding-top: calc(var(--top-h) + var(--safe-t) + 20px) !important;
+    padding-bottom: calc(40px + var(--safe-b)) !important;
+  }
+  .site-foot { padding-bottom: calc(22px + var(--safe-b)) !important; }
+  #toast { bottom: calc(28px + var(--safe-b)) !important; }
+  .mask { padding-bottom: var(--safe-b) !important; }
+}
+
+/* ── 2. ≤700px：侧栏改抽屉，主内容拿回全部宽度 ────────────────
+   这是手机上最关键的一条：之前 index.css 的 transform:none
+   把抽屉钉死，导致 72px 图标栏常驻、汉堡点了没反应。
+   断点取 700 而非历史里的 860 —— 768px 的平板竖屏宽度足够，
+   应保持 72px 图标栏常驻，硬塞进抽屉反而多一次点击。 */
+@media (max-width: 700px) {
+  .sidebar {
+    width: min(84vw, 300px) !important;
+    height: 100dvh !important;
+    transform: translateX(-100%) !important;
+    transition: transform .28s cubic-bezier(.4, 0, .2, 1) !important;
+    box-shadow: 0 0 40px rgba(60, 40, 120, .22) !important;
+    padding-left: calc(10px + var(--safe-l)) !important;
+    overscroll-behavior: contain;
+  }
+  body.side-open .sidebar { transform: translateX(0) !important; }
+  body.side-open::after {
+    height: 100dvh !important;
+  }
+
+  /* 抽屉展开要看得见文字：覆盖 1000px 断点的 mini 隐藏 */
+  .sidebar .side-txt, .sidebar .side-gtitle,
+  .side-brand .sb-sub { display: initial !important; }
+  /* 品牌名原本靠 -webkit-box + line-clamp:2 折两行显示长站点名，
+     不能跟着用 display:initial，否则会退化成 inline 并撑高侧栏。 */
+  .side-brand b { display: -webkit-box !important; }
+  .side-item {
+    justify-content: flex-start !important;
+    width: auto !important;
+    min-height: 44px;
+    padding: 12px 14px !important;
+  }
+  .side-brand {
+    justify-content: flex-start !important;
+    padding: 0 10px !important;
+    min-height: var(--top-h-m) !important;
+  }
+  .side-brand b {
+    overflow-wrap: anywhere;         /* TerraDomain 这类长名折两行，不截断 */
+    line-height: 1.18;
+  }
+
+  .topbar {
+    left: 0 !important;
+    right: 0 !important;
+    height: calc(var(--top-h-m) + var(--safe-t)) !important;
+    padding-left: var(--safe-l) !important;
+    padding-right: var(--safe-r) !important;
+  }
+  .topbar-in {
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+  .crumb {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crumb span { margin: 0 4px; }
+
+  .side-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 44px !important;
+    height: 44px !important;
+    flex: 0 0 44px !important;
+  }
+  .iconbtn, .lang-switch button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .main {
+    margin-left: 0 !important;
+    padding: calc(var(--top-h-m) + var(--safe-t) + 12px)
+             calc(14px + var(--safe-r))
+             calc(32px + var(--safe-b))
+             calc(14px + var(--safe-l)) !important;
+  }
+  body .site-foot, body:has(.main) .site-foot { margin-left: 0 !important; }
+
+  /* 顶栏放不下的都收起，保证面包屑 + 铃铛 + 头像不挤成两行 */
+  .top-search, .theme-paw, .u-meta,
+  .user-chip .chev, .brand-txt, .brand-sub { display: none !important; }
+
+  /* 多列布局在窄屏一律单列；统计卡保留两列（每列仍 ≥170px） */
+  .profile-grid, .msg-grid, .two, .detail-layout,
+  .auth-wrap, .grid2, .nk-hero-in, .nk-svc, .nk-dns3, .nk-tools {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .stats, .stat-grid, .stat-row, .quick-row, .zx-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .card, .pane, .reg-card, .auth-card, .notice { padding: 18px !important; }
+
+  /* iOS 聚焦输入框时 <16px 会自动缩放整页 —— 手机端统一抬到 16px */
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea, select, .input, .textarea { font-size: 16px !important; }
+
+  /* 表格：整块横向可拖，不把详情列裁掉 */
+  .tablewrap { overflow-x: auto !important; overscroll-behavior-x: contain; }
+  td.cell-detail { max-width: 240px; min-width: 110px; }
+
+  /* 浮层不越出屏幕 */
+  .notif-panel {
+    top: calc(var(--top-h-m) + var(--safe-t) + 6px) !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - var(--top-h-m) - var(--safe-t) - 20px) !important;
+  }
+  .user-menu, .root-picker-menu {
+    max-width: calc(100vw - 16px) !important;
+    right: 8px !important;
+  }
+  .modal .box, .modal-card {
+    max-height: calc(100dvh - 32px) !important;
+    overflow-y: auto !important;
+  }
+  .mask { align-items: flex-start !important; padding-top: 12px !important; }
+
+  .zx-hero { padding: 40px 0 32px !important; }
+  .zx-title { font-size: clamp(32px, 9vw, 48px) !important; }
+  .auth-wrap { padding: 40px 16px 56px !important; gap: 28px !important; }
+  .auth-lead { font-size: 28px !important; }
+}
+
+/* 701～1000px 是 mini 图标栏常驻区：历史 CSS 在 860px 就显示了
+   汉堡，但此时侧栏并不会滑出（transform 被钉成 none），会变成
+   一个点了没反应的按钮。这里明确隐藏，抽屉只在 ≤700px 生效。 */
+@media (min-width: 701px) and (max-width: 1000px) {
+  .side-toggle { display: none !important; }
+  /* 手机开着抽屉时旋转到平板宽度，side-open 会残留；此时侧栏是 mini
+     常驻，历史 CSS 的暗色遮罩却仍在 860px 以下生效，会盖住整页。 */
+  body.side-open::after { display: none !important; }
+}
+
+/* ── 3. ≤360px：超窄小屏 / 折叠外屏 / Xperia 10 ─────────────── */
+@media (max-width: 360px) {
+  .topbar-in { padding: 0 8px !important; gap: 6px !important; }
+  .main {
+    padding-left: calc(10px + var(--safe-l)) !important;
+    padding-right: calc(10px + var(--safe-r)) !important;
+  }
+  .card, .pane, .reg-card, .auth-card { padding: 14px !important; }
+  .stats, .stat-grid, .stat-row, .quick-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .stat-v, .stat h2 { font-size: 22px !important; }
+  .crumb { font-size: 13px !important; }
+  .lang-switch button { min-width: 36px; padding: 4px !important; font-size: 10px !important; }
+  .btn { padding: 10px 16px !important; }
+  .root-picker-btn { min-width: 92px !important; }
+  .reg-step { font-size: 10px !important; }
+  h1 { font-size: 23px !important; }
+}
+
+/* ── 4. 长屏比例：19.5:9 / 20:9 / 21:9 竖屏 ──────────────────
+   比值 ≤ 9/19 ≈ .474。18:9(.5) 与 16:9(.5625) 不触发，
+   避免把普通屏也压得太紧。这类屏横向最紧张、纵向很富余。 */
+@media (max-aspect-ratio: 9/19) and (max-width: 500px) {
+  .main {
+    padding-left: calc(12px + var(--safe-l)) !important;
+    padding-right: calc(12px + var(--safe-r)) !important;
+  }
+  .card, .pane { padding: 16px !important; }
+  .zx-hero { padding: 30px 0 26px !important; }
+  .zx-title { font-size: clamp(30px, 8.4vw, 44px) !important; }
+  .zx-metrics { gap: 10px; }
+  .stat-v, .stat h2 { font-size: 24px !important; }
+  .steps { row-gap: 8px; }
+  .side-item { padding-top: 10px !important; padding-bottom: 10px !important; }
+  /* 纵向富余时不必把首屏撑满，避免 21:9 上出现大片空白 */
+  .auth-wrap { padding-top: 32px !important; padding-bottom: 40px !important; }
+}
+
+/* 21:9（.429）与更极端的长条屏再收一档。
+   排除 ≤360px：那一档已有更紧的超窄规则，别被这里反向放宽。 */
+@media (max-aspect-ratio: 9/20) and (min-width: 361px) and (max-width: 460px) {
+  .topbar-in { padding: 0 10px !important; gap: 6px !important; }
+  .main {
+    padding-left: calc(10px + var(--safe-l)) !important;
+    padding-right: calc(10px + var(--safe-r)) !important;
+  }
+  .card, .pane, .reg-card { padding: 14px !important; }
+  .stat-v, .stat h2 { font-size: 21px !important; }
+  .zx-metrics { gap: 8px; }
+  .crumb span { display: none; }
+}
+
+/* ── 5. 矮横屏：21:9 横屏（约 876×384）、手机横屏看后台 ──────
+   高度不够是最主要矛盾：64px 顶栏 + 大 padding 会把内容全挤没。 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .topbar {
+    height: calc(var(--top-h-l) + var(--safe-t)) !important;
+  }
+  .topbar-in { padding: 0 14px !important; gap: 10px !important; }
+  .side-brand { min-height: var(--top-h-l) !important; }
+  .side-item { padding-top: 7px !important; padding-bottom: 7px !important; }
+  .sidebar { height: 100dvh !important; }
+
+  .main {
+    padding-top: calc(var(--top-h-l) + var(--safe-t) + 10px) !important;
+    padding-bottom: calc(16px + var(--safe-b)) !important;
+  }
+  .site-foot { margin-top: 16px !important; padding-top: 10px !important; padding-bottom: calc(10px + var(--safe-b)) !important; }
+
+  .zx-hero { padding: 18px 0 14px !important; }
+  .zx-title { font-size: clamp(26px, 5vw, 40px) !important; }
+  .auth-wrap { padding: 20px 20px 28px !important; gap: 20px !important; }
+  .auth-lead { font-size: 26px !important; }
+  .card, .pane { padding: 14px !important; }
+
+  /* 弹窗与通知面板必须自己滚，否则在 384px 高的屏上直接被切掉 */
+  .modal .box, .modal-card {
+    max-height: calc(100dvh - 24px) !important;
+    overflow-y: auto !important;
+  }
+  .mask { align-items: flex-start !important; padding-top: 10px !important; }
+  .notif-panel {
+    max-height: calc(100dvh - var(--top-h-l) - var(--safe-t) - 14px) !important;
+    top: calc(var(--top-h-l) + var(--safe-t) + 4px) !important;
+  }
+  .user-menu { max-height: calc(100dvh - var(--top-h-l) - 12px) !important; overflow-y: auto !important; }
+  #toast { bottom: calc(10px + var(--safe-b)) !important; }
+}
+
+/* 21:9 横屏专属：宽度够（≥2:1），把统计卡铺回 4 列，别浪费横向空间 */
+@media (min-aspect-ratio: 2/1) and (orientation: landscape) and (max-height: 520px) {
+  .stats, .stat-grid, .stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  .quick-row { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
+/* ── 6. 平板 / 折叠展开：861～1000px 保持 72px 图标栏 ─────────
+   只补安全区，不改 index.css 已正确的 mini 布局。 */
+@media (min-width: 861px) and (max-width: 1000px) {
+  .topbar { padding-left: var(--safe-l) !important; }
+  .main { padding-left: calc(24px + var(--safe-l)) !important; }
+}
+
+/* ── 7. 无障碍：减少动效时连抽屉过渡一起关 ─────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none !important; }
+}
