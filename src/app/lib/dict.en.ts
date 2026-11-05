@@ -330,7 +330,6 @@ export const EXTRA_DICT: Record<string, string> = {
     'No DNS records are created by default. Add them in DNS Records when you need them.',
   '该子域名仍在审核中，审核通过后才能添加 DNS 记录。':
     'This subdomain is still under review. You can add DNS records after approval.',
-    'No DNS records yet. Creating a subdomain does not add records automatically — use the button above.',
   '删除该记录？Cloudflare 上的记录会同步删除。':
     'Delete this record? The matching Cloudflare record is removed too.',
   '确定释放该子域名？其在 Cloudflare 上的所有 DNS 记录会一并删除。':
