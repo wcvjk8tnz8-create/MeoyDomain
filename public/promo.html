@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08090b">
+<title>TerraDomain · 官方宣传片</title>
+<meta name="description" content="TerraDomain 官方宣传片 — 免费二级域名分发与 DNS 管理。官网 nic.299282.xyz">
+<style>
+:root{
+  --film:#08090b;--film2:#101418;--fg:#f4f1e9;--dim:rgba(244,241,233,.62);--faint:rgba(244,241,233,.3);
+  --acc:#7fd0b4;--acc2:#2e9e6b;--line:rgba(255,255,255,.14);
+  --paper:#fbfaf7;--surface:#fff;--ink:#16191c;--body:#4a5260;--muted:#8b93a1;--uline:#e6e3db;
+  --serif:Georgia,"Songti SC","Noto Serif SC",serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden}
+body{font-family:var(--sans);color:var(--fg);-webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+a{color:inherit;text-decoration:none}
+
+/* ── 舞台 ─────────────────────────────── */
+.stage{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(120% 120% at 50% 50%,#0d1013 0,#000 78%)}
+.frame{position:relative;width:min(100vw,177.78vh);aspect-ratio:16/9;max-height:100vh;overflow:hidden;background:var(--film);box-shadow:0 30px 120px rgba(0,0,0,.9)}
+.frame:fullscreen{width:100vw;height:100vh;aspect-ratio:auto;max-height:none}
+.scene{position:absolute;inset:0;opacity:0;visibility:hidden;overflow:hidden;will-change:opacity}
+.art{position:absolute;inset:0;transform-origin:50% 50%;will-change:transform}
+.vig{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(4,6,8,.5) 0,transparent 20%,transparent 70%,rgba(4,6,8,.45) 100%)}
+.capband{position:absolute;left:0;right:0;bottom:0;height:38%;pointer-events:none;opacity:0;transition:opacity .5s;
+  background:linear-gradient(180deg,transparent 0,rgba(4,6,8,.72) 34%,rgba(4,6,8,.96) 100%)}
+.frame.has-band .capband{opacity:1}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.16;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='.5'/></svg>")}
+.scan{position:absolute;left:0;right:0;height:calc(var(--u) * 14);pointer-events:none;opacity:.1;
+  background:linear-gradient(180deg,transparent,rgba(127,208,180,.5),transparent);transform:translateY(-100%)}
+
+/* ── 顶层 HUD ─────────────────────────── */
+.hud{position:absolute;inset:0;pointer-events:none;z-index:20}
+.mark{position:absolute;left:3.2%;top:3.2%;display:flex;align-items:center;gap:calc(var(--u)*.9);font:600 calc(var(--u)*1.05) var(--mono);letter-spacing:.2em;color:rgba(255,255,255,.82);text-shadow:0 1px 6px rgba(0,0,0,.85)}
+.mark i{width:calc(var(--u)*.95);height:calc(var(--u)*.95);border-radius:2px;background:linear-gradient(135deg,var(--acc),#4f9bff);display:block;box-shadow:0 0 calc(var(--u)*1.4) rgba(127,208,180,.6)}
+.chap{position:absolute;right:3.2%;top:3.2%;font:600 calc(var(--u)*1.05) var(--mono);letter-spacing:.16em;color:rgba(255,255,255,.55);text-align:right}
+.tcode{position:absolute;right:3.2%;top:calc(3.2% + var(--u)*2.3);font:600 calc(var(--u)*.95) var(--mono);letter-spacing:.12em;color:rgba(255,255,255,.35);text-align:right}
+.cap{position:absolute;left:5.4%;right:5.4%;bottom:calc(11% + var(--u)*1.5);will-change:opacity,transform}
+.cap-n{font:600 calc(var(--u)*1.05) var(--mono);letter-spacing:.24em;color:var(--acc);margin-bottom:calc(var(--u)*1.4)}
+.cap-n em{font-style:normal;color:rgba(255,255,255,.42);margin-left:calc(var(--u)*1.4)}
+.cap-t{font:700 calc(var(--u)*4.6) var(--serif);letter-spacing:-.03em;line-height:1.08;text-shadow:0 calc(var(--u)*.3) calc(var(--u)*2.4) rgba(0,0,0,.7)}
+.cap-d{margin-top:calc(var(--u)*1.4);font-size:calc(var(--u)*1.55);line-height:1.6;color:rgba(255,255,255,.76);max-width:62%;text-shadow:0 calc(var(--u)*.2) calc(var(--u)*1.4) rgba(0,0,0,.7)}
+
+/* ── 控件 ─────────────────────────────── */
+.ctl{position:absolute;left:3.2%;right:3.2%;bottom:3.4%;display:flex;align-items:center;gap:calc(var(--u)*1.05);z-index:25;transition:opacity .45s}
+.ctl.hide{opacity:0;pointer-events:none}
+.segs{display:flex;gap:calc(var(--u)*.5);flex:1;min-width:0}
+.seg{height:calc(var(--u)*.36);border-radius:99px;background:var(--line);overflow:hidden;cursor:pointer;position:relative;flex-grow:var(--g,1)}
+.seg i{position:absolute;inset:0;width:0;background:var(--acc);display:block;box-shadow:0 0 calc(var(--u)*.8) rgba(127,208,180,.7)}
+.seg.done i{width:100%}
+.ib{width:calc(var(--u)*3.4);height:calc(var(--u)*3.4);flex-shrink:0;border:1px solid var(--line);background:rgba(255,255,255,.07);border-radius:calc(var(--u)*.9);display:grid;place-items:center;font-size:calc(var(--u)*1.5);transition:background .2s,transform .2s}
+.ib:hover{background:rgba(255,255,255,.2);transform:translateY(-2px)}
+.ib.on{background:var(--acc);color:#0b1410;border-color:transparent}
+.spd{height:calc(var(--u)*3.4);padding:0 calc(var(--u)*1.1);flex-shrink:0;border:1px solid var(--line);background:rgba(255,255,255,.07);border-radius:calc(var(--u)*.9);font:600 calc(var(--u)*1.1) var(--mono);transition:background .2s}
+.spd:hover{background:rgba(255,255,255,.2)}
+.replay{position:absolute;left:50%;top:calc(50% + var(--u)*9);transform:translate(-50%,10px);z-index:26;opacity:0;pointer-events:none;
+  padding:calc(var(--u)*1.1) calc(var(--u)*2.4);border:1px solid var(--acc);border-radius:99px;background:rgba(8,10,12,.72);
+  font:600 calc(var(--u)*1.3) var(--mono);letter-spacing:.16em;transition:.5s}
+.replay.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.paused{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:24;font:600 calc(var(--u)*1.2) var(--mono);letter-spacing:.24em;color:rgba(255,255,255,.5);opacity:0;transition:opacity .3s}
+.paused.show{opacity:1}
+
+/* ── 片头 ─────────────────────────────── */
+.intro{background:radial-gradient(70% 80% at 50% 45%,#14201e 0,#08090b 70%)}
+.grid-lines{position:absolute;inset:0;opacity:.32;
+  background-image:linear-gradient(rgba(127,208,180,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(127,208,180,.14) 1px,transparent 1px);
+  background-size:calc(var(--u)*8) calc(var(--u)*8);mask-image:radial-gradient(60% 60% at 50% 50%,#000,transparent)}
+.ring{position:absolute;left:50%;top:46%;width:calc(var(--u)*44);height:calc(var(--u)*44);margin:calc(var(--u)*-22) 0 0 calc(var(--u)*-22);border:1px solid rgba(127,208,180,.25);border-radius:50%;box-shadow:0 0 calc(var(--u)*10) rgba(127,208,180,.08) inset}
+.ring::before,.ring::after{content:"";position:absolute;border:1px solid rgba(127,208,180,.16);border-radius:50%}
+.ring::before{inset:calc(var(--u)*6)}.ring::after{inset:calc(var(--u)*12)}
+.intro-c{position:absolute;left:0;right:0;top:39%;text-align:center}
+.logo-gem{width:calc(var(--u)*7);height:calc(var(--u)*7);margin:0 auto calc(var(--u)*2.6);border-radius:calc(var(--u)*1.8);
+  background:linear-gradient(135deg,#6fb2ff,#7fd0b4 55%,#2e9e6b);box-shadow:0 0 calc(var(--u)*6) rgba(127,208,180,.45);position:relative}
+.logo-gem::after{content:"";position:absolute;inset:calc(var(--u)*1.6);border-radius:calc(var(--u)*.7);background:rgba(8,9,11,.55)}
+.word{font:700 calc(var(--u)*8.4) var(--serif);letter-spacing:-.045em;line-height:1;background:linear-gradient(100deg,#f4f1e9,#9fd8c3);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tag{margin-top:calc(var(--u)*2.2);font:600 calc(var(--u)*1.5) var(--mono);letter-spacing:.34em;color:rgba(255,255,255,.5)}
+.filmby{position:absolute;left:0;right:0;bottom:calc(12% + var(--u)*1);text-align:center;font:600 calc(var(--u)*1) var(--mono);letter-spacing:.28em;color:rgba(255,255,255,.28)}
+
+/* ── 定位幕 ───────────────────────────── */
+.statement{background:linear-gradient(150deg,#0d1418 0,#101c1a 55%,#0a0c10 100%)}
+.code-rain{position:absolute;inset:0;overflow:hidden;opacity:.16;font:500 calc(var(--u)*1.25)/2.1 var(--mono);color:var(--acc);white-space:pre;word-break:break-all;padding:calc(var(--u)*2)}
+.st-c{position:absolute;left:8%;right:8%;top:29%}
+.st-k{font:600 calc(var(--u)*1.05) var(--mono);letter-spacing:.28em;color:var(--acc);margin-bottom:calc(var(--u)*2.6)}
+.st-t{font:700 calc(var(--u)*8.2) var(--serif);letter-spacing:-.045em;line-height:1.1}
+.st-t span{color:var(--acc)}
+.st-d{margin-top:calc(var(--u)*2.8);font-size:calc(var(--u)*1.8);line-height:1.7;color:rgba(255,255,255,.66);max-width:62%}
+.st-url{margin-top:calc(var(--u)*3.4);display:inline-flex;align-items:center;gap:calc(var(--u)*1.1);padding:calc(var(--u)*.95) calc(var(--u)*2);border:1px solid rgba(127,208,180,.4);border-radius:99px;font:600 calc(var(--u)*1.3) var(--mono);color:var(--acc);letter-spacing:.06em}
+
+/* ── 界面通用 ─────────────────────────── */
+.screen-wrap{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:calc(var(--u)*6.6);background:linear-gradient(160deg,#0d1115,#151b20)}
+.browser{width:86%;height:59%;border-radius:calc(var(--u)*1.3);overflow:hidden;background:var(--paper);color:var(--ink);box-shadow:0 calc(var(--u)*3) calc(var(--u)*9) rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08);display:flex;flex-direction:column}
+.bbar{height:calc(var(--u)*3.5);flex-shrink:0;background:#eef0ee;border-bottom:1px solid #dfe2de;display:flex;align-items:center;gap:calc(var(--u)*1.3);padding:0 calc(var(--u)*1.6)}
+.dots{display:flex;gap:calc(var(--u)*.7)}
+.dots i{width:calc(var(--u)*.85);height:calc(var(--u)*.85);border-radius:50%;background:#c9cec9;display:block}
+.dots i:first-child{background:#e8a5a0}.dots i:nth-child(2){background:#e8cf9a}.dots i:nth-child(3){background:#a8d5b5}
+.url{flex:1;height:calc(var(--u)*2.1);background:#fff;border-radius:99px;display:flex;align-items:center;padding:0 calc(var(--u)*1.4);font:500 calc(var(--u)*1.05) var(--mono);color:#7b847c;letter-spacing:.02em}
+.url b{color:#2e9e6b;font-weight:700}
+.bview{flex:1;min-height:0;overflow:hidden;position:relative;background:var(--paper)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+
+/* 官网首页 */
+.site{position:absolute;inset:0;background:var(--paper);display:flex;flex-direction:column}
+.site-top{height:calc(var(--u)*5.2);flex-shrink:0;border-bottom:1px solid var(--uline);display:flex;align-items:center;justify-content:space-between;padding:0 calc(var(--u)*3.4)}
+.site-brand{font:700 calc(var(--u)*2.15) var(--serif);letter-spacing:-.03em}
+.site-nav{display:flex;gap:calc(var(--u)*2.6);font-size:calc(var(--u)*1.15);color:#5c636b;font-weight:600}
+.site-hero{flex:1;padding:calc(var(--u)*2.6) calc(var(--u)*4.6) 0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.site-k{font:600 calc(var(--u)*.95) var(--mono);letter-spacing:.28em;color:var(--acc2)}
+.site-h{font:700 calc(var(--u)*5) var(--serif);letter-spacing:-.05em;line-height:1.08;margin-top:calc(var(--u)*1.8)}
+.site-h em{font-style:italic;color:var(--acc2)}
+.site-p{margin-top:calc(var(--u)*1.6);font-size:calc(var(--u)*1.45);color:var(--body);line-height:1.7}
+.site-search{margin-top:calc(var(--u)*2);width:76%;height:calc(var(--u)*5);display:flex;align-items:center;background:#fff;border:1.5px solid #d9ddd8;border-radius:calc(var(--u)*1.1);box-shadow:0 calc(var(--u)*.5) calc(var(--u)*2) rgba(20,40,30,.06);overflow:hidden}
+.site-search .ph{flex:1;padding-left:calc(var(--u)*1.8);font-size:calc(var(--u)*1.35);color:#a2a9a3}
+.site-search .sf{padding:0 calc(var(--u)*1.6);height:100%;display:flex;align-items:center;gap:calc(var(--u)*.6);border-left:1px solid var(--uline);font:600 calc(var(--u)*1.2) var(--mono);color:#2d6a4e}
+.site-search .go{height:100%;padding:0 calc(var(--u)*2.6);background:#14191c;color:#fff;font-size:calc(var(--u)*1.25);font-weight:700;display:grid;place-items:center}
+.site-metrics{margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--uline);border-bottom:1px solid var(--uline);height:calc(var(--u)*7)}
+.site-metrics div{padding:calc(var(--u)*1) calc(var(--u)*2.4);border-right:1px solid var(--uline);text-align:left}
+.site-metrics div:last-child{border-right:0}
+.site-metrics small{display:block;font:600 calc(var(--u)*.9) var(--mono);letter-spacing:.14em;color:var(--acc2)}
+.site-metrics b{display:block;margin-top:calc(var(--u)*.55);font:700 calc(var(--u)*1.65) var(--serif)}
+.site-metrics span{display:block;margin-top:calc(var(--u)*.25);font-size:calc(var(--u)*1.05);color:var(--muted)}
+.site-foot{padding:calc(var(--u)*1.3) calc(var(--u)*3.4);font:500 calc(var(--u)*1) var(--mono);color:var(--muted);letter-spacing:.06em}
+
+/* 控制台 */
+.console{position:absolute;inset:0;background:#f5f7fa;display:flex}
+.c-side{width:20%;background:#fff;border-right:1px solid #e4e9f0;display:flex;flex-direction:column;padding-top:calc(var(--u)*1.6)}
+.c-logo{font:700 calc(var(--u)*1.65) var(--serif);padding:0 calc(var(--u)*1.8) calc(var(--u)*1.6);border-bottom:1px solid #e9edf3;letter-spacing:-.02em}
+.c-grp{padding:calc(var(--u)*1.5) calc(var(--u)*1.8) calc(var(--u)*.5);font:600 calc(var(--u)*.85) var(--mono);letter-spacing:.14em;color:#9aa4b2;text-transform:uppercase}
+.c-nav{margin:calc(var(--u)*.2) calc(var(--u)*1) ;padding:calc(var(--u)*.8) calc(var(--u)*1.2);border-radius:calc(var(--u)*.6);font-size:calc(var(--u)*1.15);color:#5c6675;display:flex;gap:calc(var(--u)*.9);align-items:center}
+.c-nav i{width:calc(var(--u)*1.2);height:calc(var(--u)*1.2);border:1.5px solid #b9c3d0;border-radius:calc(var(--u)*.25);display:block;flex-shrink:0}
+.c-nav.on{background:#1f6feb;color:#fff;font-weight:700}.c-nav.on i{border-color:#fff}
+.c-main{flex:1;display:flex;flex-direction:column;min-width:0}
+.c-top{height:calc(var(--u)*4.4);background:#fff;border-bottom:1px solid #e4e9f0;display:flex;align-items:center;padding:0 calc(var(--u)*2.2);gap:calc(var(--u)*1.2)}
+.c-crumb{font-size:calc(var(--u)*1.15);font-weight:700;color:#1b2430}.c-crumb span{color:#a3acb9;font-weight:400;margin:0 calc(var(--u)*.6)}
+.c-search{margin-left:auto;width:26%;height:calc(var(--u)*2.4);border:1px solid #e2e7ef;border-radius:calc(var(--u)*.6);display:flex;align-items:center;padding:0 calc(var(--u)*1);font-size:calc(var(--u)*1);color:#a3acb9}
+.c-av{width:calc(var(--u)*2.3);height:calc(var(--u)*2.3);border-radius:50%;background:linear-gradient(135deg,#7fd0b4,#4f9bff)}
+.c-body{padding:calc(var(--u)*1.6) calc(var(--u)*2.4);flex:1;min-height:0;display:flex;flex-direction:column;gap:calc(var(--u)*1.6)}
+.c-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--u)*1.2)}
+.c-stat{background:#fff;border:1px solid #e6ebf2;border-radius:calc(var(--u)*.8);padding:calc(var(--u)*1.2) calc(var(--u)*1.4)}
+.c-stat small{display:block;font:600 calc(var(--u)*.85) var(--mono);letter-spacing:.1em;color:#8c97a7;text-transform:uppercase}
+.c-stat b{display:block;margin-top:calc(var(--u)*.5);font:700 calc(var(--u)*2.3) var(--serif);color:#17202c}
+.c-table{flex:1;background:#fff;border:1px solid #e6ebf2;border-radius:calc(var(--u)*.8);overflow:hidden;display:flex;flex-direction:column}
+.c-tr{display:grid;grid-template-columns:2.3fr 1.5fr .9fr 1.2fr 1.4fr;gap:calc(var(--u)*.8);padding:calc(var(--u)*.8) calc(var(--u)*1.5);font-size:calc(var(--u)*1.1);align-items:center;border-bottom:1px solid #f0f3f7}
+.c-tr:last-child{border-bottom:0}
+.c-tr.h{background:#f0f5fc;font:600 calc(var(--u)*.95) var(--mono);letter-spacing:.06em;color:#3b587f}
+.c-tr .dm{font-family:var(--mono);font-weight:700;color:#1b2430}
+.pill-s{display:inline-block;padding:calc(var(--u)*.25) calc(var(--u)*.85);border-radius:99px;font-size:calc(var(--u)*.95);font-weight:700;background:#e6f7ee;color:#1f8a5b}
+.pill-w{background:#fff2e0;color:#b8791c}
+
+/* DNS */
+.dns{position:absolute;inset:0;background:#f7f9fb;padding:calc(var(--u)*2) calc(var(--u)*3.2)}
+.dns-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:calc(var(--u)*1.2)}
+.dns-h h3{font:700 calc(var(--u)*2.3) var(--serif);letter-spacing:-.02em}
+.dns-h .add{padding:calc(var(--u)*.8) calc(var(--u)*1.8);background:#1f6feb;color:#fff;border-radius:calc(var(--u)*.7);font-size:calc(var(--u)*1.1);font-weight:700}
+.dns-card{background:#fff;border:1px solid #e5eaf1;border-radius:calc(var(--u)*1);overflow:hidden}
+.dns-r{display:grid;grid-template-columns:.8fr 1.7fr 3fr .8fr 1fr;gap:calc(var(--u)*1);padding:calc(var(--u)*.8) calc(var(--u)*1.6);font-size:calc(var(--u)*1.1);align-items:center;border-bottom:1px solid #eff2f6}
+.dns-r:last-child{border:0}
+.dns-r.h{background:#eef4fd;font:600 calc(var(--u)*.95) var(--mono);letter-spacing:.06em;color:#3b587f}
+.dns-r.hl{background:#f2fbf6}
+.typ{display:inline-grid;place-items:center;min-width:calc(var(--u)*3.4);padding:calc(var(--u)*.2) calc(var(--u)*.6);border-radius:calc(var(--u)*.4);background:#e8f0fe;color:#1f5fd0;font:700 calc(var(--u)*.95) var(--mono)}
+.typ.mx{background:#fdeaf0;color:#c23c66}.typ.txt{background:#e9f7ee;color:#1f8a5b}.typ.caa{background:#f2ecff;color:#7450c8}
+.dns-r .val{font-family:var(--mono);color:#3d4756;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dns-note{margin-top:calc(var(--u)*1.4);font-size:calc(var(--u)*1.05);color:#8b96a5;font-family:var(--mono)}
+
+/* 注册向导 */
+.wiz{position:absolute;inset:0;background:#fbfaf7;padding:calc(var(--u)*1.8) calc(var(--u)*3.6)}
+.wiz-steps{display:flex;justify-content:center;gap:calc(var(--u)*2.2);margin-bottom:calc(var(--u)*1.6)}
+.wiz-s{display:flex;align-items:center;gap:calc(var(--u)*.8);font-size:calc(var(--u)*1.1);color:#9aa2ac;font-weight:600}
+.wiz-s i{width:calc(var(--u)*2.1);height:calc(var(--u)*2.1);border-radius:50%;border:1.5px solid #d5dbe2;display:grid;place-items:center;font:700 calc(var(--u)*1) var(--mono);font-style:normal}
+.wiz-s.on{color:#14594a}.wiz-s.on i{background:#14594a;color:#fff;border-color:#14594a}
+.wiz-card{max-width:70%;margin:0 auto;background:#fff;border:1px solid var(--uline);border-radius:calc(var(--u)*1.2);padding:calc(var(--u)*1.8)}
+.wiz-lab{font-size:calc(var(--u)*1.1);font-weight:700;color:#3c444d;margin-bottom:calc(var(--u)*.8)}
+.wiz-in{height:calc(var(--u)*4.4);border:1.5px solid #cfd8e2;border-radius:calc(var(--u)*.8);display:flex;align-items:center;padding-left:calc(var(--u)*1.4);position:relative}
+.wiz-in .pre{font:600 calc(var(--u)*1.5) var(--mono);color:#1a222b}
+.wiz-in .cnt{margin-left:auto;margin-right:calc(var(--u)*1.2);font:500 calc(var(--u)*1) var(--mono);color:#a3abb5}
+.wiz-in .root{height:100%;padding:0 calc(var(--u)*1.4);border-left:1px solid var(--uline);background:#f2f7ff;color:#1f6feb;border-radius:0 calc(var(--u)*.8) calc(var(--u)*.8) 0;display:grid;place-items:center;font:700 calc(var(--u)*1.15) var(--mono)}
+.wiz-pop{position:absolute;left:calc(var(--u)*1);right:calc(var(--u)*1);top:calc(100% + var(--u)*.6);background:#fff;border:1px solid #dde4ec;border-radius:calc(var(--u)*.8);box-shadow:0 calc(var(--u)*1.2) calc(var(--u)*3) rgba(20,40,60,.16);padding:calc(var(--u)*.7);z-index:2}
+.wiz-opt{display:flex;justify-content:space-between;padding:calc(var(--u)*.8) calc(var(--u)*1.2);border-radius:calc(var(--u)*.5);font:600 calc(var(--u)*1.1) var(--mono)}
+.wiz-opt.on{background:#eaf3ff;color:#1f6feb}.wiz-opt small{color:#2e9e6b}
+.wiz-ta{margin-top:calc(var(--u)*1.6);height:calc(var(--u)*5.2);border:1.5px solid #cfd8e2;border-radius:calc(var(--u)*.8);padding:calc(var(--u)*1.1) calc(var(--u)*1.4);font-size:calc(var(--u)*1.1);color:#9aa2ac}
+.wiz-tip{margin-top:calc(var(--u)*1.4);padding:calc(var(--u)*1) calc(var(--u)*1.4);border-radius:calc(var(--u)*.6);background:#eaf3ff;color:#1f6feb;font-size:calc(var(--u)*1.05);font-weight:700}
+.wiz-btn{margin-top:calc(var(--u)*1.8);width:100%;height:calc(var(--u)*4);border-radius:calc(var(--u)*.8);background:#14191c;color:#fff;display:grid;place-items:center;font-size:calc(var(--u)*1.25);font-weight:700}
+
+/* 特性卡 */
+.feat{background:linear-gradient(140deg,#0e1518,#101d1a 60%,#0a0c10)}
+.feat-grid{position:absolute;left:8%;right:8%;top:19%;display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--u)*1.8)}
+.fcard{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.12);border-radius:calc(var(--u)*1.2);padding:calc(var(--u)*1.8) calc(var(--u)*1.5);min-height:calc(var(--u)*17);opacity:0;transform:translateY(calc(var(--u)*3))}
+.fcard.in{opacity:1;transform:none;transition:opacity .6s cubic-bezier(.2,.7,.3,1),transform .6s cubic-bezier(.2,.7,.3,1)}
+.fcard .fn{font:600 calc(var(--u)*1) var(--mono);letter-spacing:.2em;color:var(--acc)}
+.fcard .fi{width:calc(var(--u)*3.8);height:calc(var(--u)*3.8);margin:calc(var(--u)*1.4) 0;border:1px solid rgba(127,208,180,.45);border-radius:calc(var(--u)*1);display:grid;place-items:center;font:700 calc(var(--u)*1.9) var(--serif);color:var(--acc)}
+.fcard h4{font:700 calc(var(--u)*1.9) var(--serif);letter-spacing:-.02em;margin-bottom:calc(var(--u)*1)}
+.fcard p{font-size:calc(var(--u)*1.15);line-height:1.65;color:rgba(255,255,255,.55)}
+.feat-k{position:absolute;left:8%;top:13%;font:600 calc(var(--u)*1.05) var(--mono);letter-spacing:.26em;color:rgba(255,255,255,.4)}
+
+/* 多设备 */
+.devices{background:linear-gradient(160deg,#0d1216,#14201d)}
+.dev-stage{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;gap:calc(var(--u)*3);padding-top:calc(var(--u)*4)}
+.dev{background:#fff;border-radius:calc(var(--u)*1);box-shadow:0 calc(var(--u)*1.6) calc(var(--u)*5) rgba(0,0,0,.5);overflow:hidden;position:relative}
+.dev-ph{width:calc(var(--u)*13);height:calc(var(--u)*28);border:calc(var(--u)*.5) solid #1b2128;border-radius:calc(var(--u)*2.2)}
+.dev-tb{width:calc(var(--u)*29);height:calc(var(--u)*21);border:calc(var(--u)*.5) solid #1b2128;border-radius:calc(var(--u)*1.4)}
+.dev-dt{width:calc(var(--u)*48);height:calc(var(--u)*30);border:calc(var(--u)*.5) solid #1b2128;border-radius:calc(var(--u)*1)}
+.dev-in{position:absolute;inset:calc(var(--u)*.5);background:var(--paper);color:var(--ink);padding:calc(var(--u)*1.2);overflow:hidden}
+.dev-in .mini-b{font:700 calc(var(--u)*1) var(--serif);color:#16191c;border-bottom:1px solid var(--uline);padding-bottom:calc(var(--u)*.6)}
+.dev-in .mini-h{font:700 calc(var(--u)*1.9) var(--serif);margin-top:calc(var(--u)*1.4);line-height:1.15;letter-spacing:-.03em}
+.dev-in .mini-h em{font-style:italic;color:var(--acc2)}
+.dev-in .mini-l{margin-top:calc(var(--u)*.9);height:calc(var(--u)*.45);background:#dfe4de;border-radius:99px;width:80%}
+.dev-in .mini-l.s{width:56%}
+.dev-in .mini-box{margin-top:calc(var(--u)*1.4);height:calc(var(--u)*2.6);border:1.5px solid #cfd8d2;border-radius:calc(var(--u)*.4)}
+.dev-in .mini-row{margin-top:calc(var(--u)*.8);display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--u)*.5)}
+.dev-in .mini-row i{height:calc(var(--u)*2.4);background:#eef2ef;border-radius:calc(var(--u)*.3);display:block}
+.dev-cap{position:absolute;left:0;right:0;bottom:calc(12% + var(--u)*1);text-align:center;font:600 calc(var(--u)*1.05) var(--mono);letter-spacing:.22em;color:rgba(255,255,255,.42)}
+
+/* 片尾 */
+.outro{background:radial-gradient(70% 80% at 50% 42%,#14201c 0,#08090b 72%)}
+.out-c{position:absolute;left:0;right:0;top:22%;text-align:center}
+.out-gem{width:calc(var(--u)*5);height:calc(var(--u)*5);margin:0 auto calc(var(--u)*2);border-radius:calc(var(--u)*1.3);background:linear-gradient(135deg,#6fb2ff,#7fd0b4 55%,#2e9e6b);box-shadow:0 0 calc(var(--u)*5) rgba(127,208,180,.4)}
+.out-word{font:700 calc(var(--u)*5.6) var(--serif);letter-spacing:-.045em}
+.out-k{margin-top:calc(var(--u)*1.2);font:600 calc(var(--u)*1.05) var(--mono);letter-spacing:.3em;color:rgba(255,255,255,.4)}
+.out-url{display:inline-block;margin-top:calc(var(--u)*3.4);font:700 calc(var(--u)*6.4) var(--serif);letter-spacing:-.035em;
+  background:linear-gradient(100deg,#f4f1e9,#8fd7bd);-webkit-background-clip:text;background-clip:text;color:transparent;pointer-events:auto}
+.out-url{text-decoration:none}
+.out-url:hover{opacity:.82}
+.out-cta{margin-top:calc(var(--u)*3);display:flex;justify-content:center;gap:calc(var(--u)*1.4);pointer-events:auto}
+.out-cta a{padding:calc(var(--u)*1.15) calc(var(--u)*2.6);border-radius:99px;font-size:calc(var(--u)*1.3);font-weight:700;transition:transform .2s}
+.out-cta a:hover{transform:translateY(-2px)}
+.out-cta .p{background:var(--acc);color:#0b1410}
+.out-cta .g{border:1px solid rgba(255,255,255,.28);color:#fff}
+.out-f{position:absolute;left:0;right:0;bottom:calc(11% + var(--u)*.5);text-align:center;font:600 calc(var(--u)*1) var(--mono);letter-spacing:.18em;color:rgba(255,255,255,.3)}
+
+/* ── 响应式 / 无障碍 ─────────────────── */
+.rotate-tip{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);z-index:40;display:none;
+  padding:10px 20px;border-radius:99px;background:rgba(8,10,12,.8);border:1px solid rgba(127,208,180,.45);
+  font:600 12px var(--mono);letter-spacing:.12em;color:var(--acc);white-space:nowrap;pointer-events:none}
+@media(max-aspect-ratio:1/1){.cap{bottom:calc(14% + var(--u)*1)}.cap-d{max-width:88%}.ib,.spd{transform:scale(.92)}.rotate-tip{display:block}}
+@media(max-width:560px){.chap,.tcode{display:none}#snd,#full{display:none}}
+@media(prefers-reduced-motion:reduce){.art{transform:none!important}.fcard.in{transition:none}.scan{display:none}.grain{display:none}}
+</style>
+</head>
+<body>
+<div class="stage"><div class="frame" id="frame">
+
+  <!-- 01 片头 -->
+  <section class="scene" data-i="0">
+    <div class="art intro" data-motion="zoom">
+      <div class="grid-lines"></div><div class="ring"></div>
+      <div class="intro-c">
+        <div class="logo-gem"></div>
+        <div class="word">TerraDomain</div>
+        <div class="tag">A DOMAIN TO BEGIN WITH</div>
+      </div>
+      <div class="filmby">A TERRADOMAIN FILM · 2026 · nic.299282.xyz</div>
+    </div>
+  </section>
+
+  <!-- 02 定位 -->
+  <section class="scene" data-i="1">
+    <div class="art statement" data-motion="panRight">
+      <div class="code-rain" id="rain"></div>
+      <div class="st-c">
+        <div class="st-k">PUBLIC SUBDOMAIN SERVICE / 免费二级域名分发</div>
+        <div class="st-t">属于你的<br><span>专属子域名</span></div>
+        <div class="st-d">免费申请，自行管理 DNS 记录，几分钟就能把服务挂上线。</div>
+        <div class="st-url"><span>◉</span> nic.299282.xyz</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 官网 -->
+  <section class="scene" data-i="2">
+    <div class="art screen-wrap" data-motion="zoom">
+      <div class="browser">
+        <div class="bbar"><div class="dots"><i></i><i></i><i></i></div><div class="url">https://<b>nic.299282.xyz</b>/</div></div>
+        <div class="bview"><div class="site">
+          <div class="site-top"><div class="site-brand">TerraDomain</div><div class="site-nav"><span>注册账号</span><span>WHOIS 查询</span><span>服务条款</span><span>返回首页</span></div></div>
+          <div class="site-hero">
+            <div class="site-k">FREE SUBDOMAIN · GLOBAL ANYCAST</div>
+            <div class="site-h">免费申请<em>二级域名</em></div>
+            <div class="site-p">自行管理 DNS 记录，几分钟就能把服务挂上线。</div>
+            <div class="site-search"><div class="ph">输入你想要的前缀…</div><div class="sf">.meoy.top ▾</div><div class="go">查询可用性 →</div></div>
+            <div class="site-metrics">
+              <div><small>01 / INSTANT</small><b>即时开通</b><span>审核通过即可使用</span></div>
+              <div><small>02 / DNS</small><b>完整解析</b><span>12 种记录类型</span></div>
+              <div><small>03 / OPEN</small><b>开源免费</b><span>Workers + D1</span></div>
+            </div>
+          </div>
+          <div class="site-foot">全球 Anycast 解析 · 永久免费 · © 2026 TerraDomain</div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 控制台 -->
+  <section class="scene" data-i="3">
+    <div class="art screen-wrap" data-motion="panRight">
+      <div class="browser" style="width:92%">
+        <div class="bbar"><div class="dots"><i></i><i></i><i></i></div><div class="url">https://<b>nic.299282.xyz</b>/dashboard</div></div>
+        <div class="bview"><div class="console">
+          <div class="c-side">
+            <div class="c-logo">TerraDomain</div>
+            <div class="c-grp">控制台</div><div class="c-nav on"><i></i>我的域名</div><div class="c-nav"><i></i>注册域名</div>
+            <div class="c-grp">资源管理</div><div class="c-nav"><i></i>WHOIS 查询</div><div class="c-nav"><i></i>域名转移</div>
+            <div class="c-grp">用户中心</div><div class="c-nav"><i></i>签到地</div><div class="c-nav"><i></i>工单系统</div><div class="c-nav"><i></i>个人资料</div>
+          </div>
+          <div class="c-main">
+            <div class="c-top"><div class="c-crumb">首页<span>/</span>我的域名</div><div class="c-search">🔍 搜索域名…</div><div class="c-av"></div></div>
+            <div class="c-body">
+              <div class="c-stats">
+                <div class="c-stat"><small>DOMAINS</small><b>4</b></div>
+                <div class="c-stat"><small>RECORDS</small><b>27</b></div>
+                <div class="c-stat"><small>POINTS</small><b>1,280</b></div>
+                <div class="c-stat"><small>STATUS</small><b>正常</b></div>
+              </div>
+              <div class="c-table">
+                <div class="c-tr h"><span>域名</span><span>根域名</span><span>记录</span><span>状态</span><span>到期</span></div>
+                <div class="c-tr"><span class="dm">mail.meoy.top</span><span>meoy.top</span><span>4</span><span><i class="pill-s">已开通</i></span><span>2027-11-05</span></div>
+                <div class="c-tr"><span class="dm">lol.v-1.top</span><span>v-1.top</span><span>不限</span><span><i class="pill-s">已开通</i></span><span>2027-11-05</span></div>
+                <div class="c-tr"><span class="dm">blog.meoy.top</span><span>meoy.top</span><span>2</span><span><i class="pill-w">待审核</i></span><span>—</span></div>
+                <div class="c-tr"><span class="dm">api.v-1.top</span><span>v-1.top</span><span>6</span><span><i class="pill-s">已开通</i></span><span>2027-08-12</span></div>
+                <div class="c-tr"><span class="dm">dev.meoy.top</span><span>meoy.top</span><span>3</span><span><i class="pill-s">已开通</i></span><span>2027-06-01</span></div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 DNS -->
+  <section class="scene" data-i="4">
+    <div class="art screen-wrap" data-motion="panDown">
+      <div class="browser" style="width:88%">
+        <div class="bbar"><div class="dots"><i></i><i></i><i></i></div><div class="url">https://<b>nic.299282.xyz</b>/domain?name=mail</div></div>
+        <div class="bview"><div class="dns">
+          <div class="dns-h"><h3>mail.meoy.top · DNS 记录</h3><div class="add">＋ 添加记录</div></div>
+          <div class="dns-card">
+            <div class="dns-r h"><span>类型</span><span>名称</span><span>值</span><span>TTL</span><span>状态</span></div>
+            <div class="dns-r"><span><i class="typ">A</i></span><span class="mono">@</span><span class="val">203.0.113.10</span><span>自动</span><span>已生效</span></div>
+            <div class="dns-r hl"><span><i class="typ">AAAA</i></span><span class="mono">@</span><span class="val">2001:db8::1</span><span>自动</span><span>已生效</span></div>
+            <div class="dns-r"><span><i class="typ txt">TXT</i></span><span class="mono">@</span><span class="val">v=spf1 include:_spf.example.com ~all</span><span>3600</span><span>已生效</span></div>
+            <div class="dns-r"><span><i class="typ mx">MX</i></span><span class="mono">@</span><span class="val">10 mx1.example.com</span><span>3600</span><span>已生效</span></div>
+            <div class="dns-r"><span><i class="typ">CNAME</i></span><span class="mono">www</span><span class="val">mail.meoy.top</span><span>自动</span><span>已生效</span></div>
+            <div class="dns-r"><span><i class="typ caa">CAA</i></span><span class="mono">@</span><span class="val">0 issue "letsencrypt.org"</span><span>3600</span><span>已生效</span></div>
+          </div>
+          <div class="dns-note">A / AAAA / CNAME / MX / TXT / NS / SRV / CAA / CERT / DNSKEY … 12 种记录类型</div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 注册向导 -->
+  <section class="scene" data-i="5">
+    <div class="art screen-wrap" data-motion="zoom">
+      <div class="browser" style="width:82%">
+        <div class="bbar"><div class="dots"><i></i><i></i><i></i></div><div class="url">https://<b>nic.299282.xyz</b>/register</div></div>
+        <div class="bview"><div class="wiz">
+          <div class="wiz-steps">
+            <div class="wiz-s"><i>✓</i>使用须知</div><div class="wiz-s on"><i>2</i>选择域名</div><div class="wiz-s"><i>3</i>确认信息</div><div class="wiz-s"><i>4</i>提交注册</div>
+          </div>
+          <div class="wiz-card">
+            <div class="wiz-lab">想要的前缀</div>
+            <div class="wiz-in" style="position:relative">
+              <span class="pre">lol</span><span class="cnt">3 / 63</span><span class="root">.v-1.top ▾</span>
+              <div class="wiz-pop">
+                <div class="wiz-opt"><span>.meoy.top</span><small>Free</small></div>
+                <div class="wiz-opt on"><span>.v-1.top</span><small>AI 自动审核 · 不限</small></div>
+              </div>
+            </div>
+            <div class="wiz-lab" style="margin-top:calc(var(--u)*2.4)">用途说明</div>
+            <div class="wiz-ta">个人博客，展示作品集…</div>
+            <div class="wiz-tip">✓ 该后缀由 AI 自动审核，通过即开通；DNS 记录数量不限</div>
+            <div class="wiz-btn">提交注册 →</div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 特性 -->
+  <section class="scene" data-i="6">
+    <div class="art feat" data-motion="none">
+      <div class="feat-k">WHY TERRADOMAIN / 四件我们认真做的事</div>
+      <div class="feat-grid" id="featGrid">
+        <div class="fcard"><div class="fn">01 / AI</div><div class="fi">✦</div><h4>自动审核</h4><p>域名与用途交给模型判定，PASS 即开通；网关异常回落人工。</p></div>
+        <div class="fcard"><div class="fn">02 / TRUST</div><div class="fi">⚖</div><h4>举报与合规</h4><p>滥用邮箱与在线举报入口，核实后立即停用违规域名。</p></div>
+        <div class="fcard"><div class="fn">03 / I18N</div><div class="fi">文</div><h4>中英双语</h4><p>全站界面与动态内容一次切换，刷新不闪、切回不串味。</p></div>
+        <div class="fcard"><div class="fn">04 / EVERYWHERE</div><div class="fi">▭</div><h4>全比例适配</h4><p>21:9 长屏、折叠机、平板与桌面，安全区逐处避让。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 多设备 -->
+  <section class="scene" data-i="7">
+    <div class="art devices" data-motion="zoom">
+      <div class="dev-stage">
+        <div class="dev dev-ph"><div class="dev-in"><div class="mini-b">TerraDomain</div><div class="mini-h" style="font-size:calc(var(--u)*1.2)">免费申请<br><em>二级域名</em></div><div class="mini-l"></div><div class="mini-l s"></div><div class="mini-box"></div><div class="mini-row"><i></i><i></i><i></i></div></div></div>
+        <div class="dev dev-tb"><div class="dev-in" style="padding:calc(var(--u)*1.8)"><div class="mini-b" style="font-size:calc(var(--u)*1.2)">TerraDomain</div><div class="mini-h">免费申请<br><em>二级域名</em></div><div class="mini-l"></div><div class="mini-l s"></div><div class="mini-box"></div><div class="mini-row"><i></i><i></i><i></i></div></div></div>
+        <div class="dev dev-dt"><div class="dev-in" style="padding:calc(var(--u)*2.2)"><div class="mini-b" style="font-size:calc(var(--u)*1.3)">TerraDomain</div><div class="mini-h" style="font-size:calc(var(--u)*2.6)">免费申请<em>二级域名</em></div><div class="mini-l"></div><div class="mini-l s"></div><div class="mini-box"></div><div class="mini-row"><i></i><i></i><i></i></div></div></div>
+      </div>
+      <div class="dev-cap">ONE INTERFACE · EVERY SCREEN · 21:9 / 16:9 / TABLET / DESKTOP</div>
+    </div>
+  </section>
+
+  <!-- 09 片尾 -->
+  <section class="scene" data-i="8">
+    <div class="art outro" data-motion="zoom">
+      <div class="grid-lines"></div>
+      <div class="out-c">
+        <div class="out-gem"></div>
+        <div class="out-word">TerraDomain</div>
+        <div class="out-k">FREE · OPEN SOURCE · BUILT ON CLOUDFLARE</div>
+        <a class="out-url" href="https://nic.299282.xyz/" target="_blank" rel="noopener">nic.299282.xyz</a>
+        <div class="out-cta"><a class="p" href="https://nic.299282.xyz/register" target="_blank" rel="noopener">立即注册 →</a><a class="g" href="https://nic.299282.xyz/" target="_blank" rel="noopener">访问官网</a></div>
+      </div>
+      <div class="out-f">© 2026 TERRADOMAIN · 全球 ANYCAST 解析 · 永久免费</div>
+    </div>
+  </section>
+
+  <div class="vig"></div><div class="capband"></div><div class="grain"></div><div class="scan" id="scan"></div>
+
+  <div class="hud">
+    <div class="mark"><i></i><span>TerraDomain · OFFICIAL FILM</span></div>
+    <div class="chap" id="chap">CHAPTER 01 / 09</div>
+    <div class="tcode" id="tcode">00:00 / 01:13</div>
+    <div class="cap" id="cap">
+      <div class="cap-n" id="capN"></div>
+      <div class="cap-t" id="capT"></div>
+      <div class="cap-d" id="capD"></div>
+    </div>
+  </div>
+
+  <div class="paused" id="paused">❚❚ 已暂停</div>
+  <button class="replay" id="replay">↻ 重新播放</button>
+
+  <div class="ctl" id="ctl">
+    <div class="segs" id="segs"></div>
+    <button class="ib" id="prev" title="上一幕 (←)">‹</button>
+    <button class="ib" id="play" title="播放 / 暂停 (空格)">❚❚</button>
+    <button class="ib" id="next" title="下一幕 (→)">›</button>
+    <button class="spd" id="spd" title="倍速">1×</button>
+    <button class="ib" id="snd" title="音效开关">♪</button>
+    <button class="ib" id="full" title="全屏 (F)">⛶</button>
+  </div>
+</div></div>
+
+<script>
+(function(){
+  'use strict';
+  var SITE = 'https://nic.299282.xyz';
+  var TOTAL = 73;                       /* 九幕总时长（秒） */
+  var FADE = .55;
+  var SC = [
+    {s:0,  e:7,   no:'01 / 09', en:'OPENING',        t:'',               d:'', cap:false, motion:'zoom'},
+    {s:7,  e:15,  no:'02 / 09', en:'THE IDEA',       t:'把域名，交还给每个人', d:'免费申请二级域名，自行管理 DNS 记录。', cap:true, motion:'panRight'},
+    {s:15, e:25,  no:'03 / 09', en:'THE WEBSITE',    t:'一眼可用的注册入口',   d:'nic.299282.xyz · 查询可用性，选好后缀，直接开始。', cap:true, motion:'zoom'},
+    {s:25, e:35,  no:'04 / 09', en:'THE CONSOLE',    t:'专业密度的管理后台',   d:'域名、根后缀、记录数、状态与到期，一屏看清。', cap:true, motion:'panRight'},
+    {s:35, e:44,  no:'05 / 09', en:'FULL DNS',       t:'完整解析，自己说了算', d:'12 种记录类型，A / AAAA / CNAME / MX / TXT / SRV / CAA 一键写入。', cap:true, motion:'panDown'},
+    {s:44, e:53,  no:'06 / 09', en:'IN MINUTES',     t:'从查询到开通，几分钟', d:'后缀嵌在输入框里；v-1.top 由 AI 自动审核，DNS 记录不限。', cap:true, motion:'zoom'},
+    {s:53, e:62,  no:'07 / 09', en:'BUILT WITH CARE',t:'认真做好的四件小事',   d:'自动审核 · 举报合规 · 中英双语 · 全比例适配。', cap:true, motion:'none'},
+    {s:62, e:68,  no:'08 / 09', en:'EVERY SCREEN',   t:'一块屏幕，也是每一块', d:'21:9 长屏、折叠机、平板与桌面，安全区逐处避让。', cap:true, motion:'zoom'},
+    {s:68, e:73,  no:'09 / 09', en:'START NOW',      t:'',               d:'', cap:false, motion:'zoom'}
+  ];
+
+  var frame = document.getElementById('frame');
+  var scenes = [].slice.call(document.querySelectorAll('.scene'));
+  var segsEl = document.getElementById('segs');
+  var cap = document.getElementById('cap');
+  var capN = document.getElementById('capN'), capT = document.getElementById('capT'), capD = document.getElementById('capD');
+  var chap = document.getElementById('chap'), tcode = document.getElementById('tcode');
+  var ctl = document.getElementById('ctl'), playBtn = document.getElementById('play');
+  var spdBtn = document.getElementById('spd'), sndBtn = document.getElementById('snd');
+  var pausedEl = document.getElementById('paused'), replayEl = document.getElementById('replay');
+  var scanEl = document.getElementById('scan');
+  var featCards = [].slice.call(document.querySelectorAll('.fcard'));
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* 尺寸单位：1u = 舞台宽度的 1%，全片等比缩放 */
+  function resize(){
+    var w = frame.getBoundingClientRect().width;
+    frame.style.setProperty('--u', (w/100) + 'px');
+  }
+  addEventListener('resize', resize);
+  document.addEventListener('fullscreenchange', function(){ setTimeout(resize, 60); });
+  resize();
+
+  /* 字符雨 */
+  var rain = document.getElementById('rain');
+  var stream = '';
+  for (var i=0;i<900;i++) stream += 'nic.299282.xyz  meoy.top  v-1.top  DNS  A  AAAA  CNAME  TXT  ';
+  rain.textContent = stream;
+
+  /* 时间轴分段 */
+  SC.forEach(function(sc, i){
+    var b = document.createElement('div');
+    b.className = 'seg'; b.style.setProperty('--g', (sc.e-sc.s).toFixed(2));
+    b.title = sc.no + ' · ' + sc.en;
+    b.innerHTML = '<i></i>';
+    b.onclick = function(e){ e.stopPropagation(); seek(sc.s + FADE + .05); };
+    segsEl.appendChild(b);
+  });
+  var segs = [].slice.call(segsEl.children);
+
+  /* 状态 */
+  var t = 0, playing = true, speed = 1, last = 0, cur = -1, capIdx = -1, ended = false, soundOn = false, ac = null;
+  var hideTimer = null;
+
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+  function fmt(s){ s = Math.max(0, Math.floor(s)); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+
+  function blip(f, dur){
+    if(!soundOn) return;
+    try{
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if(ac.state === 'suspended') ac.resume();
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(.0001, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(.025, ac.currentTime+.012);
+      g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime+dur);
+      o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+dur+.03);
+    }catch(e){}
+  }
+  function chord(){
+    [261.6,329.6,392,523.2].forEach(function(f,i){ setTimeout(function(){ blip(f,.9); }, i*110); });
+  }
+
+  function setCap(idx, p){
+    var sc = SC[idx];
+    if(!sc.cap){ cap.style.opacity = 0; return; }
+    if(idx !== capIdx){
+      capN.innerHTML = sc.no + '<em>' + sc.en + '</em>';
+      capT.textContent = sc.t; capD.textContent = sc.d;
+      capIdx = idx;
+    }
+    var inn = clamp((p-.02)/.055, 0, 1), out = clamp((.93-p)/.075, 0, 1);
+    cap.style.opacity = (inn*out).toFixed(3);
+    cap.style.transform = 'translateY(' + ((1-inn)*14) + 'px)';
+  }
+
+  function render(now){
+    var p, i, sc, a, op, fi, fo, art, m;
+    for(i=0;i<SC.length;i++){
+      sc = SC[i];
+      fi = clamp((t - sc.s)/FADE, 0, 1);
+      fo = (i === SC.length-1) ? 1 : clamp((sc.e - t)/FADE, 0, 1);
+      op = Math.min(fi, fo);
+      a = scenes[i];
+      a.style.opacity = op.toFixed(3);
+      a.style.visibility = op > .005 ? 'visible' : 'hidden';
+      if(op > .005){
+        p = clamp((t - sc.s)/(sc.e - sc.s), 0, 1);
+        art = a.querySelector('.art');
+        if(!reduce){
+          m = art.getAttribute('data-motion');
+          if(m === 'zoom') art.style.transform = 'scale(' + (1.03 + .075*p).toFixed(4) + ')';
+          else if(m === 'panRight') art.style.transform = 'scale(' + (1.05 + .03*p).toFixed(4) + ') translateX(' + (-1.5*p).toFixed(2) + '%)';
+          else if(m === 'panDown') art.style.transform = 'scale(' + (1.05 + .03*p).toFixed(4) + ') translateY(' + (-1.2*p).toFixed(2) + '%)';
+          else art.style.transform = 'scale(1.01)';
+        }
+      }
+    }
+
+    /* 当前幕 */
+    var idx = SC.length-1;
+    for(i=0;i<SC.length;i++){ if(t >= SC[i].s && t < SC[i].e){ idx = i; break; } }
+    var scNow = SC[idx];
+    var pp = clamp((t - scNow.s)/(scNow.e - scNow.s), 0, 1);
+    frame.classList.toggle('has-band', (idx >= 2 && idx <= 5) || idx === 7);
+
+    if(idx !== cur){
+      if(cur >= 0) blip(480 + idx*36, .085);
+      if(idx === SC.length-1) chord();
+      cur = idx;
+      chap.textContent = 'CHAPTER ' + scNow.no + ' · ' + scNow.en;
+      featCards.forEach(function(c){ c.classList.remove('in'); });
+    }
+    /* 特性卡依次弹入 */
+    if(idx === 6){
+      featCards.forEach(function(c, k){ if(pp > .06 + k*.08) c.classList.add('in'); });
+    }
+
+    setCap(idx, pp);
+    tcode.textContent = fmt(t) + ' / ' + fmt(TOTAL);
+
+    /* 进度段 */
+    for(i=0;i<segs.length;i++){
+      var s = SC[i];
+      if(t >= s.e){ segs[i].classList.add('done'); segs[i].firstChild.style.width = '100%'; }
+      else if(t >= s.s){
+        segs[i].classList.remove('done');
+        segs[i].firstChild.style.width = (((t-s.s)/(s.e-s.s))*100).toFixed(2) + '%';
+      } else { segs[i].classList.remove('done'); segs[i].firstChild.style.width = '0%'; }
+    }
+    /* 扫描光带 */
+    if(!reduce){
+      var fh = frame.getBoundingClientRect().height;
+      scanEl.style.transform = 'translateY(' + ((t/TOTAL)*(fh+160)-120).toFixed(1) + 'px)';
+    }
+  }
+
+  function tick(now){
+    if(!last) last = now;
+    var dt = (now-last)/1000; last = now;
+    if(playing){
+      t = Math.min(TOTAL, t + dt*speed);
+      if(t >= TOTAL){ playing = false; ended = true; updateBtns(); }
+    }
+    render(now);
+    requestAnimationFrame(tick);
+  }
+
+  function updateBtns(){
+    playBtn.textContent = playing ? '❚❚' : '▶';
+    playBtn.classList.toggle('on', !playing && !ended);
+    pausedEl.classList.toggle('show', !playing && !ended);
+    replayEl.classList.toggle('show', ended);
+    if(ended) ctl.classList.remove('hide');
+  }
+  function seek(v){
+    t = clamp(v, 0, TOTAL-.001);
+    if(ended){ ended = false; playing = true; cur = -1; }
+    render(performance.now()); updateBtns();
+  }
+  function toggle(){ if(ended){ t=0; ended=false; playing=true; } else playing = !playing; updateBtns(); }
+  function jump(d){
+    var idx = 0; for(var i=0;i<SC.length;i++){ if(t >= SC[i].s && t < SC[i].e){ idx=i; break; } }
+    var n = clamp(idx+d, 0, SC.length-1);
+    if(n !== idx) seek(SC[n].s + FADE + .05); else if(d>0) seek(TOTAL-.01);
+    if(!playing && !ended){ playing = true; updateBtns(); }
+  }
+
+  playBtn.onclick = function(e){ e.stopPropagation(); toggle(); };
+  document.getElementById('prev').onclick = function(e){ e.stopPropagation(); jump(-1); };
+  document.getElementById('next').onclick = function(e){ e.stopPropagation(); jump(1); };
+  spdBtn.onclick = function(e){ e.stopPropagation(); speed = speed===1?1.5:(speed===1.5?2:1); spdBtn.textContent = speed+'×'; };
+  sndBtn.onclick = function(e){
+    e.stopPropagation(); soundOn = !soundOn; sndBtn.classList.toggle('on', soundOn);
+    sndBtn.textContent = soundOn ? '♫' : '♪';
+    if(soundOn) blip(660,.12);
+  };
+  document.getElementById('full').onclick = function(e){
+    e.stopPropagation();
+    if(!document.fullscreenElement) frame.requestFullscreen && frame.requestFullscreen();
+    else document.exitFullscreen && document.exitFullscreen();
+  };
+  replayEl.onclick = function(e){ e.stopPropagation(); t=0; ended=false; playing=true; cur=-1; updateBtns(); };
+  frame.addEventListener('click', function(e){ if(e.target.tagName !== 'A' && !e.target.closest('button')) toggle(); });
+
+  addEventListener('keydown', function(e){
+    if(e.key === ' ' || e.key === 'k' || e.key === 'K'){ e.preventDefault(); toggle(); }
+    else if(e.key === 'ArrowLeft'){ e.preventDefault(); jump(-1); }
+    else if(e.key === 'ArrowRight'){ e.preventDefault(); jump(1); }
+    else if(e.key === 'f' || e.key === 'F'){ document.getElementById('full').click(); }
+    else if(e.key === 'r' || e.key === 'R'){ replayEl.click(); }
+    else if(/^[1-9]$/.test(e.key)){ seek(SC[+e.key-1].s + FADE + .05); }
+  });
+
+  /* 控件自动隐藏 */
+  function poke(){
+    ctl.classList.remove('hide');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function(){ if(playing && !ended) ctl.classList.add('hide'); }, 2600);
+  }
+  ['mousemove','touchstart','keydown'].forEach(function(ev){ addEventListener(ev, poke, {passive:true}); });
+  poke();
+
+  /* 外链统一（防止误写） */
+  document.querySelectorAll('a[href^="https://nic.299282.xyz"]').forEach(function(a){ a.href = SITE + a.getAttribute('href').slice(SITE.length); });
+
+  updateBtns();
+  render(0);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
