@@ -617,6 +617,25 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         } catch (e) { toast(e.message, 'err'); }
       };
 
+      /* 自检 / 诊断打通后，把「实际生效的模型」同步回输入框。
+         否则页面仍显示旧模型名，用户随后点保存会把它写回去，
+         又把刚打通的模型覆盖成无效值。 */
+      const syncAiModel = (model: string) => {
+        if (!model) return;
+        const mi = document.getElementById('sAiModel') as HTMLInputElement | null;
+        if (mi) mi.value = model;
+        const ml = document.getElementById('sAiModelList') as HTMLSelectElement | null;
+        if (ml) {
+          const has = Array.from(ml.options).some((o) => o.value === model);
+          if (!has) {
+            const opt = document.createElement('option');
+            opt.value = model; opt.textContent = model;
+            ml.appendChild(opt);
+          }
+          ml.value = model;
+        }
+      };
+
       /* AI 连接自检：真实调用 chat/completions，回报每个候选模型的具体失败点 */
       const aiTestBtn = document.getElementById('aiTestBtn');
       if (aiTestBtn) aiTestBtn.onclick = async () => {
@@ -624,6 +643,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         if (out) { out.textContent = '测试中…'; out.className = 'hint'; }
         try {
           const r = await api.post('/api/admin/ai-test', {});
+          if (r.ok && r.model) syncAiModel(r.model);
           if (out) {
             out.className = 'hint';
             const tried = (r.attempts || []) as string[];
@@ -646,6 +666,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         box.textContent = '诊断中…（会真实请求网关，最多约 45 秒）';
         try {
           const r = await api.post('/api/admin/ai-diagnose', {});
+          if (r.testOk && r.testModel) syncAiModel(r.testModel);
           box.textContent = (r.lines || []).join('\n');
           toast(r.ok ? 'AI 审核链路可用' : '诊断完成，请查看下方明细', r.ok ? 'ok' : 'err');
         } catch (e) { box.textContent = '诊断失败：' + ((e as any).message || e); }

@@ -11,12 +11,17 @@
  *      「强制直连」模式才只打 Base URL 本身。成功的端点会被记住并复用。
  *   5. 每个端点独立超时（9s），不再让一个挂起请求用共享 signal 掐死整批。
  *      模型候选优先取网关 /models 的真实清单，内置 Agnes/OpenAI 名只作最后兜底。
- *   6. 审核链路只打「已选定模型」一次，失败即回落人工并给出具体原因。
+ *   6. 后台自检与正式审核**共用同一套送审逻辑**：谁先打通，就把「真正生效的
+ *      模型 + 端点」写回 settings，两边随后都用这一份配置，不再各跑各的。
  *
  * 链路：后台填地址 + Key → 辅助探测 /models（失败也有内置官方清单可选）→
- *      管理员选定一个模型 → 审核时直接把中文提示词发给该模型 → PASS / REJECT。
- * 关键：探测只是「选模型的辅助」，绝不是审核的前置条件。审核时若已选定模型，
+ *      管理员选定一个模型 → 把中文提示词发给该模型 → PASS / REJECT。
+ * 关键：探测只是「选模型的辅助」，绝不是审核的前置条件。审核时
  *      一次 /models 都不请求，避免网关不支持 /models 时整个审核链路瘫痪。
+ *
+ * 历史坑：后台自检会遍历 8 个候选模型，第 2 个之后的模型打通了也只记住端点、
+ *      不写回模型名；而正式审核只打 settings 里那个旧模型 → 「设置里能调、
+ *      一提交就失败」。现在成功即写回模型，且正式审核也允许少量候选回退。
  */
 
 import { normalizeDomain, parseRootList } from './roots.js';
@@ -390,7 +395,10 @@ export function endpointCandidates(cfg: Pick<AiConfig, 'base' | 'endpoint' | 'mo
 /** 每个端点自己的超时；共享总预算只用来兜底，不再把整批请求一起掐死 */
 const PER_ENDPOINT_TIMEOUT_MS = 9000;
 const AI_TEST_BUDGET_MS = 45000;
-const AI_REVIEW_BUDGET_MS = 20000;
+/** 后台自检 45s；正式审核给到 30s（首个端点失败后仍够试完收窄后的候选）。
+ *  之前只有 20s：网关慢一点就把 externalSignal abort 了，后面的候选端点全被跳过，
+ *  表现就是「设置里测得通、提交时所有候选模型调用失败」。 */
+const AI_REVIEW_BUDGET_MS = 30000;
 
 /** 不同端点吃不同的请求体：直连地址全带上，官方子路径按各自规范发 */
 function requestBody(url: string, model: string, prompt: string, extra: Record<string, unknown>) {
@@ -505,6 +513,66 @@ async function rememberEndpoint(env: any, url: string): Promise<void> {
   } catch { /* 表未就绪时忽略 */ }
 }
 
+/**
+ * 把「真正打通的模型和端点」一起写回 settings。
+ * 这是修复「后台测得通、提交却失败」的核心：以前只记住端点，
+ * 而 ai_model 仍是那个无效的名字，正式审核只打它一个，必然失败。
+ */
+async function rememberSuccess(env: any, model: string, url: string): Promise<void> {
+  await rememberEndpoint(env, url);
+  if (!model) return;
+  try {
+    await env.DB.prepare(
+      "INSERT INTO settings(key, value) VALUES ('ai_model', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    ).bind(model.slice(0, 80)).run();
+  } catch { /* 表未就绪时忽略 */ }
+}
+
+export interface ChatRun {
+  text: string;
+  /** 实际打通的模型（可能与 cfg.model 不同） */
+  model: string;
+  endpoint: string;
+  attempts: ChatAttempt[];
+  usedModels: string[];
+}
+
+/**
+ * 后台自检与正式审核共用的实际送审逻辑。
+ * - 候选模型以 settings 里选定的为先，其余作为回退（正式审核最多 4 个、不请求 /models）
+ * - 某个端点已经探明可达后，后续模型只打这个端点，避免重复 9 秒超时拖满预算
+ * - 一旦有回复，立刻写回模型 + 端点，之后两条链路都走同一份配置
+ */
+async function reviewChat(
+  env: any,
+  cfg: AiConfig,
+  prompt: string,
+  signal?: AbortSignal,
+  opts: { extraModels?: string[]; maxModels?: number } = {},
+): Promise<ChatRun> {
+  const usedModels = [...new Set([
+    cfg.model || '',
+    ...(opts.extraModels || []),
+    ...FALLBACK_MODELS,
+  ].filter(Boolean).filter(isChatModel))].slice(0, opts.maxModels || 4);
+
+  const attempts: ChatAttempt[] = [];
+  let runCfg: AiConfig = { ...cfg };
+  for (const model of usedModels) {
+    if (signal?.aborted) break;
+    const r = await chatOnce(runCfg, model, prompt, signal);
+    attempts.push(...r.attempts);
+    if (r.text) {
+      await rememberSuccess(env, model, r.url);
+      return { text: r.text, model, endpoint: r.url, attempts, usedModels };
+    }
+    // 有 HTTP 状态码说明端点可达、只是模型名不对 → 后续模型只打它
+    const reachable = r.attempts.find((a) => a.status > 0);
+    if (reachable) runCfg = { ...runCfg, endpoint: reachable.url, mode: 'direct' };
+  }
+  return { text: '', model: '', endpoint: '', attempts, usedModels };
+}
+
 export interface AiTestResult {
   ok: boolean;
   model: string;
@@ -547,39 +615,30 @@ export async function aiTest(env: any): Promise<AiTestResult> {
     const probe = await probeAiModels(env).catch(() => null);
     const gatewayModels = (probe?.models || []).filter(isChatModel).slice(0, 12);
     const modelInCatalog = !cfg.model || gatewayModels.includes(cfg.model);
-    const candidates = [
-      cfg.model || '',
-      ...gatewayModels.filter((x) => x !== cfg.model),
-      ...FALLBACK_MODELS,
-    ].filter(Boolean).slice(0, 8);
     const prompt = buildReviewPrompt({
       fqdn: 'demo.v-1.top', label: 'demo', root: 'v-1.top', note: '个人博客，用于展示作品集',
     });
 
-    // 第一个模型负责探端点；成功后记住，后续模型只打这一个地址
-    let runCfg: AiConfig = { ...cfg };
-    for (const model of candidates) {
-      if (ctl.signal.aborted) break;
-      try {
-        const r = await chatOnce(runCfg, model, prompt, ctl.signal);
-        if (r.text) {
-          await rememberEndpoint(env, r.url);
-          runCfg = { ...runCfg, endpoint: r.url, mode: 'direct' };
-          const v = parseVerdict(r.text);
-          return {
-            ...blank, ok: true, model, endpoint: r.url, latencyMs: Date.now() - t0,
-            gatewayModels, modelInCatalog,
-            attempts: [...attempts, ...r.attempts.map((a) => `${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`)],
-            sample: r.text.trim().slice(0, 80),
-            message: v ? (v.approve ? '✓ 审核返回 PASS（通过）' : '✓ 审核返回 REJECT（驳回）')
-              : '模型可调用，但回复无法解析（实际审核会回落人工）',
-          };
-        }
-        attempts.push(`${model} → 端点均未打通`);
-        for (const a of r.attempts) attempts.push(`  ${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`);
-      } catch (e) {
-        attempts.push(`${model} → ${String((e as Error)?.name || 'error')}`);
-      }
+    const run = await reviewChat(env, cfg, prompt, ctl.signal, {
+      extraModels: gatewayModels, maxModels: 8,
+    });
+    if (run.text) {
+      const v = parseVerdict(run.text);
+      return {
+        ...blank, ok: true, model: run.model, endpoint: run.endpoint,
+        latencyMs: Date.now() - t0, gatewayModels,
+        modelInCatalog: gatewayModels.includes(run.model),
+        attempts: [...attempts, ...run.attempts.map(
+          (a) => `${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`)],
+        sample: run.text.trim().slice(0, 80),
+        message: (v ? (v.approve ? '✓ 审核返回 PASS（通过）' : '✓ 审核返回 REJECT（驳回）')
+          : '模型可调用，但回复无法解析（实际审核会回落人工）')
+          + (run.model !== cfg.model ? ` · 已自动把可用模型写回设置（${run.model}）` : ''),
+      };
+    }
+    for (const m of run.usedModels) attempts.push(`${m} → 端点均未打通`);
+    for (const a of run.attempts) {
+      attempts.push(`  ${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`);
     }
     const hint = cfg.model && !modelInCatalog
       ? `当前模型 ${cfg.model} 不在网关 /models 清单里，请从清单改选`
@@ -627,7 +686,9 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
   let startedAt = 0;   // 只在真正发请求后才计时；短路跳过恒为 0
   const skip = (r: AiSkipReason): AiReviewOutcome => {
     diag.skipReason = r;
-    diag.skipText = explainAiSkip(r);
+    // 把第一次真实失败的地址和状态码带出来，别再只显示一句笼统的「网络不可达」
+    const first = diag.attempts.find((x) => x.trim())?.trim();
+    diag.skipText = explainAiSkip(r) + (first ? `（${first.slice(0, 180)}）` : '');
     return { verdict: null, diag };
   };
 
@@ -643,19 +704,25 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
   const timer = setTimeout(() => ctl.abort(), AI_REVIEW_BUDGET_MS);
   try {
     const prompt = buildReviewPrompt(input);
-    const r = await chatOnce(cfg, cfg.model, prompt, ctl.signal);
+    // 与后台自检同一套送审逻辑：优先 settings 里选定的模型，失败时可回退到
+    // 少量候选；打通后写回模型 + 端点，下次申请一次请求就能命中。
+    // 不在这里请求 /models，避免每次申请都多一次网络往返。
+    const r = await reviewChat(env, cfg, prompt, ctl.signal, { maxModels: 4 });
     if (!r.text) {
-      for (const a of r.attempts) diag.attempts.push(`  ${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`);
+      for (const a of r.attempts) {
+        diag.attempts.push(`  ${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`);
+      }
+      diag.model = cfg.model || '';
       return skip(ctl.signal.aborted ? 'timeout' : 'all-models-failed');
     }
-    await rememberEndpoint(env, r.url);
-    diag.endpoint = r.url;
+    diag.endpoint = r.endpoint;
+    diag.model = r.model;
     const verdict = parseVerdict(r.text);
     if (verdict) {
-      diag.attempts.push(`${cfg.model} → ${verdict.approve ? 'PASS' : 'REJECT'} · ${r.url}`);
-      return { verdict: { ...verdict, model: cfg.model }, diag };
+      diag.attempts.push(`${r.model} → ${verdict.approve ? 'PASS' : 'REJECT'} · ${r.endpoint}`);
+      return { verdict: { ...verdict, model: r.model }, diag };
     }
-    diag.attempts.push(`${cfg.model} → 回复无法解析：${r.text.trim().slice(0, 60)}`);
+    diag.attempts.push(`${r.model} → 回复无法解析：${r.text.trim().slice(0, 60)}`);
     return skip('parse-failed');
   } catch {
     return skip(ctl.signal.aborted ? 'timeout' : 'all-models-failed');

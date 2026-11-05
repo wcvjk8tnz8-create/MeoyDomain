@@ -570,7 +570,7 @@ app.post('/ai-diagnose', async (c) => {
       `/models：${probe ? (probe.source === 'gateway' ? '网关返回 ' + probe.models.length + ' 个' : '不可用，已回落内置清单') : '未检测'}`,
       `网关模型清单：${(probe?.models || []).slice(0, 20).join(', ') || '（无）'}`,
       `当前模型是否在网关清单中：${test?.modelInCatalog === false ? '✗ 不在 —— 请从上面的清单里改选（大小写必须一致）' : (test?.modelInCatalog ? '✓ 在' : '未检测')}`,
-      `实际打通地址：${test?.ok ? test.endpoint : '（无）'}`,
+      `实际打通地址：${test?.ok ? test.endpoint + (test.model !== cfg.model ? `（已把可用模型 ${test.model} 写回设置）` : '') : '（无）'}`,
       `审核调用：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
       `审核调用耗时：${test ? (test.latencyMs / 1000).toFixed(1) + 's' + (test.ok ? '（真实模型往返）' : '（失败前的探测）') : '未检测'}`,
       // 真调模型必然有网络往返（通常 1–5 秒）；「提交后立刻开通」一定是短路，不是 AI 判定
@@ -603,6 +603,7 @@ app.post('/ai-diagnose', async (c) => {
       model: cfg.model, modelFromCatalog: !cfg.model,
       gatewayModels: probe?.models || [], modelInCatalog: !!test?.modelInCatalog,
       probeSource: probe?.source || '', testOk: !!test?.ok,
+      testModel: test?.ok ? test.model : '', testEndpoint: test?.ok ? test.endpoint : '',
     });
   } catch (e) {
     return ok(c, {
@@ -665,17 +666,28 @@ app.post('/settings', async (c) => {
   if (body.aiEnabled !== undefined) await set('ai_review_enabled', body.aiEnabled ? '1' : '0');
   if (body.aiRoots !== undefined) await set('ai_review_roots', cleanRoots(body.aiRoots));
   if (body.aiDnsUnlimitedRoots !== undefined) await set('dns_unlimited_roots', cleanRoots(body.aiDnsUnlimitedRoots));
+  /* 只有地址 / 端点模式「真的变了」才清掉已记住的成功端点。
+     后台表单每次都会带 aiUrl 与 aiEndpointMode，以前无条件清空 ——
+     「用此模型测试审核」刚打通并写回的端点，一保存就没了，正式申请
+     又得重新探端点，表现为「设置里能调、提交时失败」。 */
+  const getSetting = async (k: string): Promise<string> => {
+    try {
+      const row: any = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind(k).first();
+      return String(row?.value ?? '').trim();
+    } catch { return ''; }
+  };
   if (body.aiUrl !== undefined) {
     const u = String(body.aiUrl || '').trim().replace(/\/+$/, '');
-    await set('ai_api_url', /^https:\/\//i.test(u) ? u.slice(0, 300) : 'https://apihub.agnes-ai.com/v1');
+    const url = /^https:\/\//i.test(u) ? u.slice(0, 300) : 'https://apihub.agnes-ai.com/v1';
+    if ((await getSetting('ai_api_url')) !== url) await set('ai_api_endpoint', '');
+    await set('ai_api_url', url);
   }
   if (body.aiEndpointMode !== undefined) {
     const m = String(body.aiEndpointMode || '').trim();
-    await set('ai_endpoint_mode', ['auto','direct','standard'].includes(m) ? m : 'auto');
-    // 换模式或改地址时清掉旧的成功端点，让它重新挑一次
-    await set('ai_api_endpoint', '');
+    const mode = ['auto', 'direct', 'standard'].includes(m) ? m : 'auto';
+    if ((await getSetting('ai_endpoint_mode')) !== mode) await set('ai_api_endpoint', '');
+    await set('ai_endpoint_mode', mode);
   }
-  if (body.aiUrl !== undefined) await set('ai_api_endpoint', '');
   if (body.aiModel !== undefined) await set('ai_model', String(body.aiModel || '').trim().slice(0, 80));
   if (String(body.aiApiKey || '').trim()) await set('ai_api_key', String(body.aiApiKey).trim().slice(0, 300));
   else if (body.aiClearKey === true) await set('ai_api_key', '');
