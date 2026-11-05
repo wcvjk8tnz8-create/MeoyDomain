@@ -130,6 +130,11 @@ export const SERVER_DICT: Record<string, string> = {
   '当前未开放注册': 'Registration is currently closed',
   '新域名申请已暂停': 'New domain requests are paused',
   '申请已暂停': 'Requests are paused',
+  /* AI 批量审核队列 */
+  'AI 配置读取失败': 'Could not load AI configuration',
+  'Workers AI 未绑定': 'Workers AI binding missing',
+  '没有需要 AI 处理的待审域名': 'No pending domains for AI to review',
+  '批量审核异常：': 'Batch review error: ',
   '域名不可用': 'Domain unavailable',
   '该域名不在已移除列表中': 'This domain is not in the removed list',
 
@@ -572,6 +577,12 @@ export const SERVER_PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> =
   [/^有效期 (\d+) 天$/, m => `Valid for ${m[1]} days`],
   [/^（未配置）$/, () => '(not configured)'],
   [/^根域名 (.+?) 已(.+)$/, m => `Root ${m[1]} ${m[2]}`],
+  /* AI 批量审核队列 */
+  [/^本轮审核 (\d+) 个：通过 (\d+) · 驳回 (\d+) · 待重试 (\d+)$/,
+    m => `Reviewed ${m[1]}: ${m[2]} approved · ${m[3]} rejected · ${m[4]} to retry`],
+  [/^批量审核异常：(.+)$/, m => `Batch review error: ${m[1]}`],
+  [/^(.+?)：已失败 (\d+) 次，转人工审核（后台可点「重试全部」清零）$/,
+    m => `${m[1]}: failed ${m[2]} times, handed to manual review (use "Retry all" in admin to reset)`],
 ];
 
 const SKIP_KEYS = new Set([

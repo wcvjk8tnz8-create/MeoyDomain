@@ -8,6 +8,7 @@ import { expiryRules, computeExpiry, expiryState, renewExpiry, migrateLegacyPerp
 import { defaultRoot, isAllowedRoot, listRoots } from '../lib/roots.js';
 import { applyGate } from '../lib/applyGate.js';
 import { aiReviewDetailed } from '../lib/aiReview.js';
+import { ensureAiColumns, queueAiBatch } from '../lib/aiBatch.js';
 
 const app = new Hono();
 
@@ -167,6 +168,8 @@ app.get('/', listMine);
 const createMine = async (c) => {
   const u = c.get('user');
   await ensureExpiryColumns(c.env);
+  // 旧库补齐 AI 批量审核用的列；失败也不影响申请（退分会回退查积分流水）
+  await ensureAiColumns(c.env);
 
   /* 后台可暂停新申请（维护 / 防滥用）。管理员自建不受限：
      管理员是「开通」而非「申请」，停掉它会连后台都无法补发域名。 */
@@ -346,6 +349,22 @@ const createMine = async (c) => {
     else detail.push(`消耗 ${cost} 分${short && !rootOverride ? '（单字域名）' : ''}`);
   }
   if (isReserved) detail.push('保留域名');
+
+  /* 记录本次申请实际扣掉的积分。AI 事后（cron / 新申请批处理）驳回时据此退还，
+     保持与「提交时同步 AI 驳回不扣分」一致的语义。列不存在时静默跳过，
+     refundableCost 会自动回退查 point_logs。 */
+  try {
+    await c.env.DB.prepare('UPDATE subdomains SET apply_cost = ? WHERE id = ?')
+      .bind(isAdmin || aiRejected ? 0 : cost, res.meta?.last_row_id)
+      .run();
+  } catch { /* 旧库尚未补齐该列：不影响申请 */ }
+
+  /* 有新申请时自动审核「所有」待审域名，而不只是这一条：
+     提交瞬间的同步 AI 判定可能因网关抖动失败，历史积压的 pending 也该一起重试。
+     挂到 waitUntil，不拖慢接口响应；与整点 cron 靠 ai_claim_at 原子锁互斥。 */
+  const aiQueued = !isAdmin && queueAiBatch(c, 'new-request');
+  if (aiQueued) detail.push('已排队后台审核全部待审域名');
+
   await audit(c, u.id, 'subdomain.create', fqdn, detail.join(' · '));
   // 注意：创建子域名时不会写入任何 DNS 记录，用户需要时再自行添加
   return ok(c, {
@@ -360,6 +379,7 @@ const createMine = async (c) => {
     aiSkip: isAdmin ? 'admin' : ai ? null : (aiDiag?.skipReason || 'unavailable'),
     aiSkipText: isAdmin ? '管理员免审核' : (aiDiag?.skipText || ''),
     aiAttempts: aiDiag?.attempts || [],
+    aiQueued,
     reserved: isReserved,
     cost: isAdmin ? 0 : (aiRejected ? 0 : cost),
     short,

@@ -584,4 +584,19 @@ export const EXTRA_DICT: Record<string, string> = {
     '⚠ Workers AI is not bound (add [ai] binding to wrangler.toml): applications fall back to manual review.',
   '✓ Workers AI 自动审核已就绪（将使用 Cloudflare 内置模型）；管理员账号免审核，不会触发 AI。':
     '✓ Workers AI auto-review is ready (uses a Cloudflare built-in model). Admin accounts skip review and do not trigger AI.',
+
+  /* ── AI 批量审核队列（每小时 cron + 新申请触发） ── */
+  '立即审核所有待审域名': 'Review all pending domains now',
+  '重试全部（清零失败计数）': 'Retry all (reset failure counts)',
+  '每小时整点自动审核；有新申请时也会立即审核全部待审域名。':
+    'Runs every hour on the hour; a new request also triggers a full review of all pending domains.',
+  '正在清零并重新审核…': 'Resetting and re-reviewing…',
+  '正在审核所有待审域名…': 'Reviewing all pending domains…',
+  '队列状态读取失败': 'Could not load queue status',
+  '批量审核失败：': 'Batch review failed: ',
+  '已加入 AI 自动审核队列，后台会处理全部待审域名；稍后刷新「我的域名」查看结果。':
+    'Queued for AI review; all pending domains are being processed. Refresh "My Domains" shortly for the result.',
+  '已提交，AI 正在后台自动审核所有待审域名，稍后会自动开通或驳回':
+    'Submitted — AI is reviewing all pending domains in the background and will approve or reject them shortly',
+  '没有待审域名': 'No pending domains',
 };

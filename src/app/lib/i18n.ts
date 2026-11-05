@@ -466,6 +466,15 @@ const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
     m => `Global approval is off — activated directly (AI not involved${m[1]})`],
   [/^已提交，等待管理员审核（AI 未自动审核：(.+)）$/,
     m => `Submitted for manual review (AI did not run: ${m[1]})`],
+  /* AI 批量审核队列：后台状态行与 toast 的动态数字句式 */
+  [/^待审 (\d+) 个 · AI 名单内 (\d+) 个 · 名单外人工 (\d+) 个 · 超限转人工 (\d+) 个 ｜ 尚未运行过$/,
+    m => `Pending ${m[1]} · AI-covered ${m[2]} · manual ${m[3]} · handed over ${m[4]} | Not run yet`],
+  [/^待审 (\d+) 个 · AI 名单内 (\d+) 个 · 名单外人工 (\d+) 个 · 超限转人工 (\d+) 个 ｜ 上次运行：(.+)（([\d.]+)s）$/,
+    m => `Pending ${m[1]} · AI-covered ${m[2]} · manual ${m[3]} · handed over ${m[4]} | Last run: ${m[5]} (${m[6]}s)`],
+  [/^AI 批量审核完成：通过 (\d+) \/ 驳回 (\d+) \/ 待重试 (\d+)$/,
+    m => `AI batch review complete: ${m[1]} approved / ${m[2]} rejected / ${m[3]} to retry`],
+  [/^本轮审核 (\d+) 个：通过 (\d+) · 驳回 (\d+) · 待重试 (\d+)$/,
+    m => `Reviewed ${m[1]}: ${m[2]} approved · ${m[3]} rejected · ${m[4]} to retry`],
 ];
 
 const LONG_KEYS = Object.keys(DICT).sort((a, b) => b.length - a.length);

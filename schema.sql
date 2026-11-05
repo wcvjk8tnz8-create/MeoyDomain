@@ -113,7 +113,13 @@ CREATE TABLE IF NOT EXISTS subdomains (
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL,
   reviewed_at   INTEGER,
-  reviewed_by   INTEGER
+  reviewed_by   INTEGER,
+  -- AI 批量审核（每小时 cron + 新申请触发）：本次扣分、失败计数、并发领取锁
+  apply_cost    INTEGER,
+  ai_attempts   INTEGER NOT NULL DEFAULT 0,
+  ai_last_error TEXT,
+  ai_last_try_at INTEGER,
+  ai_claim_at   INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_subdomains_user    ON subdomains(user_id);
 CREATE INDEX IF NOT EXISTS idx_subdomains_status  ON subdomains(status);
@@ -338,7 +344,12 @@ CREATE TABLE IF NOT EXISTS subdomains_mr (
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL,
   reviewed_at   INTEGER,
-  reviewed_by   INTEGER
+  reviewed_by   INTEGER,
+  apply_cost    INTEGER,
+  ai_attempts   INTEGER NOT NULL DEFAULT 0,
+  ai_last_error TEXT,
+  ai_last_try_at INTEGER,
+  ai_claim_at   INTEGER
 );
 
 -- 迁移：仅当新表为空时执行（避免重复部署覆盖已有数据）

@@ -18,7 +18,7 @@ export default function RegisterPage() {
   const [summary, setSummary] = useState<Summary>({ label: '', root: '', fqdn: '', note: '' });
   const [done, setDone] = useState<{
     fqdn: string; status: string; ai: boolean; source: string;
-    ms: number; model: string; reason: string; skip: string;
+    ms: number; model: string; reason: string; skip: string; queued: boolean;
   } | null>(null);
   const [count, setCount] = useState(0);
   const [noteCount, setNoteCount] = useState(0);
@@ -41,6 +41,7 @@ export default function RegisterPage() {
         model: String(r?.aiModel || ''),
         reason: String(r?.aiReason || ''),
         skip: String(r?.aiSkipText || ''),
+        queued: !!r?.aiQueued,
       });
       setStep(4);
     };
@@ -188,9 +189,11 @@ export default function RegisterPage() {
                     ? '管理员自建，免审核，已直接开通（AI 未调用）'
                     : done?.status === 'approved'
                       ? `当前为免审核模式，已直接开通（AI 未参与${done?.skip ? '：' + done?.skip : ''}）`
-                      : done?.skip
-                        ? `已提交，等待管理员审核（AI 未自动审核：${done?.skip}）`
-                        : '已提交，等待管理员审核'}
+                      : done?.queued
+                        ? '已提交，AI 正在后台自动审核所有待审域名，稍后会自动开通或驳回'
+                        : done?.skip
+                          ? `已提交，等待管理员审核（AI 未自动审核：${done?.skip}）`
+                          : '已提交，等待管理员审核'}
             </p>
             {done?.status === 'approved' && done?.source !== 'ai-pass' && (
               <p className="dim" style={{ fontSize: 12 }}>

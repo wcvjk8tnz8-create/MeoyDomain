@@ -13,6 +13,7 @@ import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship 
 import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList, setDnsBackend } from '../lib/rootStore.js';
 import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS, rootInAiList, endpointCandidates,
   normalizeProvider, WORKERS_AI_MODELS, DEFAULT_WORKERS_AI_MODEL } from '../lib/aiReview.js';
+import { runAiReviewBatch, aiBatchStatus, queueAiBatch, startAiBatch } from '../lib/aiBatch.js';
 
 const app = new Hono();
 
@@ -654,6 +655,41 @@ app.post('/ai-test', async (c) => {
   }
 });
 
+/* 立即审核所有待审域名。手动触发与 cron / 新申请共用同一套批处理，
+   原子领取锁保证不会重复调用模型。reset=true 会清零失败计数，
+   让之前「累计失败 5 次转人工」的记录重新送审。 */
+app.post('/ai-review-run', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const r = await runAiReviewBatch(c.env, 'manual', {
+      reset: body?.reset === true,
+      limit: Math.min(Number(body?.limit) || 20, 100),
+    });
+    await audit(c, c.get('user')?.id, 'admin.ai-batch', 'ai',
+      `${r.reason} · 触发 manual · ${r.elapsedMs}ms`);
+    return ok(c, r);
+  } catch (e) {
+    return ok(c, {
+      trigger: 'manual', scanned: 0, approved: 0, rejected: 0, failed: 0, skipped: 0,
+      noConfig: false, reason: '批量审核异常：' + String((e as Error)?.message || e).slice(0, 200),
+      details: [], elapsedMs: 0,
+    });
+  }
+});
+
+/* 队列状态：待审总数、名单内可审数、转人工数、上次运行结果与逐条失败原因 */
+app.get('/ai-review-status', async (c) => {
+  try {
+    return ok(c, await aiBatchStatus(c.env));
+  } catch (e) {
+    return ok(c, {
+      pendingTotal: 0, aiCovered: 0, manualOnly: 0, exhausted: 0,
+      configured: false, enabled: false, roots: [], items: [],
+      error: String((e as Error)?.message || e).slice(0, 200),
+    });
+  }
+});
+
 app.post('/settings', async (c) => {
   const u = c.get('user');
   const body = await c.req.json().catch(() => ({}));
@@ -866,6 +902,10 @@ app.post('/settings', async (c) => {
     if (!['masked', 'none', 'full'].includes(m)) return fail(c, 'WHOIS 显示方式不合法');
     await set('whois_holder', m);
   }
+
+  /* 管理员刚改完 AI 配置（例如补上 Key / 换模型）时，顺手把积压的
+     pending 重新送审一次，不必等下一个整点或下一笔新申请。 */
+  queueAiBatch(c, 'settings-save');
 
   await audit(c, u.id, 'admin.settings', 'site', `name=${name} logo=${logo || '(默认)'}`);
   return ok(c, {});

@@ -3,6 +3,7 @@ import { mergeRootEnv } from './lib/rootStore.js';
 import { DEFAULT_MESSAGE } from './lib/applyGate.js';
 import { loadAiConfig } from './lib/aiReview.js';
 import { parseRootCosts } from './lib/points.js';
+import { runAiReviewBatch } from './lib/aiBatch.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -232,4 +233,16 @@ app.all('*', async (c) => {
 
 app.notFound((c) => fail(c, '页面不存在', 404));
 
-export default app;
+/**
+ * 定时触发：每小时整点把所有待审域名重新交给 AI 判定一次
+ * （wrangler.toml [triggers] crons = ["0 * * * *"]）。
+ * 除了 cron，新申请提交时也会立即跑同一套批处理，所以网关偶尔超时
+ * 留下的 pending 不会被永久挂住。两条路径靠 ai_claim_at 原子锁互斥，
+ * 不会重复调用模型或重复批准。
+ */
+export default {
+  fetch: (request: Request, env: any, ctx: ExecutionContext) => app.fetch(request, env, ctx),
+  async scheduled(_controller: ScheduledController, env: any, ctx: ExecutionContext) {
+    ctx.waitUntil(runAiReviewBatch(env, 'cron'));
+  },
+};

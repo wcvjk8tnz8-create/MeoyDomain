@@ -16,6 +16,12 @@ run_worker_first = true
 [ai]
 binding = "AI"
 
+# 定时审核：每小时整点把全部待审（pending）域名重新交给 AI 判定一次。
+# 新申请提交时也会立即触发同一套批处理，两条路径用数据库领取锁互斥。
+# 只处理 AI 名单内的根域名；失败会累计次数，超过 5 次转人工，避免无限重试。
+[triggers]
+crons = ["0 * * * *"]
+
 # R2 对象存储：用于用户上传自定义头像（可选）
 # 创建：npx wrangler r2 bucket create meoy-avatars
 # 若不使用自定义头像上传，可整段删除（上传接口会自动禁用）

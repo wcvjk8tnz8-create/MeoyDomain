@@ -22,8 +22,12 @@ export default function DashboardPage() {
       <header className="topbar" id="topbar"></header>
       <aside className="sidebar" id="sidebar"></aside>
       
-      <main className="main"><div className="main-in"><div className="wrap">
-          <div className="welcome" id="welcome">
+      <main className="main"><div className="main-in"><div className="wrap td-wrap">
+        <div className="td-crumbbar">
+          <div className="td-crumb">控制台 <span>/</span> <b>域名管理</b></div>
+          <div className="td-crumb-meta"><span>DNS ZONES</span><span>·</span><span>实时状态</span></div>
+        </div>
+          <div className="welcome td-pagehead" id="welcome">
           <span className="w-av" id="wAv">M</span>
           <div className="w-txt">
             <div className="w-hi" id="wHi">欢迎回来</div>
@@ -36,7 +40,7 @@ export default function DashboardPage() {
           </div>
         </div>
       
-        <div className="stat-row">
+        <div className="stat-row td-stats">
           <div className="stat-card sc-pink">
             <span className="sc-ico"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2c1.3 0 2.6 2 3.2 5H8.8C9.4 6 10.7 4 12 4ZM4.3 9h3.1c-.1 1-.2 2.1-.2 3s.1 2 .2 3H4.3a8 8 0 0 1 0-6Zm1.1 8h3.4c.6 3 1.9 5 3.2 5-2.5 0-4.8-2-6.6-5Zm4.6 0h7.9c-1.8 3-4.1 5-6.6 5 1.3 0 2.6-2 3.2-5h-4.5Zm8.6-2c.1-1 .2-2.1.2-3s-.1-2-.2-3h3.1a8 8 0 0 1 0 6h-3.1Z" /></svg></span>
             <div><div className="sc-num" id="stDomains">0</div><div className="sc-lbl">域名总数</div></div>
@@ -55,7 +59,7 @@ export default function DashboardPage() {
           </div>
         </div>
       
-        <div className="quick-row">
+        <div className="quick-row td-quickbar">
           <a className="quick" href="#listAnchor" data-quick="list"><span className="q-ico"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z" /></svg></span><span className="q-txt">我的域名</span></a>
           <a className="quick" href="#applyCard" data-quick="apply"><span className="q-ico"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 5v4h4v2h-4v4h-2v-4H7v-2h4V7h2Z" /></svg></span><span className="q-txt">注册域名</span></a>
           <a className="quick" href="/rewards"><span className="q-ico"><svg viewBox="0 0 24 24"><path d="M20 7h-2.2A3 3 0 0 0 12 3.2 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h8V8h2v3h8V8a1 1 0 0 0-1-1ZM4 13v7a1 1 0 0 0 1 1h6v-8H4Zm9 8h6a1 1 0 0 0 1-1v-7h-7v8Z" /></svg></span><span className="q-txt">奖励中心</span></a>
@@ -83,14 +87,15 @@ export default function DashboardPage() {
           <div className="hint" id="applyCardHint">注册入口已独立为单独页面：可先检查名称是否可用、查看积分消耗，再提交申请。</div>
         </div>
       
-        <div className="card" id="listAnchor">
-          <h2>我的域名</h2>
-          <div className="row" style={{alignItems: "flex-end", gap: "9px", marginBottom: "11px"}}>
-            <div style={{flex: "1", minWidth: "170px"}}>
-              <label>搜索</label>
+        <div className="card td-table-card" id="listAnchor">
+          <div className="td-cardhead"><h2>我的域名</h2><span className="td-cardhint">ZONE LIST · 可搜索 / 分页</span></div>
+          <div className="td-toolbar">
+            <div className="td-field" style={{flex: "1", minWidth: "170px"}}>
+              <label>搜索域名</label>
               <input id="kw" placeholder="域名关键字" autocomplete="off" />
             </div>
-            <button className="btn" id="btnSearch">搜索</button>
+            <button className="btn sm" id="btnSearch">搜索</button>
+            <a className="btn sm ghost" href="/register">＋ 注册域名</a>
           </div>
           <div className="tablewrap">
             <table>

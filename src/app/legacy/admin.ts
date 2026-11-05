@@ -385,6 +385,11 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 <button class="btn sm ghost" id="aiDiagBtn" type="button">一键诊断</button>
                 <span class="hint" id="aiTestResult" style="margin:0">每个端点独立超时，成功的地址会被记住后续复用。诊断会列出网关返回的真实模型清单。</span>
               </div>
+              <div class="row" style="gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+                <button class="btn sm ghost" id="aiBatchBtn" type="button">立即审核所有待审域名</button>
+                <button class="btn sm ghost" id="aiBatchResetBtn" type="button">重试全部（清零失败计数）</button>
+                <span class="hint" id="aiBatchHint" style="margin:0">每小时整点自动审核；有新申请时也会立即审核全部待审域名。</span>
+              </div>
               <pre class="mono" id="aiDiagOut" style="display:none;white-space:pre-wrap;font-size:12px;line-height:1.7;background:var(--surface-2,#f6f8fc);padding:12px;border-radius:10px;margin:10px 0 0;max-height:260px;overflow:auto"></pre>
             </div>
             <div class="field">
@@ -737,7 +742,42 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           toast(r.ok ? 'AI 审核链路可用' : '诊断完成，请查看下方明细', r.ok ? 'ok' : 'err');
         } catch (e) { box.textContent = '诊断失败：' + ((e as any).message || e); }
       };
-  
+
+      /* AI 批量审核：手动立即处理全部待审域名 / 查看队列状态。
+         与整点 cron、新申请触发共用同一套后端批处理，靠领取锁互斥。 */
+      const aiBatchHint = document.getElementById('aiBatchHint');
+      const showBatchStatus = async () => {
+        if (!aiBatchHint) return;
+        try {
+          const s = await api.get('/api/admin/ai-review-status');
+          const last = s.lastResult;
+          const base = `待审 ${s.pendingTotal} 个 · AI 名单内 ${s.aiCovered} 个 · 名单外人工 ${s.manualOnly} 个 · 超限转人工 ${s.exhausted} 个`;
+          aiBatchHint.textContent = base + (last
+            ? ` ｜ 上次运行：${last.reason || '已完成'}（${(Number(last.elapsedMs || 0) / 1000).toFixed(1)}s）`
+            : ' ｜ 尚未运行过');
+        } catch (e) { aiBatchHint.textContent = '队列状态读取失败'; }
+      };
+      showBatchStatus();
+      const runAiBatch = async (reset: boolean) => {
+        if (aiBatchHint) aiBatchHint.textContent = reset ? '正在清零并重新审核…' : '正在审核所有待审域名…';
+        try {
+          const r = await api.post('/api/admin/ai-review-run', { reset: !!reset });
+          if (aiBatchHint) {
+            aiBatchHint.textContent = (r.reason || '已完成')
+              + `（耗时 ${(Number(r.elapsedMs || 0) / 1000).toFixed(1)}s）`
+              + (r.details && r.details.length ? ' · ' + r.details.slice(0, 2).join(' | ') : '');
+          }
+          toast(r.scanned
+            ? `AI 批量审核完成：通过 ${r.approved} / 驳回 ${r.rejected} / 待重试 ${r.failed}`
+            : (r.reason || '没有待审域名'), r.noConfig ? 'err' : 'ok');
+          showBatchStatus();
+        } catch (e) { if (aiBatchHint) aiBatchHint.textContent = '批量审核失败：' + ((e as any).message || e); }
+      };
+      const aiBatchBtn = document.getElementById('aiBatchBtn');
+      if (aiBatchBtn) aiBatchBtn.onclick = () => runAiBatch(false);
+      const aiBatchResetBtn = document.getElementById('aiBatchResetBtn');
+      if (aiBatchResetBtn) aiBatchResetBtn.onclick = () => runAiBatch(true);
+
       // 有效期规则
       {
         const ex = d.expiry || {};

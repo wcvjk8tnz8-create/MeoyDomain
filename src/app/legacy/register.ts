@@ -268,9 +268,13 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       localStorage.setItem('meoy_agree_use', '1');
       var r = await api.post('/api/subdomains', { label: label, note: note, root: currentRoot() });
       const rejected = r.status === 'rejected';
-      var pendingMsg = r.aiSkipText
-        ? '已提交，等待管理员审核（AI 未自动审核：' + r.aiSkipText + '）'
-        : '已提交，等待管理员审核';
+      // 有新申请时后端会立即排队审核「所有」待审域名；同步判定失败的这一条
+      // 很可能在后台几秒内被重新判定，别再写成「等待管理员审核」。
+      var pendingMsg = r.aiQueued
+        ? '已提交，AI 正在后台自动审核所有待审域名，稍后会自动开通或驳回'
+        : r.aiSkipText
+          ? '已提交，等待管理员审核（AI 未自动审核：' + r.aiSkipText + '）'
+          : '已提交，等待管理员审核';
       // 别把「免审核直接开通」说成「审核通过」：AI 可能压根没调用。
       // 真跑模型会有一次网关往返 + 推理（约 1–5 秒），耗时字段可验证。
       var approvedMsg = r.aiReviewed
@@ -296,12 +300,14 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       }
       document.getElementById('label').value = '';
       document.getElementById('note').value = '';
-      document.getElementById('checkTip').innerHTML = (r.status === 'pending' && r.aiSkipText)
-        ? '<span style="color:var(--warn)">AI 未自动审核：' + esc(r.aiSkipText)
-          + (r.aiAttempts && r.aiAttempts.length
-            ? '<br><span class="mono" style="font-size:12px">' + esc(r.aiAttempts.join(' | ').slice(0, 300)) + '</span>' : '')
-          + '</span>'
-        : '';
+      document.getElementById('checkTip').innerHTML = (r.status === 'pending' && r.aiQueued)
+        ? '<span style="color:var(--ok)">已加入 AI 自动审核队列，后台会处理全部待审域名；稍后刷新「我的域名」查看结果。</span>'
+        : (r.status === 'pending' && r.aiSkipText)
+          ? '<span style="color:var(--warn)">AI 未自动审核：' + esc(r.aiSkipText)
+            + (r.aiAttempts && r.aiAttempts.length
+              ? '<br><span class="mono" style="font-size:12px">' + esc(r.aiAttempts.join(' | ').slice(0, 300)) + '</span>' : '')
+            + '</span>'
+          : '';
       document.getElementById('costBox').style.display = 'none';
       loadPending();
       // 新版四步向导存在时停在第四步展示结果；没有时才沿用旧的自动跳转
