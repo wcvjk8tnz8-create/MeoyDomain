@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { ok, fail, now, clientIp } from '../lib/util.js';
+import { langOf } from '../lib/i18nServer.js';
 import { VERIFY_PRESETS, RECORD_TYPES } from '../lib/records.js';
 
 const app = new Hono();
@@ -8,7 +9,15 @@ const app = new Hono();
 
 const TERMS_VERSION = '2026-10-31';
 
-const SECTIONS = [
+type Section = {
+  id: string;
+  title: string;
+  blocks: string[];
+  list?: string[];
+  note?: string;
+};
+
+const SECTIONS_ZH: Section[] = [
   {
     id: 'terms',
     title: '一、服务条款',
@@ -85,9 +94,87 @@ const SECTIONS = [
   },
 ];
 
+/** 完整英文版：结构与中文版一一对应，英文模式下整页输出，不留中文段落 */
+const SECTIONS_EN: Section[] = [
+  {
+    id: 'terms',
+    title: '1. Terms of Service',
+    blocks: [
+      'This service is provided free of charge by the site operator ("we"). We allocate subdomains under our root domains and let you manage their DNS records.',
+      'By registering you confirm that you have read, understood and accepted these terms in full. If you disagree, stop using the service immediately.',
+      'We only provide subdomain allocation and DNS management. You are solely responsible for all content, services and conduct made available through your subdomain.',
+      'We may suspend or terminate the service without prior notice if you breach these terms, if required by a competent authority, following a complaint or abuse report, where the service or third parties are put at risk, or after prolonged inactivity.',
+    ],
+  },
+  {
+    id: 'abuse',
+    title: '2. Prohibited abuse (important)',
+    blocks: [
+      'The following uses of a subdomain are strictly prohibited. Any violation results in an immediate account ban and deletion of all subdomains and DNS records, without further notice:',
+    ],
+    list: [
+      'Phishing, fraud, impersonating another website or brand, and any form of online scam',
+      'Distributing trojans, viruses, ransomware or other malware, or operating C2 / botnet control servers',
+      'Bulk phishing or spam email, or forging SPF / DKIM / DMARC records to spoof senders',
+      'Hosting or redirecting to pornographic, gambling, drug-related, violent, terrorist or content harmful to minors, or other unlawful material',
+      'Infringing intellectual property, privacy or reputation rights, doxxing, or harassment',
+      'Bypassing paywalls, account theft, credential stuffing, scanning or brute-force attacks, and any other unauthorised access',
+      'Evading third-party bans (domain rotation, redirect or landing pages used to bypass risk controls)',
+      'Any other activity that violates the laws of the People\'s Republic of China or of your own jurisdiction',
+    ],
+    note: 'We may decide whether conduct constitutes abuse based on complaints, threat intelligence, automated detection or manual review. Our determination is final.',
+  },
+  {
+    id: 'accounts',
+    title: '3. Account rules',
+    blocks: [
+      'Registration is limited to approved email providers (currently Gmail and QQ Mail).',
+      'A maximum of 2 accounts may be registered per IP address. Accounts created beyond this limit may all be banned without notice.',
+      'Bulk registration, scripted sign-ups, and using proxies or anonymity networks to bypass the IP limit are prohibited.',
+      'Accounts are personal: they may not be transferred, lent or sold. Subdomains under one account may not be shared with others for prohibited purposes.',
+      'Keep your password safe. You are responsible for any consequences of a leaked password or of sharing your account.',
+    ],
+  },
+  {
+    id: 'disclaimer',
+    title: '4. Disclaimer',
+    blocks: [
+      'The service is provided "as is", without any express or implied warranty, including but not limited to availability, stability, security, fitness for a particular purpose and non-infringement.',
+      'We do not guarantee uninterrupted service. We are not liable for outages or data loss caused by Cloudflare or upstream provider failures, network attacks, force majeure, maintenance or upgrades.',
+      'We are not responsible for content published through your subdomain, nor for disputes between users.',
+      'We are not liable for any direct or indirect loss (including but not limited to lost profit, data loss or business interruption) arising from use of, or inability to use, the service.',
+      'We may modify, suspend or terminate all or part of the service at any time, without liability to you or to any third party.',
+      'If your conduct causes complaints, penalties or losses to us, you shall fully compensate us for all such losses.',
+    ],
+    list: [
+      'Domain validity: newly approved domains are valid for one year (the exact number of days follows site settings) and may be renewed within 180 days before expiry; domains registered before the migration remain permanent and are not retroactively given an expiry date.',
+      'Expired domains are disabled and their records released. We will try to send a reminder, but you are responsible for tracking expiry; we are not liable for outages or losses caused by late renewal.',
+      'An account may have only one pending application at a time. If several are submitted within a short period by any means, we will approve only one and automatically reject the rest.',
+      'Renewal, release and DNS record changes cannot be undone once executed. You are responsible for outages caused by mistaken operations.',
+    ],
+  },
+  {
+    id: 'privacy',
+    title: '5. Data & enforcement',
+    blocks: [
+      'We collect only your registration email, password hash, registration IP and User-Agent, for account security and abuse tracing. We do not sell or share this data with third parties.',
+      'We may lawfully disclose the above information to cooperate with investigations by competent authorities or to respond to security incidents.',
+      'Enforcement measures include warnings, limiting record creation, disabling subdomains, banning accounts, banning IPs and clearing DNS records; these may be combined.',
+      'If you disagree with a ban, you may appeal using the contact details published on the site. Whether access is restored is at our discretion.',
+    ],
+  },
+  {
+    id: 'changes',
+    title: '6. Changes to these terms',
+    blocks: [
+      `These terms may be revised at any time and updated on this page (current version ${TERMS_VERSION}). Continued use after a revision constitutes acceptance. Please check this page periodically.`,
+    ],
+  },
+];
+
 /** 渲染为易读的 HTML（供 /terms.html 内嵌 fallback 使用） */
-export function termsHtml() {
-  return SECTIONS.map((s) => {
+export function termsHtml(sections: Section[] = SECTIONS_ZH) {
+  return sections.map((s) => {
     let h = `<h3 id="${s.id}">${s.title}</h3>`;
     s.blocks.forEach((b) => (h += `<p>${b}</p>`));
     if (s.list) h += `<ul>${s.list.map((li) => `<li>${li}</li>`).join('')}</ul>`;
@@ -96,8 +183,13 @@ export function termsHtml() {
   }).join('');
 }
 
-// 服务条款（结构化，前端渲染用）
-app.get('/terms', (c) => ok(c, { version: TERMS_VERSION, sections: SECTIONS, html: termsHtml() }));
+// 服务条款（结构化，前端渲染用）。英文模式直接返回完整英文版，
+// 不依赖逐句词典命中，避免长段落残留中文。
+app.get('/terms', (c) => {
+  const en = langOf(c) === 'en';
+  const sections = en ? SECTIONS_EN : SECTIONS_ZH;
+  return ok(c, { version: TERMS_VERSION, lang: en ? 'en' : 'zh', sections, html: termsHtml(sections) });
+});
 
 // 规则摘要（登录页展示）
 app.get('/rules', async (c) => {

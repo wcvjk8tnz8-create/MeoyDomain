@@ -479,6 +479,28 @@ const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
 
 const LONG_KEYS = Object.keys(DICT).sort((a, b) => b.length - a.length);
 
+/** 单句翻译：全命中才返回英文，否则返回 null（绝不产出中英夹生）。 */
+function translateClause(t: string): string | null {
+  if (!t || !/[\u4e00-\u9fa5]/.test(t)) return t;
+  if (DICT[t]) return DICT[t];
+  if (FULL_SENTENCES[t]) return FULL_SENTENCES[t];
+  for (const [re, fn] of PATTERNS) {
+    const m = t.match(re);
+    if (m) return fn(m);
+  }
+  // 邮箱 / URL / 纯域名 / 用户输入：不碰
+  if (/@|https?:\/\/|www\./i.test(t) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(t)) return t;
+
+  let out = t;
+  for (const k of LONG_KEYS) {
+    if (out.includes(k)) out = out.split(k).join(DICT[k]);
+  }
+  /* 只翻了半句就停手会产出「Sign up入口…ViewPoints消耗…Submit request」
+     这种夹生话。完整句子的译文一律走 DICT 整句词条 / PATTERNS 句式。 */
+  if (/[\u4e00-\u9fa5]/.test(out)) return null;
+  return out;
+}
+
 /** 纯函数：把一段中文翻成英文。可单独单测，不依赖 DOM。 */
 export function translateText(raw: string, to: Lang = currentLang()): string {
   if (to === 'zh') return raw;
@@ -487,25 +509,23 @@ export function translateText(raw: string, to: Lang = currentLang()): string {
   const t = raw.trim();
   if (!t || !/[\u4e00-\u9fa5]/.test(t)) return raw;
 
-  if (DICT[t]) return lead + DICT[t] + trail;
-  if (FULL_SENTENCES[t]) return lead + FULL_SENTENCES[t] + trail;
-  for (const [re, fn] of PATTERNS) {
-    const m = t.match(re);
-    if (m) return lead + fn(m) + trail;
-  }
-  // 邮箱 / URL / 纯域名 / 用户输入：不碰
-  if (/@|https?:\/\/|www\./i.test(t) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(t)) return raw;
+  const one = translateClause(t);
+  if (one !== null) return lead + one + trail;
 
-  let out = t;
-  for (const k of LONG_KEYS) {
-    if (out.includes(k)) out = out.split(k).join(DICT[k]);
+  /* 长说明段落常常是「已译短句 + 标点 + 已译短句」拼出来的：
+     整句没命中词典时按中文标点切开，逐段独立翻译；
+     只有每一段都能翻成纯英文才拼回，否则整段保留中文。
+     既消灭残留中文，又不会出现半句中半句英。 */
+  const parts = t.split(/([，,。；;！!？?：:、（）()「」“”《》\s]+)/);
+  let acc = '';
+  for (const p of parts) {
+    if (!p) continue;
+    const seg = translateClause(p);
+    if (seg === null) return raw;
+    acc += seg;
   }
-  if (out === t) return raw;
-  /* 关键：只翻了半句就停手，会产出「Sign up入口…ViewPoints消耗…Submit request」
-     这种中英夹生。宁可整句保留中文，也不能把句子切碎拼贴。
-     完整句子的翻译一律走上面的 DICT 整句词条 / PATTERNS 句式。 */
-  if (/[\u4e00-\u9fa5]/.test(out)) return raw;
-  return lead + out + trail;
+  if (acc && !/[\u4e00-\u9fa5]/.test(acc)) return lead + acc + trail;
+  return raw;
 }
 
 /* ───────────────────────── 状态 ───────────────────────── */
@@ -603,13 +623,20 @@ function syncButtons(): void {
   });
 }
 
-/** 在三种顶栏（控制台 / 落地页 / 登录页）注入切换器，幂等 */
+/** 在各类顶栏注入切换器；全部找不到时给一个固定兜底，保证「每个页面都能切」。幂等 */
 export function mountLangSwitch(): void {
   const slots: Array<[string, 'append' | 'afterSearch']> = [
     ['.topbar-in', 'afterSearch'],
     ['.home-nav', 'append'],
     ['.site-links', 'append'],
+    ['.home-top-in', 'append'],
+    ['.site-nav', 'append'],
+    ['.login-top', 'append'],
+    ['.topbar', 'append'],
+    ['header', 'append'],
   ];
+  const fallback = document.querySelector('.lang-switch[data-lang-fallback]');
+  let inserted = false;
   for (const [sel, mode] of slots) {
     const host = document.querySelector(sel);
     if (!host || host.querySelector('.lang-switch')) continue;
@@ -621,6 +648,20 @@ export function mountLangSwitch(): void {
       if (anchor && anchor.nextSibling) host.insertBefore(sw, anchor.nextSibling);
       else host.insertBefore(sw, host.firstChild);
     } else host.appendChild(sw);
+    inserted = true;
+  }
+  // 真顶栏出现后撤掉临时兜底，避免两个切换器
+  if (inserted && fallback) fallback.remove();
+  // 无顶栏页面（公开页 / 弹窗型页面）：右上角固定一个极简胶囊
+  if (!document.querySelector('.lang-switch')) {
+    const host = document.querySelector('main') || document.body;
+    const wrap = document.createElement('span');
+    wrap.innerHTML = swHtml();
+    const sw = wrap.firstElementChild as HTMLElement;
+    sw.setAttribute('data-lang-fallback', '1');
+    sw.style.cssText = 'position:fixed;right:14px;top:14px;z-index:9999;background:rgba(255,255,255,.92);' +
+      'border:1px solid rgba(0,0,0,.12);border-radius:99px;padding:3px 7px;box-shadow:0 4px 18px rgba(0,0,0,.12)';
+    (host as HTMLElement).appendChild(sw);
   }
   syncButtons();
 }

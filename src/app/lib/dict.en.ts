@@ -599,4 +599,155 @@ export const EXTRA_DICT: Record<string, string> = {
   '已提交，AI 正在后台自动审核所有待审域名，稍后会自动开通或驳回':
     'Submitted — AI is reviewing all pending domains in the background and will approve or reject them shortly',
   '没有待审域名': 'No pending domains',
+
+  /* ── 全局英文补遗：后台设置 / 注册 / DNS / AI 审核 / 举报 ──
+     这些都是会整段显示的说明文案，优先整句精确命中；
+     短标签则供「分句整译」在长文本里逐段消费，避免残留中文。 */
+  '输入前缀后自动检查是否可用，仅支持字母、数字与连字符':
+    'Availability is checked as you type the prefix. Letters, digits and hyphens only.',
+  '同一时间只能申请一个域名，请等待审核结果（或被驳回）后再提交':
+    'Only one pending application is allowed at a time. Wait for the review result (or a rejection) before submitting again.',
+  '已注册的域名、DNS 记录与续期不受影响':
+    'Existing domains, DNS records and renewals are not affected.',
+  '当前账号没有管理员权限': 'This account does not have admin permission',
+  '外部查询结果缓存 6 小时，避免触发上游限流':
+    'External lookup results are cached for 6 hours to avoid upstream rate limits.',
+  '提交举报即表示你确认所填信息真实，恶意虚假举报会被限制':
+    'By submitting you confirm the information is accurate. Deliberately false reports will be restricted.',
+  '每个端点独立超时，成功的地址会被记住后续复用。诊断会列出网关返回的真实模型清单':
+    'Each endpoint has its own timeout; a working address is remembered and reused. Diagnostics list the real model IDs returned by the gateway.',
+  '启用自动审核（仅对下方根域名生效；通过后无需管理员同意':
+    'Enable automatic review (applies only to the root domains below; approval needs no admin action',
+  '每小时整点自动审核；有新申请时也会立即审核全部待审域名':
+    'Reviews run automatically every hour on the hour; a new application also triggers an immediate review of all pending domains.',
+  '判定。AI 未配置、超时或返回异常时，申请自动回落为人工审核':
+    'If AI is not configured, times out or returns an error, the application falls back to manual review.',
+  '重试全部（清零失败计数': 'Retry all (reset failure counters',
+  '重试全部': 'Retry all',
+  '查询外部域名并识别到托管平台时，结果下方会展示「滥用与违规举报通道」区块':
+    'When an external domain is looked up and its host is identified, an abuse reporting section appears below the result.',
+  '本人与管理员始终可见完整地址，不受此项影响':
+    'You and admins always see the full address; this setting does not affect that.',
+  '发件人需先在服务商处完成域名验证（SPF / DKIM':
+    'The sender domain must first be verified with the provider (SPF / DKIM',
+  '未配置邮件服务时，忘记密码验证码功能不可用（会提示联系管理员':
+    'Without a mail provider, password reset codes are unavailable (users are told to contact an admin',
+  '强制直连：只 POST 填写地址本身（多数网关会 404':
+    'Force direct: POST only to the address you entered (most gateways return 404',
+  'Workers AI 使用 Cloudflare 内置模型，点「探测模型」可即时列出（无需联网、无需 Key':
+    'Workers AI uses Cloudflare built-in models; click "Detect models" to list them instantly (no network, no key',
+  'Workers AI 直接调用 Cloudflare 绑定，不读取 API Key':
+    'Workers AI calls the Cloudflare binding directly and does not read the API key.',
+  '自检直接调用 env.AI.run，无外部网络请求':
+    'The self-test calls env.AI.run directly with no external network request.',
+  '无需 API Key，直接调用 Cloudflare Workers AI':
+    'No API key needed — calls Cloudflare Workers AI directly.',
+  '可在上方输入框手动填写模型名，然后保存':
+    'You can also type a model ID in the field above and save it.',
+  '改选后点「保存」生效': 'Click "Save" after changing the selection.',
+  '已自动选择并保存': 'Selected and saved automatically',
+  '未配置 API Key（后台填一次，或用 Worker Secret AI_API_KEY':
+    'API key not configured (set it once in Admin, or use the Worker Secret AI_API_KEY',
+  '诊断中…（会真实请求网关，最多约 45 秒': 'Diagnosing… (real gateway requests, up to ~45s',
+  '创建子域名不会自动写入任何 DNS 记录，开通后到「DNS 记录」页按需添加':
+    'Creating a subdomain does not write any DNS records. Add the ones you need on the DNS Records page afterwards.',
+  '该域名不占用配额。修正后可释放它再重新申请':
+    'This domain does not use your quota. Release it after fixing the issue, then apply again.',
+  '移除这条被驳回的申请？移除后可以重新申请该名称':
+    'Remove this rejected application? You can apply for the same name again afterwards.',
+  '确定释放该子域名？其在 Cloudflare 上的所有 DNS 记录会一并删除':
+    'Release this subdomain? All its DNS records on Cloudflare will be deleted too.',
+  '管理员申请子域名不消耗积分': 'Admin-created subdomains do not consume points.',
+  '管理员申请即时开通，可占用保留域名且不限数量':
+    'Admin-created subdomains are activated immediately, may use reserved names, and have no quota.',
+  '新申请需管理员审核': 'New applications require admin review',
+  '管理员自建，免审核，已直接开通（AI 未调用':
+    'Created by an admin, activated immediately without review (AI was not called',
+  '封禁后该用户立即下线、无法登录，其全部子域名停用':
+    'A banned user is signed out immediately, cannot sign in, and all their subdomains are disabled.',
+  '确认封禁': 'Confirm ban',
+  '同时封禁该 IP（禁止再注册/登录': 'Also ban this IP (blocks further sign-ups / sign-ins',
+  '超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响':
+    'Accounts over the limit can all be banned at once on the "Same-IP accounts" page. Admin accounts are not affected.',
+  '删除该子域名并清空其 DNS 记录': 'Delete this subdomain and clear its DNS records',
+  '确定删除该帖及其回复': 'Delete this post and all its replies',
+  '确定删除该帖': 'Delete this post',
+  '删除这条回复': 'Delete this reply',
+  '当前为 MOCK 模式：DNS 记录只写入内存，不会真正调用 Cloudflare':
+    'MOCK mode: DNS records are kept in memory only; Cloudflare is not called.',
+  'DNS 记录按各根域名配置的后端实时同步（Cloudflare / Spaceship':
+    'DNS records sync live using the backend configured for each root domain (Cloudflare / Spaceship',
+  '每个根域名是否会触发 AI': 'Whether AI review is triggered for each root domain',
+  '候选模型逐项': 'Candidate models',
+  '当前模型': 'Current model',
+  '耗时': 'Elapsed',
+  '待重试': 'Retry pending',
+  '申请人未填写': 'Not provided by the applicant',
+  'AI 审核不可用': 'AI review unavailable',
+  '探测失败': 'Detection failed',
+  '测试失败': 'Test failed',
+  '诊断失败': 'Diagnostics failed',
+  '批量审核失败': 'Batch review failed',
+  '批量审核异常': 'Batch review error',
+  '检查失败': 'Check failed',
+  '读取失败': 'Could not read',
+  '加载失败': 'Failed to load',
+  'DNS 写入失败': 'Failed to write DNS record',
+  'DNS 删除失败': 'Failed to delete DNS record',
+  'DNSHE 请求失败': 'DNSHE request failed',
+  '连接异常（超时或网络不可达': 'Connection error (timeout or unreachable',
+  '登录成功。登录 IP': 'Signed in. Login IP',
+  '账号已被封禁': 'This account has been banned',
+  '当前账号': 'Current account',
+  '当前': 'Current',
+  '需要': 'Required',
+  '后台不可修改': 'Cannot be changed in Admin',
+  '即时生效': 'Takes effect immediately',
+  '配置': 'Configuration',
+  '来源': 'Source',
+  '顺序': 'Order',
+  '偏好': 'Preference',
+  '替换域名': 'Replace domain',
+  '浏览': 'Browse',
+  '驳回原因': 'Rejection reason',
+  '已移除（可恢复': 'Removed (restorable',
+  '无生效的根域名': 'No active root domains',
+  '当前根域名': 'Current root domain',
+  '未配置，头像走 /api/avatar': 'Not configured; avatars are served via /api/avatar',
+  '代理读取（桶无需公开': 'Read through the proxy (the bucket need not be public',
+  '配置并重新部署': 'Configure and redeploy',
+  '并重新部署': 'and redeploy',
+  '再推一次即可': 'Just push once more',
+  '留空保持原': 'Leave blank to keep the current',
+  '没有覆盖任何当前': 'does not cover any current',
+  '明天可再领': 'Claim again tomorrow',
+  '请稍后再试': 'Please try again later',
+  '积分明细': 'Points history',
+  '新密码（至少 8 位': 'New password (at least 8 characters',
+  '域名列表加载失败': 'Could not load the domain list',
+  'NS 服务器': 'NS server',
+  '起始授权记录（区域主 NS、管理员邮箱、序列号等':
+    'Start of authority (primary NS, admin mailbox, serial number, etc.',
+  '服务记录，指定某服务的主机名与端口（SIP、XMPP 等':
+    'Service record: hostname and port for a service (SIP, XMPP, etc.',
+  '∞ 不限': '∞ Unlimited',
+  '分兑换': 'points to redeem',
+  '页 · 共': 'Page · Total',
+  '个 · AI 名单内': '· in AI scope',
+  '个 · 名单外人工': '· manual review (out of scope)',
+  '个 · 超限转人工': '· over limit, manual review',
+  '条 · 第': 'records · Page',
+  '已封': 'Banned',
+  '置顶': 'Pinned',
+  '已添加': 'Added',
+  '正常': 'Normal',
+  '账号下没有域名': 'No domains in this account',
+  '图片不能超过': 'Image must be smaller than',
+  '服务条款与免责声明': 'Terms of Service & Disclaimer',
+  '发现违规域名？': 'Found a domain in violation?',
+  '返回': 'Back',
+  '返回控制台': 'Back to console',
+  '返回登录': 'Back to sign in',
+  '版本': 'Version',
+  '注册即视为同意本条款': 'By registering you accept these terms',
 };

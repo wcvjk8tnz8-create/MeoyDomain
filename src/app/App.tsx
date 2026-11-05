@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useLayoutEffect, useState, type JSX } from 'react';
 import { navigate } from './lib/runtime';
 import { startI18n } from './lib/i18n';
 import LoginPage from './pages/Login';
@@ -109,9 +109,10 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     mountPageVisuals(key);
-    // 语言切换器与翻译在每次切页后补挂（内部幂等）
+    // 语言切换器与翻译在每次切页后补挂（内部幂等）。
+    // 用 layout effect 而非 effect：绘制前就完成首次翻译，英文模式不会先闪一帧中文。
     try { startI18n(); } catch { /* 不影响页面功能 */ }
   }, [key]);
 

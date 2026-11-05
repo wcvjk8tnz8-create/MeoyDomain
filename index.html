@@ -20,7 +20,8 @@
     /* 语言预置：同步设置 lang / data-lang，供 CSS 与辅助技术使用 */
     (function(){try{var v=localStorage.getItem('terradata_lang')==='en'?'en':'zh';
     document.documentElement.setAttribute('lang',v==='en'?'en':'zh-CN');
-    document.documentElement.setAttribute('data-lang',v);}catch(e){}})();
+    document.documentElement.setAttribute('data-lang',v);
+    if(v==='en')document.title='TerraDomain · Free Subdomains';}catch(e){}})();
   </script>
 </head>
 <body>

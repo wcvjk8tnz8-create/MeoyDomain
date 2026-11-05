@@ -3,197 +3,261 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f7f9fc">
+<meta name="theme-color" content="#fbfaf7">
 <title>meoy.top · TerraDomain</title>
-<meta name="description" content="meoy.top — TerraDomain Public Domain Registration Service">
+<meta name="description" content="meoy.top — TerraDomain public subdomain service">
 <style>
 :root{
-  --bg1:#eafaf1;--bg2:#eaf1ff;--bg:#f7f9fc;--card:#fff;--ink:#101827;--body:#1e293b;
-  --muted:#94a3b8;--line:#e8edf3;--green:#2e9e6b;--greenText:#16a34a;--greenLine:#bfe6cf;
-  --blue:#2563eb;--red:#dc4a4a;--row:#fff;--rowLine:#f4e3e6;--abuse1:#fff6f7;--abuse2:#fff9fb;
-  --abuseLine:#f2d4d8;--notice:#c9454a;--shadow:0 24px 70px rgba(24,42,70,.08);
+  --paper:#fbfaf7;--paper2:#f4f2ec;--card:#fff;--ink:#16191c;--body:#40474f;
+  --muted:#8a8f96;--line:#e4e1d9;--line2:#d8d4ca;--acc:#2e7d5b;--accSoft:#eaf4ee;
+  --blue:#1f6feb;--red:#b8484e;--radius:14px;
+  --serif:"Noto Serif CJK SC","Songti SC","STSong",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
 }
 @media(prefers-color-scheme:dark){
-  :root{--bg1:#0e1a16;--bg2:#0e1524;--bg:#0c1119;--card:#161b23;--ink:#eef3f8;--body:#ccd6e2;
-  --muted:#7f8b9c;--line:#293340;--green:#2e9e6b;--greenText:#4ade94;--greenLine:#25543d;
-  --blue:#7aa8ff;--red:#ff8b8b;--row:#1c232c;--rowLine:#333c48;--abuse1:#241a1e;--abuse2:#1e181c;
-  --abuseLine:#4a2c33;--notice:#ffadad;--shadow:0 24px 70px rgba(0,0,0,.35)}
+  :root{--paper:#101315;--paper2:#171b1e;--card:#171b1e;--ink:#f2f0e9;--body:#c8cdd2;
+    --muted:#858d94;--line:#2b3134;--line2:#3a4246;--acc:#7fd0b4;--accSoft:#182a24;
+    --blue:#8ab4ff;--red:#f3979b}
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{
-  min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;
-  padding:calc(28px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
-  background:radial-gradient(1100px 620px at 0% 0%,var(--bg1),transparent 62%),radial-gradient(1000px 700px at 100% 100%,var(--bg2),transparent 62%),var(--bg);
-  color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  -webkit-font-smoothing:antialiased;
+  height:100dvh;overflow:hidden;color:var(--ink);background:var(--paper);
+  font-family:var(--sans);-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(900px 560px at 12% -10%,var(--accSoft),transparent 66%),
+                   radial-gradient(760px 520px at 100% 110%,var(--paper2),transparent 70%);
 }
 a{color:inherit;text-decoration:none}
-.card{width:100%;max-width:1060px;background:var(--card);border-radius:28px;box-shadow:var(--shadow);padding:26px 56px 38px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:6px 0 20px;border-bottom:1px solid var(--line)}
-.brand{font-size:29px;font-weight:900;letter-spacing:-.025em;background:linear-gradient(100deg,#2b86d6,#2fa46c);-webkit-background-clip:text;background-clip:text;color:transparent}
-.lang{display:flex;gap:2px;background:var(--bg);border-radius:999px;padding:4px;flex-shrink:0}
-.lang button{font:inherit;font-size:14px;font-weight:700;color:var(--muted);padding:8px 16px;border-radius:999px;transition:.2s}
-.lang button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 5px rgba(20,35,60,.12)}
-.center{text-align:center}
-.badge{display:inline-flex;align-items:center;gap:8px;margin-top:36px;padding:8px 20px;border:1px solid var(--greenLine);border-radius:999px;background:var(--card);font-size:17px;font-weight:700;box-shadow:0 2px 8px rgba(46,158,107,.07)}
-.badge b{color:var(--greenText)}
-h1{font-size:clamp(30px,4.2vw,46px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:22px 0 28px}
-.body{margin:0 auto 34px;max-width:920px}
-.body p{font-size:clamp(16px,1.6vw,20px);font-weight:600;line-height:1.62;color:var(--body);margin-bottom:16px}
-.body p:last-child{margin-bottom:0}
-.body a{font-weight:800;text-decoration:underline;text-underline-offset:3px;color:var(--ink)}
-.body a:hover{color:var(--green)}
-.abuse{background:linear-gradient(135deg,var(--abuse1),var(--abuse2));border:1px solid var(--abuseLine);border-radius:20px;padding:22px 24px}
-.abuse h2{display:flex;align-items:center;gap:10px;color:var(--red);font-size:21px;font-weight:800;margin-bottom:16px}
-.abuse h2 span[aria-hidden]{white-space:nowrap;flex-shrink:0}
-.row{display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--row);border:1px solid var(--rowLine);border-radius:14px;padding:14px 20px;margin-bottom:12px;font-size:17px;font-weight:700}
-.row>span{white-space:nowrap}
-.row a{font-weight:800;white-space:nowrap}
-.row a.red{color:var(--red)}
-.row a.blue{color:var(--blue)}
-.row a:hover{text-decoration:underline;text-underline-offset:3px}
-.notice{margin-top:18px;padding-top:16px;border-top:1px dashed var(--abuseLine);color:var(--notice);font-size:15px;font-weight:600;line-height:1.75}
-.notice b{font-weight:800}
-.cta{display:flex;gap:16px;margin-top:30px}
-.btn{flex:1;display:block;text-align:center;padding:16px 22px;border-radius:14px;font-size:17px;font-weight:800;transition:transform .2s,box-shadow .2s,border-color .2s}
-.btn:hover{transform:translateY(-2px)}
-.btn.primary{background:var(--green);color:#fff;box-shadow:0 6px 16px rgba(46,158,107,.25)}
-.btn.primary:hover{box-shadow:0 10px 22px rgba(46,158,107,.34)}
-.btn.ghost{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
-.btn.ghost:hover{border-color:var(--green);color:var(--green)}
-footer{text-align:center;color:var(--muted);font-size:13px;margin-top:30px}
-.rise{animation:rise .65s cubic-bezier(.2,.7,.3,1) both;animation-delay:var(--d,0s)}
-@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@media(max-width:700px){
-  .card{padding:20px 22px 30px;border-radius:22px}
-  .top{flex-wrap:wrap;gap:10px}.lang{margin-left:auto}
-  .brand{font-size:22px}.lang button{font-size:12px;padding:7px 11px}
-  .badge{margin-top:26px;font-size:14px;padding:7px 16px}
-  h1{font-size:30px;margin:18px 0 22px}
-  .body p{font-size:16px;line-height:1.7}
-  .abuse{padding:18px 16px}.abuse h2{font-size:18px}
-  .row{font-size:14px;padding:12px 14px;flex-wrap:wrap;gap:8px}.row a{margin-left:auto}
-  .cta{flex-direction:column;gap:12px}.btn{font-size:16px}
+.stage{
+  height:100%;display:flex;flex-direction:column;
+  padding:calc(20px + env(safe-area-inset-top)) calc(clamp(20px,5vw,72px) + env(safe-area-inset-right))
+          calc(16px + env(safe-area-inset-bottom)) calc(clamp(20px,5vw,72px) + env(safe-area-inset-left));
 }
-@media(max-aspect-ratio:9/19) and (max-width:520px){.badge{margin-top:20px}h1{margin-bottom:18px}.body{margin-bottom:26px}}
-@media(max-height:460px) and (orientation:landscape){body{align-items:flex-start}.card{padding-top:16px}.badge{margin-top:18px}h1{margin:14px 0 16px}}
-@media(prefers-reduced-motion:reduce){.rise{animation:none}.btn{transition:none}}
+/* ── 顶栏 ── */
+.head{display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--line);padding-bottom:14px;flex-shrink:0}
+.brand{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:-.035em;white-space:nowrap}
+.brand i{display:inline-block;width:9px;height:9px;margin-right:10px;border-radius:2px;background:var(--acc);transform:rotate(45deg)}
+.nav{display:flex;gap:24px;margin-left:auto;font-size:13.5px;font-weight:600;color:var(--body)}
+.nav a:hover{color:var(--acc)}
+.lang{display:flex;gap:2px;border:1px solid var(--line2);border-radius:99px;padding:3px;flex-shrink:0}
+.lang button{font:inherit;font-size:12.5px;font-weight:700;color:var(--muted);padding:6px 13px;border-radius:99px;cursor:pointer;background:none;border:0}
+.lang button.on{background:var(--ink);color:var(--paper)}
+/* ── 主体：单屏居中，不上下滑 ── */
+.hero{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.28em;color:var(--acc);text-transform:uppercase}
+h1{font-family:var(--serif);font-size:clamp(38px,5.4vw,76px);font-weight:700;letter-spacing:-.055em;line-height:1.14;margin:18px 0 0}
+h1 em{font-style:italic;color:var(--acc)}
+.sub{margin-top:16px;font-size:clamp(14px,1.4vw,18px);line-height:1.7;color:var(--body);max-width:660px}
+/* ── 域名查询框（DNSHE 式核心） ── */
+.checker{
+  width:min(100%,860px);margin-top:clamp(24px,3.4vh,40px);display:flex;align-items:stretch;
+  background:var(--card);border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden;
+  box-shadow:0 14px 44px rgba(24,38,30,.06);
+}
+.checker .field{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 22px}
+.field label{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--muted);white-space:nowrap}
+.field input{flex:1;min-width:0;height:64px;border:0;outline:0;background:transparent;font:600 19px/1 var(--mono);color:var(--ink)}
+.field input::placeholder{color:var(--muted);font-weight:400}
+.suffix{position:relative;flex-shrink:0;border-left:1px solid var(--line);display:flex;align-items:center}
+.suffix select{appearance:none;border:0;outline:0;background:transparent;color:var(--acc);font:700 17px/1 var(--mono);padding:0 38px 0 22px;height:64px;cursor:pointer}
+.suffix:after{content:"▾";position:absolute;right:16px;color:var(--muted);font-size:13px;pointer-events:none}
+.checker button.check{
+  flex-shrink:0;border:0;cursor:pointer;background:var(--ink);color:var(--paper);
+  padding:0 clamp(20px,3vw,42px);font:700 16px/1 var(--sans);letter-spacing:.01em;
+}
+.checker button.check:hover{background:var(--acc)}
+/* ── 状态条 ── */
+.status{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:18px;font-size:13px;color:var(--muted)}
+.pill{border:1px solid var(--line2);border-radius:99px;padding:6px 15px;font-weight:600}
+.pill b{color:var(--acc);font-family:var(--mono)}
+.pill.live{color:var(--acc);border-color:var(--acc)}
+.pill .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);margin-right:8px}
+/* ── 细线指标 ── */
+.metrics{width:min(100%,860px);margin-top:clamp(22px,3.2vh,40px);display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.metric{padding:clamp(12px,2vh,20px) 14px;text-align:left;border-right:1px solid var(--line)}
+.metric:last-child{border-right:0}
+.metric small{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--muted)}
+.metric b{display:block;font-family:var(--serif);font-size:clamp(17px,1.9vw,23px);font-weight:700;margin-top:6px;letter-spacing:-.02em}
+/* ── 合规声明 ── */
+.legal{width:min(100%,860px);margin-top:clamp(14px,2.2vh,26px);font-size:12.5px;line-height:1.75;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px}
+.legal a{border-bottom:1px solid var(--line2);color:var(--body);font-weight:600}
+.legal a:hover{color:var(--acc);border-color:var(--acc)}
+/* ── 页脚 ── */
+.foot{flex-shrink:0;border-top:1px solid var(--line);padding-top:12px;display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--muted)}
+.foot a:hover{color:var(--acc)}
+/* ── 入场 ── */
+.rise{animation:rise .7s cubic-bezier(.2,.7,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* ── 紧凑屏：压缩间距，仍然一屏 ── */
+@media(max-height:760px){
+  h1{margin-top:10px;font-size:clamp(32px,4.4vw,58px)}
+  .sub{margin-top:10px}
+  .checker{margin-top:20px}.field input,.suffix select{height:54px}
+  .metrics{margin-top:18px}.metric{padding:10px 14px}
+  .legal{margin-top:12px}
+}
+@media(max-height:560px) and (orientation:landscape){
+  .stage{padding-top:10px;padding-bottom:8px}
+  .head{padding-bottom:8px}.brand{font-size:20px}.nav{font-size:12px;gap:14px}
+  h1{font-size:34px;margin-top:6px}.sub{margin-top:6px;font-size:13px}
+  .checker{margin-top:12px}.field input,.suffix select{height:44px}
+  .status{margin-top:10px}.metrics{margin-top:12px}.metric{padding:7px 12px}
+  .legal{margin-top:8px;font-size:11px}.foot{padding-top:7px}
+}
+@media(max-width:640px){
+  .nav{display:none}.brand{font-size:21px}
+  .checker{flex-wrap:wrap}.checker .field{width:100%;flex:1 1 100%;border-bottom:1px solid var(--line)}
+  .field input{height:52px}.suffix{flex:1}.suffix select{height:50px;width:100%}
+  .checker button.check{height:50px;padding:0 22px}
+  .metrics{grid-template-columns:repeat(3,1fr)}.metric{text-align:center;padding:10px 5px}
+  .metric b{font-size:14px}.metric small{font-size:9px;letter-spacing:.08em}
+  .legal{font-size:11px}.foot{font-size:10px}
+}
+/* 极矮屏才允许局部滚动，避免内容被切 */
+@media(max-height:430px){body{overflow:auto}.stage{min-height:100dvh;height:auto}}
+@media(max-aspect-ratio:9/19) and (max-width:520px){h1{font-size:clamp(32px,9vw,44px)}}
+@media(prefers-reduced-motion:reduce){.rise{animation:none}}
 </style>
 </head>
 <body>
-<main class="card">
-  <header class="top rise" style="--d:.02s">
-    <a class="brand" id="brandLink" href="#">TerraDomain</a>
+<div class="stage">
+  <header class="head rise" style="--d:.02s">
+    <a class="brand" id="brandLink" href="#"><i></i>TerraDomain</a>
+    <nav class="nav">
+      <a data-go="/whois" data-i18n="navWhois">WHOIS Lookup</a>
+      <a data-go="/terms" data-i18n="navTos">Terms of Service</a>
+      <a data-go="/report" data-i18n="navReport">Report Abuse</a>
+      <a data-go="/dashboard" data-i18n="navConsole">Console</a>
+    </nav>
     <div class="lang" role="group" aria-label="Language">
-      <button type="button" data-lang="en" class="on">English</button>
-      <button type="button" data-lang="zh">简体中文</button>
+      <button type="button" data-lang="en" class="on">EN</button>
+      <button type="button" data-lang="zh">中</button>
     </div>
   </header>
 
-  <div class="center rise" style="--d:.08s">
-    <div class="badge"><span data-i18n="badgeLabel">Current Public Domain:</span> <b>meoy.top</b></div>
-    <h1 data-i18n="title">Public Domain Registration Service</h1>
-  </div>
+  <main class="hero">
+    <div class="eyebrow rise" style="--d:.06s" data-i18n="eyebrow">FREE PUBLIC SUBDOMAIN · GLOBAL ANYCAST</div>
+    <h1 class="rise" style="--d:.1s"><span data-i18n="h1a">A domain</span> <em data-i18n="h1b">to begin with</em></h1>
+    <p class="sub rise" style="--d:.14s" data-i18n="sub">Check a prefix, pick a root domain, and put your service online in minutes — free of charge.</p>
 
-  <div class="body rise" style="--d:.14s">
-    <p data-i18n-html="p1">This root domain is managed by the <a href="#">TerraDomain Free Subdomain Service Platform</a>.</p>
-    <p data-i18n="p2">Users are permitted to register and operate independent subdomains under the hosting namespace provided by TerraDomain.</p>
-    <p data-i18n="p3">TerraDomain solely provides DNS resolution and basic technical hosting services.</p>
-    <p data-i18n="p4">The content, purpose, and operations of each subdomain are the exclusive responsibility of its respective owner. TerraDomain assumes no legal liability for user-generated content.</p>
-  </div>
+    <form class="checker rise" style="--d:.18s" id="checker">
+      <div class="field">
+        <label for="prefix">PREFIX</label>
+        <input id="prefix" type="text" maxlength="63" autocomplete="off" spellcheck="false" placeholder="your-name" data-i18n-ph="prefixPh">
+      </div>
+      <div class="suffix">
+        <select id="root" aria-label="Root domain">
+          <option value="meoy.top">.meoy.top</option>
+          <option value="v-1.top">.v-1.top</option>
+        </select>
+      </div>
+      <button class="check" type="submit" data-i18n="checkBtn">Check availability →</button>
+    </form>
 
-  <section class="abuse rise" style="--d:.2s">
-    <h2><span aria-hidden="true">⚠️ 🚨</span><span data-i18n="abuseTitle">Abuse &amp; Compliance Report</span></h2>
-    <div class="row"><span data-i18n="abuseEmail">Abuse Email:</span><a class="red" id="abuseMail" href="#">abuse@meoy.top</a></div>
-    <div class="row"><span data-i18n="onlineReport">Online Report:</span><a class="blue" id="reportLink" href="#"><span data-i18n="reportPortal">Report Portal →</span></a></div>
-    <p class="notice"><b data-i18n="noticeLabel">Important Notice:</b> <span data-i18n="noticeText">The platform strictly prohibits abuse, fraud, pornography, infringement, malware distribution, and any other illegal activity. Upon verification, we will take immediate action, including banning accounts and suspending or deleting domains.</span></p>
-  </section>
+    <div class="status rise" style="--d:.22s">
+      <span class="pill"><span data-i18n="rootLabel">Current public domain</span> <b id="curRoot">meoy.top</b></span>
+      <span class="pill live"><span class="dot"></span><span data-i18n="liveLabel">Open for registration</span></span>
+      <span class="pill" id="rootNote" data-i18n="rootNote">Default root · 12 DNS record types</span>
+    </div>
 
-  <div class="cta rise" style="--d:.26s">
-    <a class="btn primary" data-go="/register" data-i18n="btnRegister">Register Free Subdomain</a>
-    <a class="btn ghost" data-go="/terms" data-i18n="btnTos">Terms of Service (TOS)</a>
-  </div>
+    <div class="metrics rise" style="--d:.26s">
+      <div class="metric"><small>01 / DNS</small><b data-i18n="m1">12 record types</b></div>
+      <div class="metric"><small>02 / NETWORK</small><b data-i18n="m2">Global Anycast</b></div>
+      <div class="metric"><small>03 / PRICE</small><b data-i18n="m3">Free, forever</b></div>
+    </div>
 
-  <footer class="rise" style="--d:.32s">© <span id="yr">2026</span> <span data-i18n="footer">TerraDomain. All rights reserved.</span></footer>
-</main>
+    <div class="legal rise" style="--d:.3s">
+      <span data-i18n="legal">DNS resolution only. Owners are solely responsible for their content.</span>
+      <a id="reportLink" href="#"><span data-i18n="legalReport">Report abuse</span></a>
+      <a id="abuseMail" href="#"><span data-i18n="legalMail">abuse@meoy.top</span></a>
+      <a data-go="/terms" href="#"><span data-i18n="legalTos">Terms</span></a>
+      <a data-go="/register" href="#"><span data-i18n="legalReg">Register →</span></a>
+    </div>
+  </main>
+
+  <footer class="foot rise" style="--d:.34s">
+    <span>© <span id="yr">2026</span> TerraDomain</span>
+    <a id="siteLink" href="#">nic.299282.xyz</a>
+  </footer>
+</div>
 
 <script>
-/* 部署配置：只需要改这两行 */
-var PANEL = "https://nic.299282.xyz";         /* 官网 / 控制台地址，不带结尾斜杠 */
-var ABUSE_EMAIL = "abuse@meoy.top";        /* 举报邮箱，改成你能收信的地址 */
+/* ── 部署配置：只改这两行 ── */
+var PANEL = "https://nic.299282.xyz";   /* 官网 / 控制台地址，不带结尾斜杠 */
+var ABUSE_EMAIL = "abuse@meoy.top";     /* 举报邮箱，改成你能收信的地址 */
+var ROOT = "meoy.top";                  /* 本页对应的根域名 */
 
 var DICT = {
   en: {
-    badgeLabel: "Current Public Domain:",
-    title: "Public Domain Registration Service",
-    p1: 'This root domain is managed by the <a href="{{PANEL}}/" target="_blank" rel="noopener">TerraDomain Free Subdomain Service Platform</a>.',
-    p2: "Users are permitted to register and operate independent subdomains under the hosting namespace provided by TerraDomain.",
-    p3: "TerraDomain solely provides DNS resolution and basic technical hosting services.",
-    p4: "The content, purpose, and operations of each subdomain are the exclusive responsibility of its respective owner. TerraDomain assumes no legal liability for user-generated content.",
-    abuseTitle: "Abuse & Compliance Report",
-    abuseEmail: "Abuse Email:",
-    onlineReport: "Online Report:",
-    reportPortal: "Report Portal →",
-    noticeLabel: "Important Notice:",
-    noticeText: "The platform strictly prohibits abuse, fraud, pornography, infringement, malware distribution, and any other illegal activity. Upon verification, we will take immediate action, including banning accounts and suspending or deleting domains.",
-    btnRegister: "Register Free Subdomain",
-    btnTos: "Terms of Service (TOS)",
-    footer: "TerraDomain. All rights reserved."
+    navWhois:"WHOIS Lookup",navTos:"Terms of Service",navReport:"Report Abuse",navConsole:"Console",
+    eyebrow:"FREE PUBLIC SUBDOMAIN · GLOBAL ANYCAST",
+    h1a:"A domain",h1b:"to begin with",
+    sub:"Check a prefix, pick a root domain, and put your service online in minutes — free of charge.",
+    prefixPh:"your-name",checkBtn:"Check availability →",
+    rootLabel:"Current public domain",liveLabel:"Open for registration",
+    rootNote:"Default root · 12 DNS record types",
+    m1:"12 record types",m2:"Global Anycast",m3:"Free, forever",
+    legal:"DNS resolution only. Owners are solely responsible for their content.",
+    legalReport:"Report abuse",legalMail:"abuse@" + ROOT,legalTos:"Terms",legalReg:"Register →"
   },
   zh: {
-    badgeLabel: "当前公共域名：",
-    title: "公共域名注册服务",
-    p1: '该根域名由 <a href="{{PANEL}}/" target="_blank" rel="noopener">TerraDomain 免费子域名服务平台</a> 管理。',
-    p2: "用户可在 TerraDomain 提供的托管命名空间下，注册并独立运营自己的子域名。",
-    p3: "TerraDomain 仅提供 DNS 解析与基础技术托管服务。",
-    p4: "各子域名的内容、用途与运营由各自所有者独立负责，TerraDomain 不对用户生成内容承担法律责任。",
-    abuseTitle: "滥用与合规举报",
-    abuseEmail: "举报邮箱：",
-    onlineReport: "在线举报：",
-    reportPortal: "进入举报入口 →",
-    noticeLabel: "重要提示：",
-    noticeText: "平台严禁任何滥用、欺诈、色情、侵权、恶意软件传播及其他违法活动。经核实后将立即处置，包括封禁账号、停用或删除域名。",
-    btnRegister: "免费注册子域名",
-    btnTos: "服务条款 (TOS)",
-    footer: "TerraDomain. 保留所有权利。"
+    navWhois:"WHOIS 查询",navTos:"服务条款",navReport:"举报滥用",navConsole:"控制台",
+    eyebrow:"免费公共子域名 · 全球 ANYCAST 解析",
+    h1a:"属于你的",h1b:"专属子域名",
+    sub:"输入前缀、选好根域名，几分钟就能把服务挂上线 —— 完全免费。",
+    prefixPh:"输入前缀",checkBtn:"查询可用性 →",
+    rootLabel:"当前公共域名",liveLabel:"开放注册中",
+    rootNote:"默认根后缀 · 12 种 DNS 记录",
+    m1:"12 种记录类型",m2:"全球 Anycast",m3:"永久免费",
+    legal:"本站仅提供 DNS 解析，各子域名的内容与用途由所有者独立负责。",
+    legalReport:"举报滥用",legalMail:"abuse@" + ROOT,legalTos:"服务条款",legalReg:"免费注册 →"
   }
 };
 
-function fillLinks() {
+function fillLinks(){
   document.getElementById("brandLink").href = PANEL + "/";
-  document.querySelectorAll("[data-go]").forEach(function (a) {
+  document.getElementById("siteLink").href = PANEL + "/";
+  document.querySelectorAll("[data-go]").forEach(function(a){
     a.href = PANEL + a.getAttribute("data-go");
   });
-  document.getElementById("abuseMail").href = "mailto:" + ABUSE_EMAIL;
   document.getElementById("reportLink").href = PANEL + "/report";
+  document.getElementById("abuseMail").href = "mailto:" + ABUSE_EMAIL;
   document.getElementById("yr").textContent = new Date().getFullYear();
+  document.getElementById("curRoot").textContent = ROOT;
+  document.getElementById("root").value = ROOT;
+  document.title = ROOT + " · TerraDomain";
 }
 
-function apply(lang) {
+function apply(lang){
   var d = DICT[lang] || DICT.en;
   document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
-  document.querySelectorAll("[data-i18n]").forEach(function (el) {
-    var v = d[el.getAttribute("data-i18n")];
-    if (v) el.textContent = v;
+  document.querySelectorAll("[data-i18n]").forEach(function(el){
+    var v = d[el.getAttribute("data-i18n")]; if (v) el.textContent = v;
   });
-  document.querySelectorAll("[data-i18n-html]").forEach(function (el) {
-    var v = d[el.getAttribute("data-i18n-html")];
-    if (v) el.innerHTML = v.replace(/\{\{PANEL\}\}/g, PANEL);
-  });
-  document.getElementById("abuseMail").textContent = ABUSE_EMAIL;
-  document.querySelectorAll("[data-lang]").forEach(function (b) {
+  var ph = document.querySelector("[data-i18n-ph]");
+  if (ph) ph.placeholder = d.prefixPh;
+  document.querySelectorAll("[data-lang]").forEach(function(b){
     b.classList.toggle("on", b.getAttribute("data-lang") === lang);
   });
-  try { localStorage.setItem("td_root_lang", lang); } catch (e) {}
+  try { localStorage.setItem("td_root_lang", lang); } catch(e){}
 }
+
+/* 查询框：跳到站内 WHOIS，带完整名称与所选根后缀 */
+document.getElementById("checker").addEventListener("submit", function(e){
+  e.preventDefault();
+  var label = document.getElementById("prefix").value.trim().replace(/^https?:\/\//i,"").replace(/\..*$/,"");
+  var root = document.getElementById("root").value;
+  if (!label) { document.getElementById("prefix").focus(); return; }
+  location.href = PANEL + "/whois?name=" + encodeURIComponent(label + "." + root) + "&root=" + encodeURIComponent(root);
+});
 
 fillLinks();
 var saved = "en";
-try { saved = localStorage.getItem("td_root_lang") || "en"; } catch (e) {}
+try { saved = localStorage.getItem("td_root_lang") || "en"; } catch(e){}
 apply(DICT[saved] ? saved : "en");
-document.querySelectorAll("[data-lang]").forEach(function (b) {
-  b.addEventListener("click", function () { apply(b.getAttribute("data-lang")); });
+document.querySelectorAll("[data-lang]").forEach(function(b){
+  b.addEventListener("click", function(){ apply(b.getAttribute("data-lang")); });
 });
 </script>
 </body>
