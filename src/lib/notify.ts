@@ -12,6 +12,7 @@ import { now } from './util.js';
 const TAGS = {
   domain_approved: '域名审核',
   login_ip: '安全提醒',
+  abuse_new: '滥用举报',
   system: '系统通知',
 };
 

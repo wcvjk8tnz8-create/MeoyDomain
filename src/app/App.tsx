@@ -15,6 +15,7 @@ import TicketsPage from './pages/Tickets';
 import TransferPage from './pages/Transfer';
 import ProfilePage from './pages/Profile';
 import TermsPage from './pages/Terms';
+import ReportPage from './pages/Report';
 
 /* 保留旧 URL，书签 / 站内链接 / Worker 重定向全部继续可用 */
 const ROUTES: Record<string, () => JSX.Element> = {
@@ -47,6 +48,10 @@ const ROUTES: Record<string, () => JSX.Element> = {
   '/profile.html': ProfilePage,
   '/terms': TermsPage,
   '/terms.html': TermsPage,
+  '/report': ReportPage,
+  '/report.html': ReportPage,
+  '/abuse': ReportPage,
+  '/abuse.html': ReportPage,
 };
 
 function keyOf(pathname: string): string {

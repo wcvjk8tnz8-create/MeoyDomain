@@ -6,7 +6,7 @@
  */
 import type { LegacyCtx } from './types';
 import { mountMotionStandalone } from './motion';
-import { startI18n } from './i18n';
+import { startI18n, currentLang } from './i18n';
 
 /* SPA 切页清理注册表：document / window 事件与定时器都登记在这里 */
 let cleanups: Array<() => void> = [];
@@ -60,7 +60,13 @@ export function refreshRuntime() {
 // 前端通用工具：接口封装、提示、渲染辅助、壁纸切换
 export const api = {
   async req(method, path, body) {
-    const opt = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
+    // 带上界面语言：后端统一响应出口据此把 message / 通知 / 条款等
+    // 服务端生成的中文换成英文。不传时后端默认中文。
+    const opt = {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Lang': currentLang() },
+      credentials: 'same-origin',
+    };
     if (body !== undefined) opt.body = JSON.stringify(body);
     let res, data;
     try {
@@ -613,6 +619,7 @@ export const SHELL_NAV = [
   { key: 'chat', name: '聊天地', icon: 'chat', href: '/chat', group: '用户中心' },
   { key: 'tickets', name: '工单系统', icon: 'ticket', href: '/tickets', group: '用户中心' },
   { key: 'profile', name: '个人资料', icon: 'user', href: '/profile', group: '用户中心' },
+  { key: 'report', name: '举报滥用', icon: 'flag', href: '/report', group: '用户中心' },
   { key: 'home', name: '站点首页', icon: 'home', href: '/home', group: '用户中心' },
 ];
 
@@ -631,6 +638,7 @@ export const SHELL_ICON = {
   logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
   bell: '<path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  flag: '<path d="M5 21V4h13l-2.5 4L18 12H5"/>',
 };
 
 
@@ -920,7 +928,7 @@ export async function mountShell(active, opt = {}) {
   const catStyle = `--bg:${_av.bg};--fur:${_av.fur};--eye:${_av.eye};--accent:${_av.accent}`;
 
   // 面包屑当前页名
-  const EXTRA_NAME = { admin: '管理后台', terms: '服务条款', domain: '域名详情', register: '注册域名' };
+  const EXTRA_NAME = { admin: '管理后台', terms: '服务条款', domain: '域名详情', register: '注册域名', report: '举报滥用' };
   const _all = [...SHELL_NAV, { key: 'admin', name: '管理后台' }];
   const _cur = _all.find((x) => x.key === active);
   const curName = (opt.title || (_cur && _cur.name) || EXTRA_NAME[active] || '控制台');

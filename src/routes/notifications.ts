@@ -8,6 +8,7 @@
  */
 import { Hono } from 'hono';
 import { ok, fail } from '../lib/util.js';
+import { tr } from '../lib/i18nServer.js';
 import { unreadCount } from '../lib/notify.js';
 
 const app = new Hono();
@@ -23,7 +24,15 @@ app.get('/', async (c) => {
   )
     .bind(u.id)
     .all();
-  return ok(c, { items: results, unread: await unreadCount(c.env, u.id) });
+  // 通知的 title / body / tag 全是服务端生成，按请求语言翻译。
+  // 不走 ok() 的通用递归，是因为这些字段名在别处属于用户数据（工单标题等）。
+  const items = (results || []).map((n: any) => ({
+    ...n,
+    title: tr(c, String(n.title || '')),
+    body: tr(c, String(n.body || '')),
+    tag: tr(c, String(n.tag || '')),
+  }));
+  return ok(c, { items, unread: await unreadCount(c.env, u.id) });
 });
 
 app.get('/unread', async (c) => {

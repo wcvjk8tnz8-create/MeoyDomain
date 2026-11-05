@@ -428,6 +428,35 @@ INSERT OR IGNORE INTO settings(key, value) VALUES ('spaceship_api_url', 'https:/
 INSERT OR IGNORE INTO settings(key, value) VALUES ('spaceship_api_key', '');
 INSERT OR IGNORE INTO settings(key, value) VALUES ('spaceship_api_secret', '');
 
+-- ══════════════════════════════════════════════════════════
+--  滥用举报（公开提交 / 管理员处理）
+--  由 src/routes/abuse.ts 首次请求时幂等建表，这里同步写入基准 schema
+--  状态：open 待处理 / investigating 处理中 / resolved 已处理 / dismissed 已驳回
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS abuse_reports (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  domain        TEXT NOT NULL,
+  type          TEXT NOT NULL,
+  description   TEXT NOT NULL,
+  evidence_url  TEXT,
+  contact_email TEXT,
+  user_id       INTEGER,
+  ip            TEXT,
+  status        TEXT NOT NULL DEFAULT 'open',
+  admin_note    TEXT,
+  handled_by    INTEGER,
+  local_match   INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_abuse_status ON abuse_reports(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_abuse_domain ON abuse_reports(domain);
+CREATE INDEX IF NOT EXISTS idx_abuse_user ON abuse_reports(user_id, created_at DESC);
+
+-- 举报渠道展示（外部域名 WHOIS 与举报页共用），已在站点设置中配置
+INSERT OR IGNORE INTO settings(key, value) VALUES ('abuse_email', '');
+INSERT OR IGNORE INTO settings(key, value) VALUES ('abuse_report_url', '');
+
 -- 后台导入的根域名（无需改环境变量；中间件会合并进 ROOT_DOMAINS）
 -- 格式：逗号分隔域名 / "域名:ZoneID" 对
 INSERT OR IGNORE INTO settings(key, value) VALUES ('root_domains_extra', '');

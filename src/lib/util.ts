@@ -7,14 +7,21 @@
 import type { Context } from 'hono';
 import type { Env } from '../types.js';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { localize } from './i18nServer.js';
 
+/**
+ * 统一响应出口做语言本地化：前端带 X-Lang: en 时，把服务端生成的中文文案
+ * （message / 通知 / 条款段落 / AI 诊断行 / 状态词）换成英文。
+ * 只精确命中词典，绝不改写用户数据，详见 i18nServer.ts。
+ * 中文模式下 localize 直接原样返回，零额外开销。
+ */
 /** 成功响应 */
 export function ok<T extends Record<string, unknown>>(
   c: Context<{ Bindings: Env }>,
   data: T = {} as T,
   status: ContentfulStatusCode = 200
 ) {
-  return c.json({ success: true, ...data }, status);
+  return c.json(localize(c, { success: true, ...data }), status);
 }
 
 /** 失败响应 */
@@ -24,7 +31,7 @@ export function fail(
   status: ContentfulStatusCode = 400,
   extra: Record<string, unknown> = {}
 ) {
-  return c.json({ success: false, message, ...extra }, status);
+  return c.json(localize(c, { success: false, message, ...extra }), status);
 }
 
 /** 当前毫秒时间戳 */

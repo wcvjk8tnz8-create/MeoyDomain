@@ -37,6 +37,7 @@ export default function AdminPage() {
           <button className="tab" data-tab="settings">站点设置</button>
           <button className="tab" data-tab="audit">审计日志</button>
         </div>
+        <div style={{margin: "-6px 0 14px"}}><a className="btn sm ghost" href="/report">举报滥用 · 处理入口 →</a></div>
       
         <div className="card">
           <div className="tablewrap"><table>

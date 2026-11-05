@@ -11,6 +11,8 @@
  * 不走反向字典，因此不会出现「中→英→中」越翻越歪。
  */
 
+import { EXTRA_DICT } from './dict.en';
+
 export type Lang = 'zh' | 'en';
 
 const STORE_KEY = 'terradata_lang';
@@ -294,6 +296,12 @@ const DICT: Record<string, string> = {
   '界面模板 · 演示用途 · 所有内容均为占位': 'Template · Demo · Placeholder content',
 };
 
+/* 合并后续页面补录的词典。主词典优先（早期词条经过更多真机校对），
+   只补空缺，不覆盖。放在 LONG_KEYS 计算之前，子串排序会自动纳入。 */
+for (const [k, v] of Object.entries(EXTRA_DICT)) {
+  if (!DICT[k]) DICT[k] = v;
+}
+
 /* 完整句子整译：这些是界面上会整段显示的说明文案。
    整句精确命中才会翻译；命中不了就由下方安全网保留全中文，
    绝不用子串替换把它们切成「Sign up入口…ViewPoints消耗」这种夹生话。 */
@@ -364,6 +372,54 @@ const FULL_SENTENCES: Record<string, string> = {
     'Delete this subdomain and clear all its DNS records?',
   '注意：名单里的根域名必须和你实际申请时选的后缀一致':
     'Note: the roots listed here must match the suffix users actually apply under',
+
+  /* 本轮补齐：此前英文模式下仍整段显示中文的说明与状态文案 */
+  '站点已暂停新域名申请，请稍后再试。已注册的域名不受影响。':
+    'New domain requests are paused. Please try again later; existing domains are unaffected.',
+  '后台「AI 自动审核」开关未开启': 'AI auto-review is switched off in Site Settings',
+  '当前根域名不在「AI 自动审核名单」里；名单填 * 可对所有根域名生效':
+    'This root is not in the AI auto-review list; set the list to * to cover every root',
+  '所有候选模型调用失败（网关报错或网络不可达），已回落人工审核':
+    'All candidate models failed (gateway error or unreachable); fell back to manual review',
+  '模型有回复但结论无法解析，已回落人工审核':
+    'The model replied but its verdict could not be parsed; fell back to manual review',
+  'AI 调用超时（单端点 9 秒 / 总预算 20 秒），已回落人工审核':
+    'AI call timed out (9s per endpoint / 20s total); fell back to manual review',
+  '✓ 审核返回 PASS（通过）': '✓ Review returned PASS',
+  '✓ 审核返回 REJECT（驳回）': '✓ Review returned REJECT',
+  '模型可调用，但回复无法解析（实际审核会回落人工）':
+    'The model is reachable, but its reply could not be parsed (real reviews would fall back to manual)',
+  '当前模型不在清单中，可从下拉改选': 'This model is not in the list — pick another one from the dropdown',
+  '改选后点「保存」生效。': 'Save after changing the selection.',
+  '探测失败：': 'Probe failed: ', '测试失败：': 'Test failed: ', '诊断失败：': 'Diagnosis failed: ',
+  '检查失败：': 'Check failed: ', '读取失败：': 'Read failed: ',
+  '网络请求失败': 'Network request failed',
+  '菜单': 'Menu', '值': 'Value', '例如：': 'e.g. ', '夜深了': 'Late night', '我': 'Me',
+  '暂无数据': 'No data', '匿名': 'Anonymous', '本站域名': 'Local domain',
+  '须知加载失败，请刷新重试。': 'Could not load the notes. Refresh and try again.',
+  '请先勾选同意《服务条款与免责声明》': 'Please accept the Terms & Disclaimer first',
+  '请先填写邮箱': 'Enter your email first',
+  '确定清空全部券？此操作不可恢复。  兑换记录会保留（便于追溯谁用过）。':
+    'Delete all codes? This cannot be undone. Redemption records are kept for auditing.',
+  '再次确认：真的要删除所有券吗？': 'Confirm again: really delete every code?',
+  '确定取消托管？将删除父区域的 NS 记录，解析权回到本站。  注意：目标服务商上该域名的解析记录不会自动删除，请自行清理。':
+    'Cancel delegation? The NS records in the parent zone will be removed and DNS control returns here. Records at the target provider are not deleted automatically — clean them up yourself.',
+  '确定将 X 转移给 X？此操作不可撤销。': 'Transfer X to X? This cannot be undone.',
+  '选择域名 → 选择平台 → 主机名会自动填入 → 粘贴平台给出的验证值 → 写入锁定。':
+    'Pick a domain → choose a platform → the hostname is filled in → paste the verification value → the record is locked.',
+  '举报滥用 · 处理入口 →': 'Abuse reports →',
+  '发现违规用途？在这里告诉我们': 'Spot a violation? Let us know',
+  '其它举报渠道': 'Other reporting channels',
+  '相关链接': 'Related links',
+  '提交中…': 'Submitting…',
+  '登录后可以查看自己的举报记录。': 'Sign in to see your reports.',
+  '去登录': 'Sign in',
+  '请描述具体的违规行为、时间与影响（至少 10 个字）':
+    'Describe the abuse, when it happened and its impact (at least 10 characters)',
+  '用于回复处理结果': 'Used only to reply about the outcome',
+  'https://…（截图、页面存档或日志）': 'https://… (screenshots, archives or logs)',
+  '提交举报即表示你确认所填信息真实，恶意虚假举报会被限制。':
+    'By submitting you confirm the information is accurate. Deliberately false reports will be restricted.',
 };
 
 /* 带数字 / 变量的句式（优先于子串替换） */
@@ -382,6 +438,34 @@ const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^(上午好|中午好|下午好|晚上好)，(.+)$/,
     m => `${DICT[m[1]] || 'Hello'}, ${m[2]}`],
   [/^已使用 (\d+) \/ (.+)$/, m => `Used ${m[1]} / ${m[2]}`],
+  /* 动态数字句式：模板字符串拼接后的真实文案（DOM 里已是完整句） */
+  [/^签到领 (\d+) 分$/, m => `Check in for ${m[1]} points`],
+  [/^签到成功，\+(\d+) 分$/, m => `Checked in: +${m[1]} points`],
+  [/^签到成功 \+(\d+)，当前 (\d+) 分$/, m => `Checked in +${m[1]}; balance ${m[2]} points`],
+  [/^明天可再领 (\d+) 分$/, m => `Claim ${m[1]} points again tomorrow`],
+  [/^明天可再领 (\d+) 分。单字域名（如 a、1）需 (\d+) 分兑换。$/,
+    m => `Claim ${m[1]} points again tomorrow. Single-character labels (e.g. a, 1) cost ${m[2]} points.`],
+  [/^今天还没签到，可领 (\d+) 分。单字域名（如 a、1）需 (\d+) 分兑换。$/,
+    m => `Not checked in yet — ${m[1]} points available. Single-character labels (e.g. a, 1) cost ${m[2]} points.`],
+  [/^签到 \+(\d+) · 域名 -(\d+) · 单字域名 -(\d+)$/,
+    m => `Check-in +${m[1]} · Domain -${m[2]} · Single-char -${m[3]}`],
+  [/^(\d+) 个域名 · (\d+) 条解析$/, m => `${m[1]} domains · ${m[2]} records`],
+  [/^· 另有 (\d+) 个被驳回（不占配额）$/, m => `· ${m[1]} more rejected (do not count against quota)`],
+  [/^共 (\d+) 条 · 第 (\d+)\/(\d+) 页$/, m => `${m[1]} total · Page ${m[2]}/${m[3]}`],
+  [/^第 (\d+) 页$/, m => `Page ${m[1]}`],
+  [/^工单 #(\d+) · (.+)$/, m => `Ticket #${m[1]} · ${m[2]}`],
+  [/^版本 (.+) · 注册即视为同意本条款$/, m => `Version ${m[1]} · Signing up means you accept these terms`],
+  [/^已永久化 (.+)$/, m => `Made perpetual: ${m[1]}`],
+  [/^配额 \+(\d+)，当前 (\d+)$/, m => `Quota +${m[1]}, now ${m[2]}`],
+  [/^已清空 (\d+) 张券$/, m => `Cleared ${m[1]} codes`],
+  [/^查询 (.+) 下二级子域名的注册状态$/, m => `Check subdomain availability under ${m[1]}`],
+  [/^(.+?)需要 (\d+) 分$/, m => `${m[1]} needs ${m[2]} points`],
+  [/^AI 自动审核通过（模型 (.+)，耗时 (.+)），已即时开通$/,
+    m => `Approved by AI (model ${m[1]}, ${m[2]}) and activated instantly`],
+  [/^当前为免审核模式，已直接开通（AI 未参与(.+)）$/,
+    m => `Global approval is off — activated directly (AI not involved${m[1]})`],
+  [/^已提交，等待管理员审核（AI 未自动审核：(.+)）$/,
+    m => `Submitted for manual review (AI did not run: ${m[1]})`],
 ];
 
 const LONG_KEYS = Object.keys(DICT).sort((a, b) => b.length - a.length);
@@ -427,7 +511,9 @@ export function currentLang(): Lang { return _lang; }
 
 const origText = new WeakMap<Text, string>();
 const origAttr = new WeakMap<Element, Record<string, string>>();
-const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'CODE', 'PRE', 'KBD', 'SVG', 'PATH', 'NOSCRIPT', 'TEXTAREA']);
+/* TEXTAREA 不能整块跳过：它的 placeholder 属于界面文案，必须翻。
+   只跳过它内部的文本节点（那是可编辑的默认内容，可能含用户输入）。 */
+const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'CODE', 'PRE', 'KBD', 'SVG', 'PATH', 'NOSCRIPT']);
 let _origTitle = '';
 let _applying = false;
 
@@ -444,6 +530,7 @@ function translateNode(node: Node): void {
   if (node.nodeType === Node.TEXT_NODE) {
     const t = node as Text;
     if (!t.parentNode || isSkipped(t.parentElement)) return;
+    if (t.parentElement?.tagName === 'TEXTAREA') return;
     if (!origText.has(t)) origText.set(t, t.data);
     const from = origText.get(t)!;
     const to = _lang === 'zh' ? from : translateText(from, 'en');
@@ -479,7 +566,13 @@ export function applyI18n(root: Node = document.body): void {
   try { translateNode(root); } finally { _applying = false; }
   document.documentElement.setAttribute('lang', _lang === 'en' ? 'en' : 'zh-CN');
   document.documentElement.setAttribute('data-lang', _lang);
-  if (!_origTitle) _origTitle = document.title;
+  const curTitle = document.title;
+  const expectedTitle = translateText(_origTitle, _lang);
+  // SPA 切页时页面会自己写新标题。旧实现只缓存首个标题，
+  // 导致英文模式下切到任何页面都还显示登录页的中文标题。
+  if (!_origTitle || (curTitle !== expectedTitle && /[\u4e00-\u9fa5]/.test(curTitle))) {
+    _origTitle = curTitle;
+  }
   document.title = translateText(_origTitle, _lang);
   syncButtons();
 }
@@ -567,6 +660,14 @@ export function startI18n(): void {
           if (r.addedNodes.length) mountLangSwitch();
         } else if (r.type === 'characterData' && r.target) {
           const t = r.target as Text;
+          if (t.parentElement?.tagName === 'TITLE') {
+            if (_lang === 'en' && /[\u4e00-\u9fa5]/.test(t.data)) {
+              _origTitle = t.data;
+              const to = translateText(t.data, 'en');
+              if (t.data !== to) t.data = to;
+            }
+            continue;
+          }
           if (!isSkipped(t.parentElement)) {
             const saved = origText.get(t);
             // 我们自己写入的译文会再次触发本回调：与预期完全一致时直接忽略，
@@ -587,4 +688,5 @@ export function startI18n(): void {
     } finally { _applying = false; }
   });
   mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+  if (document.head) mo.observe(document.head, { childList: true, subtree: true, characterData: true });
 }

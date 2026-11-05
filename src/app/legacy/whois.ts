@@ -100,6 +100,8 @@ export async function mountWhois(_root: HTMLElement | null): Promise<void> {
   
     const who = host || '第三方服务';
     const report = [];
+    const dname = String(r.domain || r.query || '').trim();
+    report.push(`<a href="/report?domain=${encodeURIComponent(dname)}">在本站提交举报</a>`);
     if (ab.email) report.push(`投诉邮箱：<a href="mailto:${esc(ab.email)}" class="mono">${esc(ab.email)}</a>`);
     if (ab.url) report.push(`<a href="${esc(ab.url)}" target="_blank" rel="noopener">在线举报入口</a>`);
   
@@ -130,6 +132,7 @@ export async function mountWhois(_root: HTMLElement | null): Promise<void> {
   
       <div class="row" style="margin-top:12px;gap:7px;flex-wrap:wrap">
         <a class="btn sm ok" href="/terms" target="_blank">服务条款 (TOS)</a>
+        <a class="btn sm ghost" href="/report?domain=${encodeURIComponent(dname)}">举报滥用</a>
         ${ab.url ? `<a class="btn sm ghost" href="${esc(ab.url)}" target="_blank" rel="noopener">在线举报</a>` : ''}
       </div>
     </div>`;

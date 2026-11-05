@@ -169,7 +169,7 @@ export default function HomePage() {
               <div className="nk-fbrand"><img data-logo-img src="/img/logo.jpg" alt="" /><span data-site-name>TerraDomain</span></div>
               <p className="nk-fdesc">免费、开源的二级域名分发与 DNS 管理系统。<br />基于 Cloudflare Workers + D1。</p>
             </div>
-            <div className="nk-fcol"><h4>服务</h4><a href="/whois">WHOIS 查询</a><a href="/dashboard">域名管理</a><a href="/terms">服务条款</a></div>
+            <div className="nk-fcol"><h4>服务</h4><a href="/whois">WHOIS 查询</a><a href="/dashboard">域名管理</a><a href="/terms">服务条款</a><a href="/report">举报滥用</a></div>
             <div className="nk-fcol"><h4>开源</h4><a href="https://github.com/wcvjk8tnz8-create/MeoyDomain" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://github.com/wcvjk8tnz8-create/MeoyDomain/issues" target="_blank" rel="noopener noreferrer">问题反馈</a><span className="nk-fdim">MIT License</span></div>
           </div>
           <div className="nk-fbottom">

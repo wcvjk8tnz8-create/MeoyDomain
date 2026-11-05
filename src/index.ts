@@ -21,6 +21,7 @@ import notificationRoutes from './routes/notifications.js';
 import profileRoutes from './routes/profile.js';
 import ticketRoutes from './routes/tickets.js';
 import transferRoutes from './routes/transfer.js';
+import abuseRoutes from './routes/abuse.js';
 
 const app = new Hono();
 
@@ -195,6 +196,12 @@ app.route('/api/subdomains', delegationRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/redeem', redeemRoutes);
 app.route('/api/chat', chatRoutes);
+
+// 滥用举报：提交与配置公开，管理端点要求管理员
+app.use('/api/abuse/admin', requireAuth, requireAdmin);
+app.use('/api/abuse/admin/*', requireAuth, requireAdmin);
+app.use('/api/abuse/mine', requireAuth);
+app.route('/api/abuse', abuseRoutes);
 
 // API 兜底
 app.all('/api/*', (c) => fail(c, '接口不存在', 404));

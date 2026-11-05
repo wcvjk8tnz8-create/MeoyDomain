@@ -30,6 +30,14 @@ export default function TermsPage() {
         <div className="sub" id="meta"></div>
       
         <div className="card" id="body">加载中…</div>
+
+        <div className="card flat" style={{marginTop: "16px"}}>
+          <h3>发现违规域名？</h3>
+          <div className="hint" style={{lineHeight: 1.9}}>
+            如发现本站分配的域名被用于钓鱼、恶意程序、垃圾邮件等违规用途，可提交举报，管理员会尽快核查处理。
+          </div>
+          <a className="btn sm" href="/report" style={{marginTop: "12px"}}>举报滥用域名 →</a>
+        </div>
       </div></div></main>
       
       <div id="toast"></div>
