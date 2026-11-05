@@ -333,13 +333,26 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 填写后上传的头像直接外链到该地址，可省 Worker 流量。当前状态：<span id="r2Hint" class="dim">读取中…</span></div>
             </div>
             <div class="field">
-              <label>AI 自动审核（自定义 OpenAI 兼容网关）</label>
+              <label>AI 自动审核</label>
               <label class="check" style="margin:0 0 8px">
                 <input type="checkbox" id="sAiEnabled">
                 <span>启用自动审核（仅对下方根域名生效；通过后无需管理员同意）</span>
               </label>
-              <div class="grid2">
+              <div class="grid2" id="aiConfigGrid" style="margin-bottom:8px">
                 <div>
+                  <span class="dim">审核服务</span>
+                  <select id="sAiProvider" style="margin-top:6px">
+                    <option value="custom">自定义 API（OpenAI 兼容网关）</option>
+                    <option value="workers-ai">Workers AI（Cloudflare 内置，免 Key）</option>
+                  </select>
+                </div>
+                <div id="aiWorkersHint" style="display:none">
+                  <span class="dim">Workers AI 说明</span>
+                  <div class="hint" style="margin:4px 0 0">走 <span class="mono">env.AI.run</span>，不需要 API Key、接口地址或端点探测；需在 <span class="mono">wrangler.toml</span> 配置 <span class="mono">[ai] binding = "AI"</span> 并重新部署。</div>
+                </div>
+              </div>
+              <div class="grid2" id="aiProviderGrid">
+                <div id="aiUrlBlock">
                   <span class="dim">接口地址 / Base URL（如 https://host/v1）</span>
                   <input id="sAiUrl" placeholder="https://apihub.agnes-ai.com/v1">
                   <select id="sAiEndpointMode" style="margin-top:6px">
@@ -354,7 +367,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                   <select id="sAiModelList" style="margin-top:6px"><option value="">— 尚未探测 —</option></select>
                 </div>
               </div>
-              <div class="field" style="margin:8px 0 0">
+              <div class="field" id="aiKeyBlock" style="margin:8px 0 0">
                 <span class="dim">API Key</span>
                 <input id="sAiKey" type="password" autocomplete="new-password" placeholder="留空则不修改">
                 <div class="hint" id="aiHint">读取中…</div>
@@ -500,8 +513,59 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
       const aiModelHint = document.getElementById('aiModelHint');
       const aiModelList = document.getElementById('sAiModelList') as HTMLSelectElement | null;
       const aiModelInput = document.getElementById('sAiModel') as HTMLInputElement | null;
+
+      /* 审核服务联动：Workers AI 不需要地址 / Key / 端点模式，隐藏它们，
+         并把模型清单直接换成 Cloudflare 内置模型；自定义网关则反之。 */
+      const syncAiProvider = (p?: string, workersModels?: string[]): boolean => {
+        const sel = document.getElementById('sAiProvider') as HTMLSelectElement | null;
+        const provider = p || sel?.value || 'custom';
+        if (sel) sel.value = provider;
+        const isWorkers = provider === 'workers-ai';
+        const show = (id: string, visible: boolean) => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = visible ? '' : 'none';
+        };
+        show('aiUrlBlock', !isWorkers);
+        show('aiKeyBlock', !isWorkers);
+        show('aiWorkersHint', isWorkers);
+        const grid = document.getElementById('aiProviderGrid');
+        if (grid) grid.style.gridTemplateColumns = isWorkers ? '1fr' : '';
+        if (aiModelInput) {
+          aiModelInput.placeholder = isWorkers
+            ? '保存后自动选择 Workers AI 模型' : '保存后自动探测 /models';
+        }
+        if (aiModelHint) {
+          aiModelHint.textContent = isWorkers
+            ? 'Workers AI 使用 Cloudflare 内置模型，点「探测模型」可即时列出（无需联网、无需 Key）。'
+            : '填好地址与 Key 后点「保存」会自动探测 /models，请从返回的清单里选模型（大小写要一致）。Base URL 本身不是端点，直接 POST 通常返回 404。';
+        }
+        const keyHint = document.getElementById('aiHint');
+        if (isWorkers && keyHint) {
+          keyHint.innerHTML = '<span class="badge ok">无需配置</span> Workers AI 直接调用 Cloudflare 绑定，不读取 API Key。';
+        }
+        if (isWorkers && aiModelList && workersModels && workersModels.length) {
+          const cur = aiModelList.value;
+          aiModelList.innerHTML = '<option value="">— 选择模型 —</option>'
+            + workersModels.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+          if (workersModels.includes(cur)) aiModelList.value = cur;
+        }
+        const testResult = document.getElementById('aiTestResult');
+        if (testResult) {
+          testResult.textContent = isWorkers
+            ? '自检直接调用 env.AI.run，无外部网络请求。'
+            : '每个端点独立超时，成功的地址会被记住后续复用。诊断会列出网关返回的真实模型清单。';
+        }
+        return isWorkers;
+      };
+      const aiProviderSel = document.getElementById('sAiProvider') as HTMLSelectElement | null;
+      if (aiProviderSel) {
+        aiProviderSel.onchange = () => { syncAiProvider(); };
+      }
+
       const probeModels = async (useTyped: boolean) => {
         const payload: Record<string, string> = {};
+        // 带上「刚在下拉里选、还没保存」的 provider，让探测即时按新模式走
+        payload.aiProvider = (document.getElementById('sAiProvider') as HTMLSelectElement)?.value || 'custom';
         if (useTyped) {
           payload.aiUrl = (document.getElementById('sAiUrl') as HTMLInputElement)?.value.trim() || '';
           payload.aiEndpointMode = (document.getElementById('sAiEndpointMode') as HTMLSelectElement)?.value || 'auto';
@@ -519,7 +583,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           aiModelList.innerHTML = '<option value="">— 手动填写 —</option>'
             + list.map((m: string) => `<option value="${esc(m)}"${m === chosen ? ' selected' : ''}>${esc(m)}</option>`).join('');
           if (aiModelInput && chosen && !cur) aiModelInput.value = chosen;
-          const src = r.source === 'gateway' ? '网关 /models' : '内置 Agnes 官方清单';
+          const src = r.source === 'gateway' ? '网关 /models'
+            : r.source === 'workers-ai' ? 'Workers AI 内置清单' : '内置 Agnes 官方清单';
           if (aiModelHint) {
             aiModelHint.innerHTML = (r.ok ? '✓ ' : '⚠ ')
               + esc(r.message || '探测异常') + `（来源：${src}），审核模型 <b>${esc(chosen || '未选定')}</b>`
@@ -594,6 +659,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             applyPaused: document.getElementById('sApplyPaused').checked,
             applyPausedMessage: document.getElementById('sApplyPausedMsg').value,
             aiEnabled: document.getElementById('sAiEnabled').checked,
+            aiProvider: (document.getElementById('sAiProvider') as HTMLSelectElement)?.value || 'custom',
             aiUrl: document.getElementById('sAiUrl').value,
             aiEndpointMode: (document.getElementById('sAiEndpointMode') as HTMLSelectElement)?.value || 'auto',
             aiModel: document.getElementById('sAiModel').value,
@@ -728,6 +794,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
       {
         const a = d.ai || {};
         const setv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+        const isWorkers = a.provider === 'workers-ai';
         const en = document.getElementById('sAiEnabled');
         if (en) en.checked = !!a.enabled;
         setv('sAiUrl', a.url);
@@ -736,9 +803,17 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         setv('sAiModel', a.model);
         setv('sAiRoots', a.roots);
         setv('sAiDnsRoots', a.dnsUnlimitedRoots);
+        // 先联动显隐，再按需覆盖 Key 提示（syncAiProvider 会写「无需配置」）
+        syncAiProvider(a.provider || 'custom', a.workersAiModels);
         const k = document.getElementById('sAiKey');
         const hint = document.getElementById('aiHint');
-        if (a.fromEnv) {
+        if (isWorkers) {
+          if (hint) {
+            hint.innerHTML = a.workersAiAvailable
+              ? '<span class="badge ok">已绑定 env.AI</span> 无需 API Key，直接调用 Cloudflare Workers AI。'
+              : '<span class="badge warn">未绑定</span> 请在 <span class="mono">wrangler.toml</span> 加 <span class="mono">[ai] binding = "AI"</span> 后重新部署，或改回自定义 API。';
+          }
+        } else if (a.fromEnv) {
           [k].forEach((el) => { if (el) el.disabled = true; });
           if (k) k.value = a.keyMasked || '';
           if (hint) hint.innerHTML = '<span class="badge ok">已由 Worker Secret 配置</span> 后台不可修改。';
@@ -748,8 +823,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         } else {
           if (hint) hint.innerHTML = '未配置 Key：AI 不会调用，申请照常进入人工审核。也可用 <span class="mono">npx wrangler secret put AI_API_KEY</span> 配置。';
         }
-        // 已经配好 Key 时，打开设置页顺带核对一次模型列表（不改变管理员已选的模型）
-        if (a.ready) {
+        // 自定义网关配好 Key、或 Workers AI 已绑定时，打开设置页顺带核对模型列表
+        if (a.ready || (isWorkers && a.workersAiAvailable)) {
           if (aiModelHint && a.model) {
             aiModelHint.innerHTML = `当前审核模型 <b>${esc(a.model)}</b>，正在核对可用模型列表…`;
           }

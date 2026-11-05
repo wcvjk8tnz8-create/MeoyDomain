@@ -9,6 +9,13 @@ binding = "ASSETS"
 # 由 Worker 先处理（whois 子域的服务端重定向需要），处理完再回落到静态资源
 run_worker_first = true
 
+# Workers AI：后台「AI 自动审核 → 审核服务」选「Workers AI」时走这个绑定。
+# 不需要任何 API Key / 接口地址，直接 env.AI.run(模型, { messages })。
+# 若不想用 Workers AI、只用自定义 OpenAI 兼容网关，可删掉这两行，
+# 后台仍会显示该选项但诊断会提示「绑定缺失」。
+[ai]
+binding = "AI"
+
 # R2 对象存储：用于用户上传自定义头像（可选）
 # 创建：npx wrangler r2 bucket create meoy-avatars
 # 若不使用自定义头像上传，可整段删除（上传接口会自动禁用）

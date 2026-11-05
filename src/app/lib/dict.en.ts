@@ -456,8 +456,6 @@ export const EXTRA_DICT: Record<string, string> = {
     ': after a successful transfer you lose access to the domain and all its DNS records, and we cannot restore it.',
   '：服务按「现状」提供，不对可用性、数据损失及第三方行为承担责任。':
     ': the service is provided "as is"; we are not liable for availability, data loss or third-party actions.',
-  '常见问题': 'FAQ', '快捷操作': 'Quick actions',
-
   /* ── 举报滥用页（本轮新增） ── */
   '举报滥用域名': 'Report domain abuse', '举报滥用': 'Report abuse',
   '滥用举报': 'Abuse reports', '提交举报': 'Submit report',
@@ -557,4 +555,33 @@ export const EXTRA_DICT: Record<string, string> = {
   '创建子域名不会自动写入任何 DNS 记录。管理员特权：申请即时开通、不限数量、可使用 www / mail / admin 等保留域名。':
     'No DNS records are created automatically. Admins are exempt from review and quota, and may use reserved labels such as www / mail / admin.',
   '登录后可查看全部功能': 'Sign in to see every feature',
+
+  /* ── AI 自动审核：审核服务（自定义 API / Workers AI） ── */
+  '审核服务': 'Review provider',
+  '自定义 API（OpenAI 兼容网关）': 'Custom API (OpenAI-compatible gateway)',
+  'Workers AI（Cloudflare 内置，免 Key）': 'Workers AI (Cloudflare built-in, no key needed)',
+  'Workers AI 说明': 'About Workers AI',
+  '走 env.AI.run，不需要 API Key、接口地址或端点探测；需在 wrangler.toml 配置 [ai] binding = "AI" 并重新部署。':
+    'Calls env.AI.run — no API key, URL or endpoint probing. Add [ai] binding = "AI" to wrangler.toml and redeploy.',
+  'Workers AI 使用 Cloudflare 内置模型，点「探测模型」可即时列出（无需联网、无需 Key）。':
+    'Workers AI uses Cloudflare built-in models. Click "Probe models" to list them instantly — no network or key needed.',
+  '自检直接调用 env.AI.run，无外部网络请求。':
+    'The self-test calls env.AI.run directly, with no outbound network request.',
+  '每个端点独立超时，成功的地址会被记住后续复用。诊断会列出网关返回的真实模型清单。':
+    'Each endpoint has its own timeout; a working URL is remembered for reuse. Diagnostics lists the models reported by the gateway.',
+  '保存后自动选择 Workers AI 模型': 'A Workers AI model is selected automatically after saving',
+  '— 选择模型 —': '— Select a model —',
+  '无需配置': 'Not needed',
+  'Workers AI 直接调用 Cloudflare 绑定，不读取 API Key。':
+    'Workers AI calls the Cloudflare binding directly; no API key is read.',
+  '已绑定 env.AI': 'env.AI bound',
+  '请在 wrangler.toml 加 [ai] binding = "AI" 后重新部署，或改回自定义 API。':
+    'Add [ai] binding = "AI" to wrangler.toml and redeploy, or switch back to a custom API.',
+  '无需 API Key，直接调用 Cloudflare Workers AI。':
+    'No API key needed — calls Cloudflare Workers AI directly.',
+  '正在核对可用模型列表…': 'Checking available models…',
+  '⚠ Workers AI 未绑定（需在 wrangler.toml 配置 [ai] binding）：申请会回落人工审核。':
+    '⚠ Workers AI is not bound (add [ai] binding to wrangler.toml): applications fall back to manual review.',
+  '✓ Workers AI 自动审核已就绪（将使用 Cloudflare 内置模型）；管理员账号免审核，不会触发 AI。':
+    '✓ Workers AI auto-review is ready (uses a Cloudflare built-in model). Admin accounts skip review and do not trigger AI.',
 };

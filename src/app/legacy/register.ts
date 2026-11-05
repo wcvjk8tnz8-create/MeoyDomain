@@ -123,10 +123,15 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       var aiTip = document.getElementById('aiStatusTip');
       if (aiTip) {
         var st = cfg.aiStatus || {};
+        var isWorkers = st.provider === 'workers-ai';
         var msg = '';
-        if (!st.ready) msg = '⚠ AI 自动审核未配置 API Key：申请会回落人工审核。';
+        if (!st.ready) msg = isWorkers
+          ? '⚠ Workers AI 未绑定（需在 wrangler.toml 配置 [ai] binding）：申请会回落人工审核。'
+          : '⚠ AI 自动审核未配置 API Key：申请会回落人工审核。';
         else if (!st.enabled) msg = '⚠ AI 自动审核开关已关闭：申请会回落人工审核。';
-        else if (!st.modelSelected) msg = '✓ AI 自动审核已就绪（未指定模型，将使用 agnes-2.5-flash）；管理员账号免审核，不会触发 AI。';
+        else if (!st.modelSelected) msg = isWorkers
+          ? '✓ Workers AI 自动审核已就绪（将使用 Cloudflare 内置模型）；管理员账号免审核，不会触发 AI。'
+          : '✓ AI 自动审核已就绪（未指定模型，将使用 agnes-2.5-flash）；管理员账号免审核，不会触发 AI。';
         else msg = '✓ AI 自动审核已就绪，审核模型 ' + esc(st.model) + '；管理员账号免审核，不会触发 AI。';
         aiTip.textContent = msg;
         aiTip.style.display = '';

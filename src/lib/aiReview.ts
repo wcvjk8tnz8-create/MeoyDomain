@@ -28,11 +28,33 @@ import { normalizeDomain, parseRootList } from './roots.js';
 
 const KEYS = [
   'ai_review_enabled', 'ai_review_roots', 'ai_api_url', 'ai_api_key', 'ai_model',
-  'ai_api_endpoint', 'ai_endpoint_mode', 'dns_unlimited_roots',
+  'ai_api_endpoint', 'ai_endpoint_mode', 'ai_provider', 'dns_unlimited_roots',
 ];
 
 export const DEFAULT_AI_BASE = 'https://apihub.agnes-ai.com/v1';
 export const DEFAULT_AI_ROOTS = 'v-1.top';
+
+/** 审核服务提供方：
+ *  - custom     = 自定义 OpenAI 兼容网关（需 API 地址 + Key）
+ *  - workers-ai = Cloudflare Workers AI（wrangler.toml 里 [ai] binding = "AI"，
+ *                 不需要任何 Key / 地址 / 端点探测，直接 env.AI.run） */
+export type AiProvider = 'custom' | 'workers-ai';
+
+/** Workers AI 文本生成模型（Cloudflare 官方 catalog 里可用于对话的）。
+ *  不同账号可用模型略有差异，因此审核时允许按顺序回退。 */
+export const WORKERS_AI_MODELS = [
+  '@cf/meta/llama-3.1-8b-instruct',
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/meta/llama-3.2-3b-instruct',
+  '@cf/qwen/qwen1.5-14b-chat-awq',
+  '@cf/mistral/mistral-7b-instruct-v0.1',
+  '@cf/google/gemma-7b-it',
+];
+export const DEFAULT_WORKERS_AI_MODEL = WORKERS_AI_MODELS[0];
+
+export function normalizeProvider(v: any): AiProvider {
+  return String(v || '').trim() === 'workers-ai' ? 'workers-ai' : 'custom';
+}
 
 /** Agnes AI 官方 chat 模型清单（来自官方 MODEL_CATALOG 与接入文档）。
  *  即使网关 /models 不可用，也能直接从这里选，审核不会因此瘫痪。 */
@@ -62,12 +84,17 @@ export interface AiConfig {
   /** auto=先直连地址本身、失败回落子路径；direct=只直连；standard=只用官方子路径 */
   mode: EndpointMode;
   unlimitedRoots: string[];
+  /** 服务提供方；workers-ai 时 base/key/endpoint/mode 全部不参与 */
+  provider: AiProvider;
+  /** Workers AI binding 是否真的挂在 Worker 上（没挂就等于没配置） */
+  workersAiAvailable: boolean;
+  /** 是否具备调用条件：custom 看 Key，workers-ai 看 binding */
   configured: boolean;
 }
 
 /** AI 未触发的精确原因。此前一律静默返回 null，用户只看到「等待审核」却不知道为什么。 */
 export type AiSkipReason =
-  | 'disabled' | 'no-key' | 'no-model' | 'root-not-listed'
+  | 'disabled' | 'no-key' | 'no-binding' | 'no-model' | 'root-not-listed'
   | 'all-models-failed' | 'parse-failed' | 'timeout';
 
 export interface AiDiag {
@@ -81,6 +108,7 @@ export interface AiDiag {
   model: string;
   attempts: string[];
   enabled: boolean;
+  provider: AiProvider;
   /** 真正向模型网关发出请求到拿到结论的耗时（毫秒）。
       短路跳过（没 Key / 名单外 / 没选模型）恒为 0 —— 用来区分
       「AI 审过」和「压根没调模型」，避免秒过被误认成 AI 审核。 */
@@ -91,11 +119,12 @@ export function explainAiSkip(r: AiSkipReason | null): string {
   switch (r) {
     case 'disabled': return '后台「AI 自动审核」开关未开启';
     case 'no-key': return '未配置 API Key（后台填一次，或 npx wrangler secret put AI_API_KEY）';
-    case 'no-model': return '后台未选定审核模型；请先点「探测模型」并从网关清单里选一个';
+    case 'no-binding': return 'Workers AI 未绑定：请在 wrangler.toml 加 [ai] binding = "AI" 后重新部署，或改用自定义 API';
+    case 'no-model': return '后台未选定审核模型；请先点「探测模型」并从清单里选一个';
     case 'root-not-listed': return '当前根域名不在「AI 自动审核名单」里；名单填 * 可对所有根域名生效';
     case 'all-models-failed': return '所有候选模型调用失败（网关报错或网络不可达），已回落人工审核';
     case 'parse-failed': return '模型有回复但结论无法解析，已回落人工审核';
-    case 'timeout': return 'AI 调用超时（单端点 9 秒 / 总预算 20 秒），已回落人工审核';
+    case 'timeout': return 'AI 调用超时（单端点 9 秒 / 总预算 30 秒），已回落人工审核';
     default: return '';
   }
 }
@@ -125,17 +154,28 @@ export async function loadAiConfig(env: any): Promise<AiConfig> {
   const rootsRaw = m.ai_review_roots || envStr(env, 'AI_REVIEW_ROOTS') || DEFAULT_AI_ROOTS;
   const unlimitedRaw = m.dns_unlimited_roots || envStr(env, 'DNS_UNLIMITED_ROOTS') || DEFAULT_AI_ROOTS;
 
+  const provider = normalizeProvider(m.ai_provider || envStr(env, 'AI_PROVIDER'));
+  const workersAiAvailable = !!env?.AI && typeof env.AI.run === 'function';
+  // custom 需要 Key；workers-ai 只要 binding 挂上就能用，无需任何密钥
+  const configured = provider === 'workers-ai' ? workersAiAvailable : !!key;
+  // 切到 Workers AI 时，若 settings 里还留着自定义网关的模型名，换用内置默认值
+  const rawModel = m.ai_model || envStr(env, 'AI_MODEL');
+  const model = provider === 'workers-ai' && !WORKERS_AI_MODELS.includes(rawModel)
+    ? DEFAULT_WORKERS_AI_MODEL : rawModel;
+
   return {
     enabled: enabledRaw === '1',
     roots: parseRootList(rootsRaw),
     base,
     key,
-    model: m.ai_model || envStr(env, 'AI_MODEL'),
+    model,
     endpoint: (m.ai_api_endpoint || envStr(env, 'AI_API_ENDPOINT')).trim(),
     mode: (['auto', 'direct', 'standard'].includes(m.ai_endpoint_mode)
       ? m.ai_endpoint_mode : 'auto') as EndpointMode,
     unlimitedRoots: parseRootList(unlimitedRaw),
-    configured: !!key,
+    provider,
+    workersAiAvailable,
+    configured,
   };
 }
 
@@ -165,7 +205,8 @@ export interface ProbeAttempt {
 export interface ModelProbe {
   ok: boolean;                    // 是否拿到了可用模型清单（含内置回落）
   models: string[];
-  source: 'gateway' | 'catalog'; // gateway = /models 返回；catalog = 内置官方清单
+  /** gateway = 网关 /models；catalog = 内置 Agnes 清单；workers-ai = Cloudflare 内置模型 */
+  source: 'gateway' | 'catalog' | 'workers-ai';
   message: string;
   detail: string;
   attempts: ProbeAttempt[];
@@ -213,11 +254,25 @@ function modelUrls(base: string): string[] {
  */
 export async function probeAiModels(
   env: any,
-  override: { base?: string; key?: string } = {},
+  override: { base?: string; key?: string; provider?: AiProvider } = {},
 ): Promise<ModelProbe> {
   const cfg = await loadAiConfig(env).catch(() => null);
   const base = String(override.base || cfg?.base || DEFAULT_AI_BASE).trim().replace(/\/+$/, '');
   const key = String(override.key || cfg?.key || '').trim();
+  // 允许后台用「刚在下拉里选、还没保存」的 provider 即时探测一次
+  const provider = normalizeProvider(override.provider || cfg?.provider);
+
+  // Workers AI 没有 /models 端点，也不需要 Key：直接用 Cloudflare 内置清单。
+  // 这样「探测模型」按钮在 Workers AI 模式下是即时的、零网络往返。
+  if (provider === 'workers-ai') {
+    return {
+      ok: true, models: [...WORKERS_AI_MODELS], source: 'workers-ai',
+      message: cfg.workersAiAvailable
+        ? `Workers AI 内置 ${WORKERS_AI_MODELS.length} 个文本模型（无需 API Key）`
+        : 'Workers AI 绑定缺失：请检查 wrangler.toml 的 [ai] binding',
+      detail: cfg.workersAiAvailable ? '' : 'env.AI 不存在', attempts: [],
+    };
+  }
 
   const fallback = (message: string, detail: string, attempts: ProbeAttempt[]): ModelProbe => ({
     ok: true, models: [...AGNES_CHAT_MODELS], source: 'catalog',
@@ -277,18 +332,26 @@ export interface ModelChoice {
 }
 
 /** 从清单里挑一个 chat 模型；管理员已选的保留（手填允许） */
-export async function chooseModel(env: any, models: string[]): Promise<ModelChoice> {
+export async function chooseModel(
+  env: any, models: string[], providerOverride?: AiProvider,
+): Promise<ModelChoice> {
+  const cfg = await loadAiConfig(env).catch(() => null);
+  const isWorkers = normalizeProvider(providerOverride || cfg?.provider) === 'workers-ai';
   let cur = '';
   try {
     const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'ai_model'").first();
     cur = String(row?.value || '').trim();
   } catch { /* 表未就绪 */ }
+  // 从自定义网关切到 Workers AI 时，旧模型名不属于新清单，视为没选
+  if (cur && isWorkers && !WORKERS_AI_MODELS.includes(cur)) cur = '';
   if (cur) return { selected: cur, autoPicked: false, inList: models.includes(cur) };
 
   const chat = models.filter(isChatModel);
-  const pool = chat.length ? chat : AGNES_CHAT_MODELS;
-  // 优先官方 flash 系列，其次任意 chat 模型
-  const picked = (pool.find((m) => /agnes-.*flash/i.test(m)) || pool[0] || AGNES_CHAT_MODELS[0]).slice(0, 80);
+  const pool = isWorkers ? (chat.length ? chat : WORKERS_AI_MODELS)
+    : (chat.length ? chat : AGNES_CHAT_MODELS);
+  // Workers AI 用内置首选；自定义网关优先官方 flash 系列，其次任意 chat 模型
+  const picked = (isWorkers ? (pool[0] || DEFAULT_WORKERS_AI_MODEL)
+    : (pool.find((m) => /agnes-.*flash/i.test(m)) || pool[0] || AGNES_CHAT_MODELS[0])).slice(0, 80);
   if (picked) {
     try {
       await env.DB.prepare(
@@ -421,6 +484,8 @@ function extractText(d: any, raw: string): string {
     d?.output?.[0]?.content?.[0]?.text,
     d?.output?.[0]?.text,
     typeof d?.output === 'string' ? d.output : undefined,
+    // Workers AI 部分模型把正文放在 output.response
+    d?.output?.response,
     d?.text, d?.response, d?.content, d?.result,
     typeof d?.data === 'string' ? d.data : undefined,
   ];
@@ -537,9 +602,70 @@ export interface ChatRun {
   usedModels: string[];
 }
 
+/** Workers AI 单次调用：env.AI.run 不走 HTTP，因此自己包一层超时。
+ *  返回形状在不同模型间不统一（response / output.response / choices），
+ *  统一交给 extractText 解析。 */
+async function runWorkersAi(
+  env: any, model: string, prompt: string, timeoutMs = 12000,
+): Promise<{ text: string; err: string }> {
+  if (!env?.AI || typeof env.AI.run !== 'function') {
+    return { text: '', err: 'env.AI 绑定不存在' };
+  }
+  const body = {
+    messages: [
+      { role: 'system', content: '你是二级域名分发平台的审核助手，请按用户给出的规则给出明确结论。' },
+      { role: 'user', content: prompt },
+    ],
+    max_tokens: 160,
+    temperature: 0.1,
+  };
+  let timer: any;
+  try {
+    const result: any = await Promise.race([
+      env.AI.run(model, body),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('WorkersAITimeout')), timeoutMs);
+      }),
+    ]);
+    const raw = typeof result === 'string' ? result : '';
+    const text = raw || extractText(result, '');
+    return { text: String(text || '').trim(), err: '' };
+  } catch (e) {
+    return { text: '', err: String((e as Error)?.message || e).slice(0, 160) };
+  } finally { clearTimeout(timer); }
+}
+
+/** Workers AI 分支：不需要地址 / Key / 端点，只按顺序试内置模型。 */
+async function reviewWorkersAi(
+  env: any, cfg: AiConfig, prompt: string, signal?: AbortSignal,
+  opts: { extraModels?: string[]; maxModels?: number } = {},
+): Promise<ChatRun> {
+  const usedModels = [...new Set([
+    cfg.model || DEFAULT_WORKERS_AI_MODEL,
+    ...(opts.extraModels || []),
+    ...WORKERS_AI_MODELS,
+  ].filter(Boolean))].slice(0, opts.maxModels || 4);
+
+  const attempts: ChatAttempt[] = [];
+  for (const model of usedModels) {
+    if (signal?.aborted) break;
+    const r = await runWorkersAi(env, model, prompt);
+    if (r.text) {
+      // 只写回模型；不写 ai_api_endpoint，免得污染自定义网关那套端点记忆
+      await rememberSuccess(env, model, '');
+      return {
+        text: r.text, model, endpoint: 'Workers AI · env.AI', attempts, usedModels,
+      };
+    }
+    attempts.push({ url: `Workers AI · ${model}`, status: 0, err: r.err || '无回复' });
+  }
+  return { text: '', model: '', endpoint: '', attempts, usedModels };
+}
+
 /**
  * 后台自检与正式审核共用的实际送审逻辑。
- * - 候选模型以 settings 里选定的为先，其余作为回退（正式审核最多 4 个、不请求 /models）
+ * - Workers AI：env.AI.run，无网络请求、无 Key
+ * - 自定义网关：候选模型以 settings 里选定的为先，其余作为回退
  * - 某个端点已经探明可达后，后续模型只打这个端点，避免重复 9 秒超时拖满预算
  * - 一旦有回复，立刻写回模型 + 端点，之后两条链路都走同一份配置
  */
@@ -550,6 +676,9 @@ async function reviewChat(
   signal?: AbortSignal,
   opts: { extraModels?: string[]; maxModels?: number } = {},
 ): Promise<ChatRun> {
+  if (cfg.provider === 'workers-ai') {
+    return reviewWorkersAi(env, cfg, prompt, signal, opts);
+  }
   const usedModels = [...new Set([
     cfg.model || '',
     ...(opts.extraModels || []),
@@ -603,7 +732,12 @@ export async function aiTest(env: any): Promise<AiTestResult> {
     gatewayModels: [], modelInCatalog: false,
   };
   if (!cfg?.configured) {
-    return { ...blank, message: '未配置 API Key（后台填一次，或用 Worker Secret AI_API_KEY）' };
+    return {
+      ...blank,
+      message: cfg?.provider === 'workers-ai'
+        ? 'Workers AI 未绑定：请在 wrangler.toml 加 [ai] binding = "AI" 后重新部署'
+        : '未配置 API Key（后台填一次，或用 Worker Secret AI_API_KEY）',
+    };
   }
   if (!cfg.enabled) return { ...blank, message: '自动审核开关已关闭' };
 
@@ -611,9 +745,11 @@ export async function aiTest(env: any): Promise<AiTestResult> {
   const timer = setTimeout(() => ctl.abort(), AI_TEST_BUDGET_MS);
   const attempts: string[] = [];
   try {
-    // 用网关真实清单；/models 失败时 probeAiModels 会回落内置清单
+    // 自定义网关用 /models 真实清单（失败回落内置）；Workers AI 用 Cloudflare 内置清单，零请求
     const probe = await probeAiModels(env).catch(() => null);
-    const gatewayModels = (probe?.models || []).filter(isChatModel).slice(0, 12);
+    const gatewayModels = cfg.provider === 'workers-ai'
+      ? (probe?.models || WORKERS_AI_MODELS).slice(0, 12)
+      : (probe?.models || []).filter(isChatModel).slice(0, 12);
     const modelInCatalog = !cfg.model || gatewayModels.includes(cfg.model);
     const prompt = buildReviewPrompt({
       fqdn: 'demo.v-1.top', label: 'demo', root: 'v-1.top', note: '个人博客，用于展示作品集',
@@ -636,13 +772,18 @@ export async function aiTest(env: any): Promise<AiTestResult> {
           + (run.model !== cfg.model ? ` · 已自动把可用模型写回设置（${run.model}）` : ''),
       };
     }
-    for (const m of run.usedModels) attempts.push(`${m} → 端点均未打通`);
+    const failWord = cfg.provider === 'workers-ai' ? '调用未返回正文' : '端点均未打通';
+    for (const m of run.usedModels) attempts.push(`${m} → ${failWord}`);
     for (const a of run.attempts) {
-      attempts.push(`  ${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`);
+      attempts.push(cfg.provider === 'workers-ai'
+        ? `  ${a.url} → ${a.err || '无回复'}`
+        : `  ${a.url} → HTTP ${a.status}${a.err ? ' · ' + a.err.slice(0, 80) : ''}`);
     }
-    const hint = cfg.model && !modelInCatalog
-      ? `当前模型 ${cfg.model} 不在网关 /models 清单里，请从清单改选`
-      : '检查接口地址与模型名';
+    const hint = cfg.provider === 'workers-ai'
+      ? '确认 wrangler.toml 已配置 [ai] binding 并从内置清单改选模型'
+      : (cfg.model && !modelInCatalog
+        ? `当前模型 ${cfg.model} 不在网关 /models 清单里，请从清单改选`
+        : '检查接口地址与模型名');
     return {
       ...blank, latencyMs: Date.now() - t0, attempts, gatewayModels, modelInCatalog,
       message: `所有候选模型均调用失败 · ${hint}`,
@@ -672,7 +813,8 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
   const cfg = await loadAiConfig(env).catch(() => null);
   const diag: AiDiag = {
     applies: false,
-    endpoint: cfg?.endpoint || cfg?.base || '',
+    endpoint: cfg?.provider === 'workers-ai'
+      ? 'Workers AI · env.AI' : (cfg?.endpoint || cfg?.base || ''),
     skipReason: null,
     skipText: '',
     root,
@@ -681,6 +823,7 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
     model: cfg?.model || '',
     attempts: [],
     enabled: !!cfg?.enabled,
+    provider: cfg?.provider || 'custom',
     elapsedMs: 0,
   };
   let startedAt = 0;   // 只在真正发请求后才计时；短路跳过恒为 0
@@ -694,14 +837,16 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
 
   if (!cfg) return skip('no-key');
   if (!cfg.enabled) return skip('disabled');
-  if (!cfg.configured) return skip('no-key');
+  if (!cfg.configured) return skip(cfg.provider === 'workers-ai' ? 'no-binding' : 'no-key');
   if (!root || !rootInAiList(cfg, root)) return skip('root-not-listed');
   if (!cfg.model) return skip('no-model');
   diag.applies = true;
   startedAt = Date.now();
 
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), AI_REVIEW_BUDGET_MS);
+  // Workers AI 每个模型自带 12s 超时，4 个候选最多 48s；给足预算别被提前掐断
+  const budget = cfg.provider === 'workers-ai' ? 48000 : AI_REVIEW_BUDGET_MS;
+  const timer = setTimeout(() => ctl.abort(), budget);
   try {
     const prompt = buildReviewPrompt(input);
     // 与后台自检同一套送审逻辑：优先 settings 里选定的模型，失败时可回退到

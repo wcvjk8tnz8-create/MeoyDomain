@@ -20,6 +20,10 @@ export interface Env {
   AVATARS?: R2Bucket;
   /** Workers 静态资源 */
   ASSETS?: Fetcher;
+  /** Cloudflare Workers AI 绑定（wrangler.toml [ai]）。
+   *  自定义网关模式下不存在，运行时必须判空；用最小结构声明，
+   *  避免依赖 @cloudflare/workers-types 里 Ai 接口的版本差异。 */
+  AI?: { run(model: string, input: Record<string, unknown>): Promise<unknown> };
 
   // ── Secrets（wrangler secret put 写入）──
   CF_API_TOKEN?: string;
@@ -48,6 +52,8 @@ export interface Env {
   AI_MODEL?: string;
   AI_REVIEW_ENABLED?: string;
   AI_REVIEW_ROOTS?: string;
+  /** custom（默认）= 自定义 OpenAI 兼容网关；workers-ai = Cloudflare 内置 */
+  AI_PROVIDER?: string;
   DNS_UNLIMITED_ROOTS?: string;
 }
 

@@ -153,10 +153,11 @@ app.get('/api/config', async (c) => {
     aiStatus: ai ? {
       enabled: ai.enabled,
       ready: ai.configured,
+      provider: ai.provider,
       roots: ai.roots,
       model: ai.model || '',
       modelSelected: !!ai.model,
-    } : { enabled: false, ready: false, roots: [], model: '', modelSelected: false },
+    } : { enabled: false, ready: false, provider: 'custom', roots: [], model: '', modelSelected: false },
     // 邮箱验证码：mailOk 表示邮件服务已配置（可发送），verifyRequired 表示后台开了注册验证
     mailOk,
     mailVerifyRequired: verifyRequired,

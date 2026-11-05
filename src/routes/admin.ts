@@ -11,7 +11,8 @@ import { expiryRules, computeExpiry, expiryState, renewExpiry, ensureExpiryColum
 import { clearDnsProviderCache, dnsProvider } from '../lib/cf.js';
 import { spaceshipConfig, spaceshipEnabled, listSpaceshipDomains, testSpaceship } from '../lib/spaceship.js';
 import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList, setDnsBackend } from '../lib/rootStore.js';
-import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS, rootInAiList, endpointCandidates } from '../lib/aiReview.js';
+import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS, rootInAiList, endpointCandidates,
+  normalizeProvider, WORKERS_AI_MODELS, DEFAULT_WORKERS_AI_MODEL } from '../lib/aiReview.js';
 
 const app = new Hono();
 
@@ -474,10 +475,13 @@ app.get('/settings', async (c) => {
     // 按根域名的积分覆盖（0 = 免费；未列出的后缀按全局规则）
     rootPointCosts: parseRootCosts(raw.root_point_costs),
 
-    // AI 自动审核（Agnes AI 等 OpenAI 兼容网关）
+    // AI 自动审核（自定义 OpenAI 兼容网关 / Workers AI）
     ai: {
       enabled: String(raw.ai_review_enabled || '1').trim() === '1',
       roots: String(raw.ai_review_roots || 'v-1.top').trim(),
+      provider: normalizeProvider(raw.ai_provider || c.env.AI_PROVIDER),
+      workersAiAvailable: !!c.env.AI && typeof c.env.AI.run === 'function',
+      workersAiModels: [...WORKERS_AI_MODELS],
       url: String(raw.ai_api_url || c.env.AI_API_URL || 'https://apihub.agnes-ai.com/v1').trim(),
       model: String(raw.ai_model || c.env.AI_MODEL || '').trim(),
       modelSelected: !!String(raw.ai_model || c.env.AI_MODEL || '').trim(),
@@ -516,18 +520,24 @@ app.post('/ai-models', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const blank = { selected: '', autoPicked: false, inList: false };
   try {
+    const typedProvider = body.aiProvider !== undefined
+      ? normalizeProvider(body.aiProvider) : undefined;
     const p = await probeAiModels(c.env, {
       base: String(body.aiUrl || '').trim(),
       key: String(body.aiApiKey || '').trim(),
+      provider: typedProvider,
     });
     let choice = blank;
-    if (p.ok) choice = await chooseModel(c.env, p.models);
+    if (p.ok) choice = await chooseModel(c.env, p.models, typedProvider);
+    const isWorkers = p.source === 'workers-ai'
+      || normalizeProvider(typedProvider || '') === 'workers-ai';
     await audit(c, c.get('user')?.id, 'admin.ai-models', 'ai',
       `${p.source === 'gateway' ? '网关清单' : '内置清单'} · ${p.models.length} 个模型 · 选用 ${choice.selected || '（未选）'}`);
     return ok(c, {
       ok: p.ok, models: p.models, message: p.message, detail: p.detail,
       source: p.source, attempts: p.attempts,
-      chatModels: AGNES_CHAT_MODELS,
+      chatModels: isWorkers ? WORKERS_AI_MODELS : AGNES_CHAT_MODELS,
+      provider: isWorkers ? 'workers-ai' : 'custom',
       selected: choice.selected, autoPicked: choice.autoPicked, inList: choice.inList,
     });
   } catch (e) {
@@ -544,21 +554,33 @@ app.post('/ai-models', async (c) => {
 app.post('/ai-diagnose', async (c) => {
   try {
     const cfg = await loadAiConfig(c.env);
-    const probe = cfg.configured ? await probeAiModels(c.env) : null;
+    // Workers AI 的「探测」是返回内置清单，不发任何网络请求，因此即使
+    // binding 缺失也照常跑，好把「绑定缺失」和「模型清单」都列出来。
+    const probe = (cfg.configured || cfg.provider === 'workers-ai')
+      ? await probeAiModels(c.env) : null;
     const test = cfg.configured ? await aiTest(c.env) : null;
+    const isWorkers = cfg.provider === 'workers-ai';
     const allRoots = listRoots(c.env).map((r) => r.domain);
     const MODE_TEXT: Record<string, string> = {
       auto: '自动（先直连地址本身，失败回落子路径）',
       direct: '强制直连（不调用 /chat/completions）',
       standard: '标准 OpenAI（/chat/completions）',
     };
-    const lines = [
-      `API Key：${cfg.configured ? '已配置' : '未配置'}`,
+    const providerLines = isWorkers ? [
+      '审核服务：Workers AI（Cloudflare 内置，无需 API Key / 接口地址 / 端点探测）',
+      `Workers AI 绑定：${cfg.workersAiAvailable ? '✓ 已绑定 env.AI' : '✗ 未绑定 —— 检查 wrangler.toml 的 [ai] binding = "AI" 并重新部署'}`,
+      `内置候选模型：${WORKERS_AI_MODELS.join(', ')}`,
+    ] : [
+      '审核服务：自定义 OpenAI 兼容网关',
+      `API Key：${cfg.key ? '已配置' : '未配置'}`,
       `接口地址（填写值）：${cfg.base}`,
       `端点模式：${MODE_TEXT[cfg.mode] || MODE_TEXT.auto}`,
       `已记住的成功端点：${cfg.endpoint || '（尚未成功调用过）'}`,
       `候选请求地址：${endpointCandidates(cfg).join(' → ')}`,
-      `当前模型：${cfg.model || '（未选，审核时用 ' + AGNES_CHAT_MODELS[0] + '）'}`,
+    ];
+    const lines = [
+      ...providerLines,
+      `当前模型：${cfg.model || '（未选，审核时用 ' + (isWorkers ? DEFAULT_WORKERS_AI_MODEL : AGNES_CHAT_MODELS[0]) + '）'}`,
       `自动审核开关：${cfg.enabled ? '开启' : '关闭'}`,
       `作用根域名：${cfg.roots.join(', ') || '（无）'}${cfg.roots.includes('*') ? '  ← * 表示所有根域名' : ''}`,
       `全局 REQUIRE_APPROVAL：${c.env.REQUIRE_APPROVAL || '（未设置）'}（现已不作为 AI 的前置条件）`,
@@ -567,10 +589,11 @@ app.post('/ai-diagnose', async (c) => {
       ...(allRoots.length ? allRoots : ['（未配置）']).map(
         (d) => `  ${d} → ${rootInAiList(cfg, d) ? '✓ 会触发' : '✗ 不在名单，申请会走人工审核'}`,
       ),
-      `/models：${probe ? (probe.source === 'gateway' ? '网关返回 ' + probe.models.length + ' 个' : '不可用，已回落内置清单') : '未检测'}`,
-      `网关模型清单：${(probe?.models || []).slice(0, 20).join(', ') || '（无）'}`,
-      `当前模型是否在网关清单中：${test?.modelInCatalog === false ? '✗ 不在 —— 请从上面的清单里改选（大小写必须一致）' : (test?.modelInCatalog ? '✓ 在' : '未检测')}`,
-      `实际打通地址：${test?.ok ? test.endpoint + (test.model !== cfg.model ? `（已把可用模型 ${test.model} 写回设置）` : '') : '（无）'}`,
+      `/models：${isWorkers ? '不适用（Workers AI 使用内置模型清单）'
+        : (probe ? (probe.source === 'gateway' ? '网关返回 ' + probe.models.length + ' 个' : '不可用，已回落内置清单') : '未检测')}`,
+      `可用模型清单：${(probe?.models || []).slice(0, 20).join(', ') || '（无）'}`,
+      `当前模型是否在可用清单中：${test?.modelInCatalog === false ? '✗ 不在 —— 请从上面的清单里改选（大小写必须一致）' : (test?.modelInCatalog ? '✓ 在' : '未检测')}`,
+      `${isWorkers ? '实际调用方式' : '实际打通地址'}：${test?.ok ? test.endpoint + (test.model !== cfg.model ? `（已把可用模型 ${test.model} 写回设置）` : '') : '（无）'}`,
       `审核调用：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
       `审核调用耗时：${test ? (test.latencyMs / 1000).toFixed(1) + 's' + (test.ok ? '（真实模型往返）' : '（失败前的探测）') : '未检测'}`,
       // 真调模型必然有网络往返（通常 1–5 秒）；「提交后立刻开通」一定是短路，不是 AI 判定
@@ -579,13 +602,15 @@ app.post('/ai-diagnose', async (c) => {
         : '全局免审核：无论 AI 是否调用成功都会直接开通（AI 未参与时界面会写明「免审核直接开通」，不会冒充 AI 通过）'}`,
     ];
     const blockers = [];
-    if (!cfg.configured) blockers.push('未配置 API Key');
+    if (!cfg.configured) blockers.push(isWorkers ? 'Workers AI 未绑定' : '未配置 API Key');
     if (!cfg.enabled) blockers.push('自动审核开关未开启');
     const matched = allRoots.filter((d) => rootInAiList(cfg, d));
     if (!matched.length) blockers.push(`AI 名单（${cfg.roots.join(', ') || '空'}）没有覆盖任何当前根域名`);
-    if (!cfg.model) blockers.push('后台未选定审核模型');
-    if (cfg.model && test?.modelInCatalog === false) blockers.push('模型名不在网关 /models 清单里');
-    if (cfg.configured && !test?.ok) blockers.push('审核接口调用失败');
+    if (!cfg.model && !isWorkers) blockers.push('后台未选定审核模型');
+    if (cfg.model && test?.modelInCatalog === false) {
+      blockers.push(isWorkers ? '模型名不在 Workers AI 内置清单里' : '模型名不在网关 /models 清单里');
+    }
+    if (cfg.configured && !test?.ok) blockers.push(isWorkers ? 'Workers AI 调用失败' : '审核接口调用失败');
     lines.push(blockers.length
       ? `结论：AI 不会自动审核 → ${blockers.join('；')}${c.env.REQUIRE_APPROVAL !== '1' ? '；但全局免审核仍会让申请秒过（不是 AI 审的）' : ''}`
       : c.env.REQUIRE_APPROVAL !== '1'
@@ -600,6 +625,7 @@ app.post('/ai-diagnose', async (c) => {
       test?.ok ? `可用 · ${test.model}` : `不可用 · ${test?.message || '未配置 Key'}`);
     return ok(c, {
       ok: !!test?.ok, lines, keySet: cfg.configured, base: cfg.base,
+      provider: cfg.provider, workersAiAvailable: cfg.workersAiAvailable,
       model: cfg.model, modelFromCatalog: !cfg.model,
       gatewayModels: probe?.models || [], modelInCatalog: !!test?.modelInCatalog,
       probeSource: probe?.source || '', testOk: !!test?.ok,
@@ -688,7 +714,20 @@ app.post('/settings', async (c) => {
     if ((await getSetting('ai_endpoint_mode')) !== mode) await set('ai_api_endpoint', '');
     await set('ai_endpoint_mode', mode);
   }
-  if (body.aiModel !== undefined) await set('ai_model', String(body.aiModel || '').trim().slice(0, 80));
+  /* 审核服务提供方：custom（自定义网关）/ workers-ai（Cloudflare 内置）。
+     切换时清掉自定义网关记住的端点，避免两个服务互相污染。 */
+  if (body.aiProvider !== undefined) {
+    const p = normalizeProvider(body.aiProvider);
+    if ((await getSetting('ai_provider')) !== p) await set('ai_api_endpoint', '');
+    await set('ai_provider', p);
+  }
+  if (body.aiModel !== undefined) {
+    let m = String(body.aiModel || '').trim().slice(0, 80);
+    // 切到 Workers AI 后，旧网关模型名不属于 Cloudflare 清单，直接换成内置默认
+    if (normalizeProvider(await getSetting('ai_provider')) === 'workers-ai'
+      && m && !WORKERS_AI_MODELS.includes(m)) m = DEFAULT_WORKERS_AI_MODEL;
+    await set('ai_model', m);
+  }
   if (String(body.aiApiKey || '').trim()) await set('ai_api_key', String(body.aiApiKey).trim().slice(0, 300));
   else if (body.aiClearKey === true) await set('ai_api_key', '');
 
