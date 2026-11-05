@@ -16,7 +16,10 @@ export default function RegisterPage() {
   const [ok1, setOk1] = useState(true);          // 须知默认已确认，可回第一步重新勾选
   const [ok2, setOk2] = useState(true);
   const [summary, setSummary] = useState<Summary>({ label: '', root: '', fqdn: '', note: '' });
-  const [done, setDone] = useState<{ fqdn: string; status: string; ai: boolean } | null>(null);
+  const [done, setDone] = useState<{
+    fqdn: string; status: string; ai: boolean; source: string;
+    ms: number; model: string; reason: string; skip: string;
+  } | null>(null);
   const [count, setCount] = useState(0);
   const [noteCount, setNoteCount] = useState(0);
 
@@ -33,6 +36,11 @@ export default function RegisterPage() {
         fqdn: String(r?.fqdn || ''),
         status: String(r?.status || ''),
         ai: !!r?.aiReviewed,
+        source: String(r?.approvalSource || ''),
+        ms: Number(r?.aiElapsedMs || 0),
+        model: String(r?.aiModel || ''),
+        reason: String(r?.aiReason || ''),
+        skip: String(r?.aiSkipText || ''),
       });
       setStep(4);
     };
@@ -172,12 +180,23 @@ export default function RegisterPage() {
             <h3>申请已提交</h3>
             <p className="mono">{done?.fqdn || summary.fqdn}</p>
             <p className="dim">
-              {done?.status === 'approved'
-                ? (done?.ai ? 'AI 自动审核通过，已即时开通' : '审核通过，已即时开通')
-                : done?.status === 'rejected'
-                  ? 'AI 审核未通过，请返回修改用途说明'
-                  : '已提交，等待管理员审核'}
+              {done?.status === 'rejected'
+                ? `AI 审核未通过：${done?.reason || '请修改用途说明后再试'}`
+                : done?.status === 'approved' && done?.source === 'ai-pass'
+                  ? `AI 自动审核通过（模型 ${done?.model || '自动探测'}，耗时 ${(done?.ms || 0) / 1000}s），已即时开通`
+                  : done?.status === 'approved' && done?.source === 'admin'
+                    ? '管理员自建，免审核，已直接开通（AI 未调用）'
+                    : done?.status === 'approved'
+                      ? `当前为免审核模式，已直接开通（AI 未参与${done?.skip ? '：' + done?.skip : ''}）`
+                      : done?.skip
+                        ? `已提交，等待管理员审核（AI 未自动审核：${done?.skip}）`
+                        : '已提交，等待管理员审核'}
             </p>
+            {done?.status === 'approved' && done?.source !== 'ai-pass' && (
+              <p className="dim" style={{ fontSize: 12 }}>
+                这次是「免审核直接开通」，不是 AI 判定；真跑模型要 1–5 秒（最坏 20 秒）。
+              </p>
+            )}
             <div className="reg-actions center">
               <button className="btn ghost" onClick={() => { setDone(null); setStep(2); }}>再注册一个</button>
               <a className="btn primary" href="/dashboard">查看我的域名 →</a>

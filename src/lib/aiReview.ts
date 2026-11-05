@@ -76,6 +76,10 @@ export interface AiDiag {
   model: string;
   attempts: string[];
   enabled: boolean;
+  /** 真正向模型网关发出请求到拿到结论的耗时（毫秒）。
+      短路跳过（没 Key / 名单外 / 没选模型）恒为 0 —— 用来区分
+      「AI 审过」和「压根没调模型」，避免秒过被误认成 AI 审核。 */
+  elapsedMs: number;
 }
 
 export function explainAiSkip(r: AiSkipReason | null): string {
@@ -86,7 +90,7 @@ export function explainAiSkip(r: AiSkipReason | null): string {
     case 'root-not-listed': return '当前根域名不在「AI 自动审核名单」里；名单填 * 可对所有根域名生效';
     case 'all-models-failed': return '所有候选模型调用失败（网关报错或网络不可达），已回落人工审核';
     case 'parse-failed': return '模型有回复但结论无法解析，已回落人工审核';
-    case 'timeout': return 'AI 调用超时（12 秒），已回落人工审核';
+    case 'timeout': return 'AI 调用超时（单端点 9 秒 / 总预算 20 秒），已回落人工审核';
     default: return '';
   }
 }
@@ -618,7 +622,9 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
     model: cfg?.model || '',
     attempts: [],
     enabled: !!cfg?.enabled,
+    elapsedMs: 0,
   };
+  let startedAt = 0;   // 只在真正发请求后才计时；短路跳过恒为 0
   const skip = (r: AiSkipReason): AiReviewOutcome => {
     diag.skipReason = r;
     diag.skipText = explainAiSkip(r);
@@ -631,6 +637,7 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
   if (!root || !rootInAiList(cfg, root)) return skip('root-not-listed');
   if (!cfg.model) return skip('no-model');
   diag.applies = true;
+  startedAt = Date.now();
 
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), AI_REVIEW_BUDGET_MS);
@@ -654,6 +661,7 @@ export async function aiReviewDetailed(env: any, input: ReviewInput): Promise<Ai
     return skip(ctl.signal.aborted ? 'timeout' : 'all-models-failed');
   } finally {
     clearTimeout(timer);
+    if (startedAt) diag.elapsedMs = Date.now() - startedAt;
   }
 }
 

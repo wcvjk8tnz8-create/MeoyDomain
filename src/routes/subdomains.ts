@@ -279,9 +279,21 @@ const createMine = async (c) => {
   }
   const aiApproved = !!ai?.approve;
   const aiRejected = !!ai && !ai.approve;
+  const aiElapsedMs = Number(aiDiag?.elapsedMs || 0);
+  const noApprovalRequired = c.env.REQUIRE_APPROVAL !== '1';
+
+  // 明确「是谁让这个域名通过的」。以前只要 REQUIRE_APPROVAL ≠ 1 就直接
+  // approved 并写 reviewed_at，界面显示「审核通过，已即时开通」—— 但 AI
+  // 可能压根没调用（没 Key / 名单外 / 网关失败）。用户看到「秒过」却以为
+  // 是 AI 审的，就是这个语义混淆。现在来源可枚举、可审计、可显示耗时。
+  const approvalSource = aiRejected ? 'ai-reject'
+    : aiApproved ? 'ai-pass'
+      : isAdmin ? 'admin'
+        : noApprovalRequired ? 'no-approval-required'
+          : 'pending-manual';
 
   // 免审核：全局关闭审核 / 管理员 / AI 判定通过
-  const autoApprove = c.env.REQUIRE_APPROVAL !== '1' || isAdmin || aiApproved;
+  const autoApprove = noApprovalRequired || isAdmin || aiApproved;
   const status = aiRejected ? 'rejected' : autoApprove ? 'approved' : 'pending';
   const statusReason = aiRejected ? String(ai.reason || 'AI 审核未通过').slice(0, 200) : '';
 
@@ -298,7 +310,10 @@ const createMine = async (c) => {
     )
       .bind(
         v.label, reqRoot, fqdn, u.id, status, String(note || '').slice(0, 300), statusReason,
-        expiresAt, isPerpetual, now(), now(), (autoApprove || aiRejected) ? now() : null
+        expiresAt, isPerpetual, now(), now(),
+        // reviewed_at 语义是「审核发生的时间」：只有 AI 真的给出结论才写。
+        // 免审核直接开通 / 管理员自建不算审核，不写，避免冒充已审。
+        (aiApproved || aiRejected) ? now() : null
       )
       .run();
   } catch (e) {
@@ -321,9 +336,10 @@ const createMine = async (c) => {
     );
   }
 
-  const detail = [status];
-  if (isAdmin) detail.push('管理员免审核，AI 不触发');
-  else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · 模型 ${ai.model || '自动探测'} · ${ai.reason}`);
+  const detail = [status, `来源 ${approvalSource}`];
+  if (isAdmin) detail.push('管理员自建，免审核（AI 未调用）');
+  else if (ai) detail.push(`AI 自动审核：${aiApproved ? '通过' : '驳回'} · 模型 ${ai.model || '自动探测'} · 耗时 ${aiElapsedMs}ms · ${ai.reason}`);
+  else if (noApprovalRequired) detail.push(`全局免审核直接开通，AI 未参与（${aiDiag?.skipText || '未触发'}）`);
   else detail.push(`AI 未触发：${aiDiag?.skipText || '审核模块异常，已回落人工审核'}${aiDiag?.attempts?.length ? ' · ' + aiDiag.attempts.join(' | ').slice(0, 240) : ''}`);
   if (!isAdmin && !aiRejected) {
     if (cost === 0) detail.push(rootOverride ? `${reqRoot} 单独设为 0 分（免费）` : '积分为 0，免费开通');
@@ -339,6 +355,8 @@ const createMine = async (c) => {
     aiReviewed: !!ai,
     aiReason: ai ? String(ai.reason || '') : '',
     aiModel: ai ? String(ai.model || '') : '',
+    aiElapsedMs,
+    approvalSource,
     aiSkip: isAdmin ? 'admin' : ai ? null : (aiDiag?.skipReason || 'unavailable'),
     aiSkipText: isAdmin ? '管理员免审核' : (aiDiag?.skipText || ''),
     aiAttempts: aiDiag?.attempts || [],

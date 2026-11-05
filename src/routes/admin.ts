@@ -572,6 +572,11 @@ app.post('/ai-diagnose', async (c) => {
       `当前模型是否在网关清单中：${test?.modelInCatalog === false ? '✗ 不在 —— 请从上面的清单里改选（大小写必须一致）' : (test?.modelInCatalog ? '✓ 在' : '未检测')}`,
       `实际打通地址：${test?.ok ? test.endpoint : '（无）'}`,
       `审核调用：${test ? (test.ok ? '可用 · ' + test.model : '不可用 · ' + test.message) : '未检测'}`,
+      `审核调用耗时：${test ? (test.latencyMs / 1000).toFixed(1) + 's' + (test.ok ? '（真实模型往返）' : '（失败前的探测）') : '未检测'}`,
+      // 真调模型必然有网络往返（通常 1–5 秒）；「提交后立刻开通」一定是短路，不是 AI 判定
+      `审核结果语义：${c.env.REQUIRE_APPROVAL === '1'
+        ? '需要审核：AI 通过才立即开通，AI 失败则进入人工审核'
+        : '全局免审核：无论 AI 是否调用成功都会直接开通（AI 未参与时界面会写明「免审核直接开通」，不会冒充 AI 通过）'}`,
     ];
     const blockers = [];
     if (!cfg.configured) blockers.push('未配置 API Key');
@@ -582,8 +587,10 @@ app.post('/ai-diagnose', async (c) => {
     if (cfg.model && test?.modelInCatalog === false) blockers.push('模型名不在网关 /models 清单里');
     if (cfg.configured && !test?.ok) blockers.push('审核接口调用失败');
     lines.push(blockers.length
-      ? `结论：AI 不会自动审核 → ${blockers.join('；')}`
-      : '结论：配置齐全，普通用户在名单内根域名申请会由 AI 自动判定');
+      ? `结论：AI 不会自动审核 → ${blockers.join('；')}${c.env.REQUIRE_APPROVAL !== '1' ? '；但全局免审核仍会让申请秒过（不是 AI 审的）' : ''}`
+      : c.env.REQUIRE_APPROVAL !== '1'
+        ? '结论：配置齐全，但当前为全局免审核 —— 申请会瞬间开通，AI 仍会尝试判定并可驳回违规内容，通过时界面会显示实际耗时'
+        : '结论：配置齐全，普通用户在名单内根域名申请会由 AI 自动判定');
     if (test?.attempts?.length) lines.push('候选模型逐项：' + test.attempts.join(' | ').slice(0, 500));
     if (probe?.attempts?.length) {
       lines.push('/models 请求明细：');

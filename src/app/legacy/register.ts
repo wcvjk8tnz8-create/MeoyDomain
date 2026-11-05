@@ -266,10 +266,21 @@ export async function mountRegister(_root: HTMLElement | null): Promise<void> {
       var pendingMsg = r.aiSkipText
         ? '已提交，等待管理员审核（AI 未自动审核：' + r.aiSkipText + '）'
         : '已提交，等待管理员审核';
+      // 别把「免审核直接开通」说成「审核通过」：AI 可能压根没调用。
+      // 真跑模型会有一次网关往返 + 推理（约 1–5 秒），耗时字段可验证。
+      var approvedMsg = r.aiReviewed
+        ? 'AI 审核通过（' + (r.aiModel || '自动探测') + '，'
+          + (Number(r.aiElapsedMs || 0) / 1000).toFixed(1) + 's），已自动开通'
+        : r.approvalSource === 'admin'
+          ? '管理员自建，免审核，已直接开通（AI 未调用）'
+          : r.approvalSource === 'no-approval-required'
+            ? '免审核模式，已直接开通（AI 未参与'
+              + (r.aiSkipText ? '：' + r.aiSkipText : '') + '）'
+            : '申请成功，已开通';
       toast(rejected
         ? 'AI 审核未通过：' + (r.aiReason || '请修改用途说明后再试')
         : r.status === 'approved'
-          ? (r.aiReviewed ? 'AI 审核通过，已自动开通' : '申请成功，已开通')
+          ? approvedMsg
           : pendingMsg, rejected ? 'err' : 'ok');
       if (rejected) {
         // 驳回时保留输入，方便用户改写用途说明重新提交；不跳转
