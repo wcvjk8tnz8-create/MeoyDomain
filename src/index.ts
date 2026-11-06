@@ -123,6 +123,26 @@ app.get('/api/avatar/:key', async (c) => {
   return new Response(obj.body, { headers });
 });
 
+/**
+ * 公开配置跨域：根域名静态页挂在 meoy.top / v-1.top 等独立域上，
+ * 需要 fetch 官网的 /api/config 才能拿到「全部生效后缀」。
+ * 该接口只读、不含任何密钥或用户信息，允许任意来源读取；
+ * 其余 /api/* 接口保持同源，不受影响。
+ */
+app.use('/api/config', async (c, next) => {
+  const origin = c.req.header('Origin') || '*';
+  const hdrs: Record<string, string> = {
+    'Access-Control-Allow-Origin': origin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Accept, Content-Type',
+    'Access-Control-Max-Age': '600',
+  };
+  if (c.req.method === 'OPTIONS') return new Response(null, { status: 204, headers: hdrs });
+  await next();
+  try { for (const [k, v] of Object.entries(hdrs)) c.res.headers.set(k, v); } catch { /* 响应不可写时忽略 */ }
+});
+
 // 前端初始化配置
 // 公开配置（含站点品牌，登录页也要用）
 app.get('/api/config', async (c) => {

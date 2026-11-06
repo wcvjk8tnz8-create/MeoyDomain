@@ -135,7 +135,15 @@
 
 **数据源**
 
-- **DNSHE 系后缀**（`de5.net` `us.ci` `cc.cd` `ccwu.cc` `bot.cd` `dnshe.com`）
+> **口径说明（勿混淆）**：DNSHE 的**托管服务主域是 `dnshe.org`**
+> （面板 `my.dnshe.org`、WHOIS 入口 `whois.dnshe.org`）；
+> 用户在该服务里**注册到的公共域名后缀才落在 `.com` 侧**，例如 `xxx.dnshe.com`。
+> 其余分发后缀见下表；`api005.dnshe.com` 与 `ns1/2.dnshe.com` 是 API / NS 主机，
+> 同样属于 `.com` 侧的基础设施，不代表服务主域是 `.com`。
+> 代码中 `DNSHE_SUFFIXES` 只列「分发后缀」，判断 WHOIS 数据源用；
+> 涉及服务官网、面板、帮助入口时一律用 `dnshe.org`。
+
+- **DNSHE 系分发后缀**（`de5.net` `us.ci` `cc.cd` `ccwu.cc` `bot.cd` `dnshe.com`）
   → `https://api005.dnshe.com/index.php?m=domain_hub&endpoint=whois&domain=xxx`
 
 **DNSHE 凭证（推荐配置，额度更高更稳）**，两种填法任选：
@@ -156,7 +164,7 @@
 
 **缓存**：结果写入 `whois_cache` 表，TTL 6 小时。上游失败时若有旧缓存仍展示，并标注时间。
 
-**第三方直达链接**（结果卡片底部）：whois.dnshe.com / ICANN Lookup。
+**第三方直达链接**（结果卡片底部）：whois.dnshe.org / ICANN Lookup。
 （原 whois.com 已移除 —— DNSHE 公开 WHOIS 本身就能查外部域名，无需再外跳。）
 
 **托管服务说明卡**（仿 DNSHE 公共域名说明页）

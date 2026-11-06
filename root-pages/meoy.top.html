@@ -187,6 +187,8 @@ h1 em{font-style:italic;color:var(--acc)}
 var PANEL = "https://nic.299282.xyz";   /* 官网 / 控制台地址，不带结尾斜杠 */
 var ABUSE_EMAIL = "abuse@meoy.top";     /* 举报邮箱，改成你能收信的地址 */
 var ROOT = "meoy.top";                  /* 本页对应的根域名 */
+/* 跨域拉不到官网 /api/config 时的兜底清单；新增根域名时请同步加进来 */
+var KNOWN_ROOTS = ["meoy.top", "v-1.top"];
 
 var DICT = {
   en: {
@@ -256,7 +258,10 @@ document.getElementById("checker").addEventListener("submit", function(e){
    跨域被拦或接口不可用时回落到内置的两个，保证静态页永远可用。 */
 function loadRoots(){
   var sel = document.getElementById("root");
-  var fallback = ["meoy.top","v-1.top"];
+  /* 服务端清单优先（会反映后台「移除根域名」）；
+     只有跨域被拦或接口不可用，才退回 KNOWN_ROOTS，保证静态页永远可选 */
+  var fallback = (typeof KNOWN_ROOTS !== "undefined" && KNOWN_ROOTS.length)
+    ? KNOWN_ROOTS.slice() : [ROOT];
   function fill(list){
     list = (list && list.length) ? list.slice() : fallback.slice();
     if (list.indexOf(ROOT) < 0) list.unshift(ROOT);
@@ -275,7 +280,10 @@ function loadRoots(){
       .then(function(j){
         var d = j || {};
         var list = Array.isArray(d.rootDomains) && d.rootDomains.length
-          ? d.rootDomains : (d.rootDomain ? [d.rootDomain] : []);
+          ? d.rootDomains
+          : (Array.isArray(d.roots) && d.roots.length ? d.roots
+            : (d.rootDomain ? [d.rootDomain] : []));
+        /* 服务端确实给了清单才覆盖；空清单不覆盖，避免「有些域名没加载出来」 */
         if (list.length) fill(list);
       })
       .catch(function(){});
