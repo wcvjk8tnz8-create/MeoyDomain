@@ -49,7 +49,7 @@ a{color:inherit;text-decoration:none}
 h1{font-family:var(--serif);font-size:clamp(38px,5.4vw,76px);font-weight:700;letter-spacing:-.055em;line-height:1.14;margin:18px 0 0}
 h1 em{font-style:italic;color:var(--acc)}
 .sub{margin-top:16px;font-size:clamp(14px,1.4vw,18px);line-height:1.7;color:var(--body);max-width:660px}
-/* ── 域名查询框（DNSHE 式核心） ── */
+/* ── 域名查询框（dnshe.org 式单屏） ── */
 .checker{
   width:min(100%,860px);margin-top:clamp(24px,3.4vh,40px);display:flex;align-items:stretch;
   background:var(--card);border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden;
@@ -252,7 +252,38 @@ document.getElementById("checker").addEventListener("submit", function(e){
   location.href = PANEL + "/whois?name=" + encodeURIComponent(label + "." + root) + "&root=" + encodeURIComponent(root);
 });
 
+/* 根域名下拉：优先从控制台 /api/config 拉取全部生效后缀，
+   跨域被拦或接口不可用时回落到内置的两个，保证静态页永远可用。 */
+function loadRoots(){
+  var sel = document.getElementById("root");
+  var fallback = ["meoy.top","v-1.top"];
+  function fill(list){
+    list = (list && list.length) ? list.slice() : fallback.slice();
+    if (list.indexOf(ROOT) < 0) list.unshift(ROOT);
+    var seen = {}, out = [];
+    list.forEach(function(d){
+      d = String(d).trim().toLowerCase().replace(/^\.+|\.+$/g,"");
+      if (d && !seen[d]) { seen[d] = 1; out.push(d); }
+    });
+    sel.innerHTML = out.map(function(d){ return '<option value="'+d+'">.'+d+'</option>'; }).join("");
+    sel.value = ROOT;
+  }
+  fill(fallback);
+  try {
+    fetch(PANEL.replace(/\/$/,"") + "/api/config", { headers: { "Accept": "application/json" } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        var d = j || {};
+        var list = Array.isArray(d.rootDomains) && d.rootDomains.length
+          ? d.rootDomains : (d.rootDomain ? [d.rootDomain] : []);
+        if (list.length) fill(list);
+      })
+      .catch(function(){});
+  } catch(e){}
+}
+
 fillLinks();
+loadRoots();
 var saved = "en";
 try { saved = localStorage.getItem("td_root_lang") || "en"; } catch(e){}
 apply(DICT[saved] ? saved : "en");

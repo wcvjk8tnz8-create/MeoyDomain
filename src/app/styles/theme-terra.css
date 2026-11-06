@@ -380,3 +380,95 @@ table td a, .cell-fqdn, td:first-child { font-family: var(--td-mono); }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   按钮文字居中 + 分段式 tabs + 保存结果弹窗
+   历史 .tab 写成 padding: 0 0 12px !important，Chrome 的 button
+   UA 默认 align-items: flex-start，文字被顶到上沿（实测偏移 5px），
+   且 .tabs 里的 spacer 会再吃一个 gap。这里统一收口。
+   ══════════════════════════════════════════════════════════ */
+
+/* 普通按钮：统一 flex 居中，杜绝「文字偏上/偏左」 */
+button:not(.root-opt):not(.op-btn):not(.iconbtn),
+.zx-search-btn, .pc-av-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1.2 !important;
+  vertical-align: middle;
+}
+
+/* 分段控件：每个 tab 等宽、对称内边距、文字严格居中 */
+.tabs {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  margin-bottom: 20px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--td-side) !important;
+  overflow-x: auto !important;
+}
+.tab, .tab.on, .tab.active {
+  display: inline-flex !important;
+  flex: 1 1 0 !important;
+  min-width: max-content;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1.2 !important;
+  padding: 10px 16px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  white-space: nowrap;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  position: relative !important;
+  background: transparent !important;
+  color: var(--td-muted) !important;
+  box-shadow: none !important;
+}
+.tab::after, .tab.on::after, .tab.active::after { display: none !important; }
+.tab:hover { color: var(--td-ink) !important; background: transparent !important; }
+.tab.active, .tab.on {
+  background: var(--td-surface) !important;
+  color: var(--td-accent) !important;
+  box-shadow: var(--td-shadow) !important;
+  font-weight: 700 !important;
+}
+/* tabs 内残留的 spacer 不再参与布局 */
+.tabs > .spacer { display: none !important; }
+
+/* 保存结果弹窗：替代底部黑色药丸 toast */
+.dlg { display: flex; align-items: flex-start; gap: 14px; margin: 6px 0 4px; }
+.dlg-icon {
+  flex: 0 0 34px; width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font: 700 18px/1 var(--td-mono);
+  background: var(--td-accent-soft);
+  color: var(--td-accent);
+}
+.dlg.err .dlg-icon {
+  background: color-mix(in srgb, var(--td-bad) 14%, transparent);
+  color: var(--td-bad);
+}
+.dlg-msg {
+  flex: 1; min-width: 0;
+  font-size: 14px; line-height: 1.7;
+  color: var(--td-ink); white-space: pre-line;
+}
+.dlg-sub {
+  margin-top: 12px;
+  font: 12px/1.7 var(--td-mono);
+  color: var(--td-muted);
+}
+.dlg .modal-foot { justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.dlg .btn { min-width: 96px; }
+.modal .box h2 { font-family: var(--td-serif); color: var(--td-ink); margin: 0 0 8px; }

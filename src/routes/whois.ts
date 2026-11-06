@@ -195,13 +195,13 @@ async function abuseInfo(env) {
 
 /**
  * 第三方查询站直达链接
- * 注意：已移除 whois.com —— DNSHE 的公开 WHOIS 本身就能查外部域名，
- * 保留 whois.dnshe.com 与 ICANN Lookup 即可覆盖。
+ * DNSHE 托管服务主域是 dnshe.org；在其注册分发出来的域名后缀才是 .com。
+ * 因此对外入口统一指向 .org（API / NS 等技术端点仍沿用官方 .com 地址）。
  */
 function externalLinks(domain) {
   const d = encodeURIComponent(domain);
   return [
-    { name: 'whois.dnshe.com', url: `https://whois.dnshe.com/?domain=${d}` },
+    { name: 'whois.dnshe.org', url: `https://whois.dnshe.org/?domain=${d}` },
     { name: 'ICANN Lookup', url: `https://lookup.icann.org/en/lookup?name=${d}` },
   ];
 }

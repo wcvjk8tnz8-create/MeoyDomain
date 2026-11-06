@@ -74,7 +74,6 @@ export default function LoginPage() {
           <div className="tabs">
             <button className="tab active" id="tabLogin">登录</button>
             <button className="tab" id="tabReg">注册</button>
-            <span className="spacer"></span>
           </div>
 
           {/* 登录 */}

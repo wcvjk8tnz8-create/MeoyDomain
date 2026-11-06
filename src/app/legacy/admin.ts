@@ -2,9 +2,14 @@
  * Admin 页面控制器（由 admin.html 内联脚本平移）
  * 外部符号由 runtime 提供；DOM 查询作用于当前挂载的页面。
  */
-import { api, esc, fmtTime, toast, openModal, closeModal, loadBranding, applyBranding, statusBadge, mountShell } from '../lib/runtime';
+import { api, esc, fmtTime, openModal, closeModal, loadBranding, applyBranding, statusBadge, mountShell, showDialog } from '../lib/runtime';
 
 import type { LegacyCtx } from '../lib/types';
+
+/** 站点设置页的操作反馈：统一用弹窗，不再弹底部黑色药丸。 */
+function settingsFeedback(msg: string, type: 'ok' | 'err' = 'ok') {
+  showDialog({ message: msg, tone: type === 'err' ? 'err' : 'ok' });
+}
 
 export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
   
@@ -67,17 +72,17 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
         const z = mask.querySelector('.sp-zone[data-i="' + i + '"]');
         picked.push({ domain: items[i].domain, zoneId: z ? z.value.trim() : '' });
       });
-      if (!picked.length) return toast('请先勾选要添加的域名', 'err');
+      if (!picked.length) return settingsFeedback('请先勾选要添加的域名', 'err');
       const btn = document.getElementById('spAdd');
       btn.disabled = true; btn.textContent = '添加中…';
       try {
         const r = await api.post('/api/admin/spaceship/add', { domains: picked });
-        toast('已添加：' + r.added.join('、') + (r.skipped.length ? '（跳过已存在 ' + r.skipped.length + ' 个）' : ''));
+        settingsFeedback('已添加：' + r.added.join('、') + (r.skipped.length ? '（跳过已存在 ' + r.skipped.length + ' 个）' : ''));
         if (showRoots) showRoots(r.rootDomains);
         close();
       } catch (e) {
         btn.disabled = false; btn.textContent = '添加选中';
-        toast(e.message, 'err');
+        settingsFeedback(e.message, 'err');
       }
     };
   }
@@ -135,7 +140,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           </td>
         </tr>`).join('');
       tb.querySelectorAll('[data-points]').forEach((b) => b.onclick = () => {
-        if (b.dataset.role === 'admin') return toast('管理员积分不限，无需调整', 'err');
+        if (b.dataset.role === 'admin') return settingsFeedback('管理员积分不限，无需调整', 'err');
         openModal('调整积分 · ' + b.dataset.email, `
           <div class="field"><label>设置为</label><input id="pset" type="number" value="${b.dataset.p || 0}"><div class="hint">直接指定最终余额</div></div>
           <div class="field"><label>或增减</label><input id="pdelta" type="number" placeholder="如 +20 或 -5"><div class="hint">填了这项则忽略上面的「设置为」</div></div>
@@ -146,8 +151,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           const body = delta
             ? { delta: Number(delta), reason: document.getElementById('preason').value.trim() }
             : { set: Number(document.getElementById('pset').value), reason: document.getElementById('preason').value.trim() };
-          try { await api.post('/api/admin/users/' + b.dataset.points + '/points', body); toast('已保存'); closeModal(); load(); }
-          catch (e) { toast(e.message, 'err'); }
+          try { await api.post('/api/admin/users/' + b.dataset.points + '/points', body); settingsFeedback('已保存'); closeModal(); load(); }
+          catch (e) { settingsFeedback(e.message, 'err'); }
         };
       });
       tb.querySelectorAll('[data-quota]').forEach((b) => b.onclick = () => {
@@ -156,8 +161,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           <div class="field"><label>角色</label><select id="r"><option value="user" ${b.dataset.role === 'user' ? 'selected' : ''}>user</option><option value="admin" ${b.dataset.role === 'admin' ? 'selected' : ''}>admin</option></select></div>
           <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" id="ok">保存</button></div>`);
         document.getElementById('ok').onclick = async () => {
-          try { await api.post('/api/admin/users/' + b.dataset.quota + '/quota', { quota: Number(document.getElementById('q').value), role: document.getElementById('r').value }); toast('已保存'); closeModal(); load(); }
-          catch (e) { toast(e.message, 'err'); }
+          try { await api.post('/api/admin/users/' + b.dataset.quota + '/quota', { quota: Number(document.getElementById('q').value), role: document.getElementById('r').value }); settingsFeedback('已保存'); closeModal(); load(); }
+          catch (e) { settingsFeedback(e.message, 'err'); }
         };
       });
       tb.querySelectorAll('[data-ban]').forEach((b) => b.onclick = () => {
@@ -167,12 +172,12 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           <label class="check" style="margin-bottom:12px"><input type="checkbox" id="pg"> 同时清空其在 Cloudflare 上的全部 DNS 记录</label>
           <div class="row end"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" id="ok">确认封禁</button></div>`);
         document.getElementById('ok').onclick = async () => {
-          try { await api.post('/api/admin/users/' + b.dataset.ban + '/ban', { reason: document.getElementById('rs').value, purgeDns: document.getElementById('pg').checked }); toast('已封禁'); closeModal(); load(); }
-          catch (e) { toast(e.message, 'err'); }
+          try { await api.post('/api/admin/users/' + b.dataset.ban + '/ban', { reason: document.getElementById('rs').value, purgeDns: document.getElementById('pg').checked }); settingsFeedback('已封禁'); closeModal(); load(); }
+          catch (e) { settingsFeedback(e.message, 'err'); }
         };
       });
       tb.querySelectorAll('[data-unban]').forEach((b) => b.onclick = async () => {
-        try { await api.post('/api/admin/users/' + b.dataset.unban + '/unban', {}); toast('已解封'); load(); } catch (e) { toast(e.message, 'err'); }
+        try { await api.post('/api/admin/users/' + b.dataset.unban + '/unban', {}); settingsFeedback('已解封'); load(); } catch (e) { settingsFeedback(e.message, 'err'); }
       });
     }
   
@@ -191,8 +196,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           </td>
         </tr>`).join('');
       tb.querySelectorAll('[data-unlock]').forEach((b) => b.onclick = async () => {
-        try { await api.post('/api/records/' + b.dataset.unlock + '/force-unlock', { delete: b.dataset.keep !== '1' }); toast('已强制解锁'); load(); }
-        catch (e) { toast(e.message, 'err'); }
+        try { await api.post('/api/records/' + b.dataset.unlock + '/force-unlock', { delete: b.dataset.keep !== '1' }); settingsFeedback('已强制解锁'); load(); }
+        catch (e) { settingsFeedback(e.message, 'err'); }
       });
     }
   
@@ -244,14 +249,14 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               banIp: document.getElementById('ipb').checked,
               purgeDns: document.getElementById('ipp').checked,
             });
-            toast(`已封禁 ${r.banned} 个账号` + (r.purged ? `，清空 ${r.purged} 条 DNS` : ''));
+            settingsFeedback(`已封禁 ${r.banned} 个账号` + (r.purged ? `，清空 ${r.purged} 条 DNS` : ''));
             closeModal(); load();
-          } catch (e) { toast(e.message, 'err'); }
+          } catch (e) { settingsFeedback(e.message, 'err'); }
         };
       });
       tb.querySelectorAll('[data-ipunban]').forEach((b) => b.onclick = async () => {
-        try { await api.post('/api/admin/ips/unban', { ip: b.dataset.ipunban }); toast('已解除 IP 封禁'); load(); }
-        catch (e) { toast(e.message, 'err'); }
+        try { await api.post('/api/admin/ips/unban', { ip: b.dataset.ipunban }); settingsFeedback('已解除 IP 封禁'); load(); }
+        catch (e) { settingsFeedback(e.message, 'err'); }
       });
       return;
     }
@@ -684,20 +689,26 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             aiRoots: document.getElementById('sAiRoots').value,
             aiDnsUnlimitedRoots: document.getElementById('sAiDnsRoots').value,
           });
-          toast('已保存，刷新页面后生效');
+          showDialog({
+            title: '设置已保存',
+            message: '已保存，刷新页面后生效',
+            detail: '已自动重新探测可用模型，并刷新了导航 Logo。',
+            tone: 'ok',
+            onReload: () => location.reload(),
+          });
           // 保存后自动探测 /models 并选定一个模型（可在下拉里改选后再次保存）
           probeModels(false);
           // 立即刷新导航 Logo
           brandPromise = null;
           const b = await loadBranding();
           applyBranding(b);
-        } catch (e) { toast(e.message, 'err'); }
+        } catch (e) { showDialog({ title: '保存失败', message: (e as any).message || String(e), tone: 'err' }); }
       };
       document.getElementById('resetLogo').onclick = async () => {
         try {
           await api.post('/api/admin/settings/reset-logo', {});
-          toast('已恢复默认 Logo'); load();
-        } catch (e) { toast(e.message, 'err'); }
+          settingsFeedback('已恢复默认 Logo'); load();
+        } catch (e) { settingsFeedback((e as any).message || String(e), 'err'); }
       };
 
       /* 自检 / 诊断打通后，把「实际生效的模型」同步回输入框。
@@ -736,7 +747,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 + (r.detail ? '<br><span class="mono">' + esc(r.detail) + '</span>' : '')
                 + (tried.length ? '<br><span class="dim">逐个模型：' + esc(tried.join(' | ').slice(0, 400)) + '</span>' : '');
           }
-          toast(r.ok ? 'AI 审核可用' : 'AI 审核不可用：' + (r.message || ''), r.ok ? 'ok' : 'err');
+          settingsFeedback(r.ok ? 'AI 审核可用' : 'AI 审核不可用：' + (r.message || ''), r.ok ? 'ok' : 'err');
         } catch (e) { if (out) out.textContent = '测试失败：' + (e.message || e); }
       };
 
@@ -751,7 +762,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           const r = await api.post('/api/admin/ai-diagnose', {});
           if (r.testOk && r.testModel) syncAiModel(r.testModel);
           box.textContent = (r.lines || []).join('\n');
-          toast(r.ok ? 'AI 审核链路可用' : '诊断完成，请查看下方明细', r.ok ? 'ok' : 'err');
+          settingsFeedback(r.ok ? 'AI 审核链路可用' : '诊断完成，请查看下方明细', r.ok ? 'ok' : 'err');
         } catch (e) { box.textContent = '诊断失败：' + ((e as any).message || e); }
       };
 
@@ -779,7 +790,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               + `（耗时 ${(Number(r.elapsedMs || 0) / 1000).toFixed(1)}s）`
               + (r.details && r.details.length ? ' · ' + r.details.slice(0, 2).join(' | ') : '');
           }
-          toast(r.scanned
+          settingsFeedback(r.scanned
             ? `AI 批量审核完成：通过 ${r.approved} / 驳回 ${r.rejected} / 待重试 ${r.failed}`
             : (r.reason || '没有待审域名'), r.noConfig ? 'err' : 'ok');
           showBatchStatus();
@@ -984,9 +995,9 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 sel.disabled = true;
                 try {
                   await api.post('/api/admin/roots/' + encodeURIComponent(dmn) + '/backend', { backend: v });
-                  toast('已切换 ' + dmn + ' 的 DNS 写入后端');
+                  settingsFeedback('已切换 ' + dmn + ' 的 DNS 写入后端');
                   renderRoots();
-                } catch (e) { toast(e.message, 'err'); renderRoots(); }
+                } catch (e) { settingsFeedback(e.message, 'err'); renderRoots(); }
               };
             });
             box.querySelectorAll('[data-rm]').forEach((b) => {
@@ -996,8 +1007,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 b.disabled = true;
                 try {
                   const q = await api.del('/api/admin/roots/' + encodeURIComponent(dmn));
-                  toast('已移除 ' + dmn); showRoots(q.rootDomains); renderRoots();
-                } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+                  settingsFeedback('已移除 ' + dmn); showRoots(q.rootDomains); renderRoots();
+                } catch (e) { settingsFeedback(e.message, 'err'); b.disabled = false; }
               };
             });
             box.querySelectorAll('[data-restore]').forEach((b) => {
@@ -1005,8 +1016,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
                 b.disabled = true;
                 try {
                   const q = await api.post('/api/admin/roots/' + encodeURIComponent(b.dataset.restore) + '/restore', {});
-                  toast('已恢复 ' + b.dataset.restore); showRoots(q.rootDomains); renderRoots();
-                } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+                  settingsFeedback('已恢复 ' + b.dataset.restore); showRoots(q.rootDomains); renderRoots();
+                } catch (e) { settingsFeedback(e.message, 'err'); b.disabled = false; }
               };
             });
           } catch (e) {
@@ -1020,8 +1031,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           testBtn.disabled = true;
           try {
             const r = await api.post('/api/admin/spaceship/test', {});
-            toast('连接成功，账号下共 ' + r.total + ' 个域名');
-          } catch (e) { toast(e.message, 'err'); }
+            settingsFeedback('连接成功，账号下共 ' + r.total + ' 个域名');
+          } catch (e) { settingsFeedback(e.message, 'err'); }
           testBtn.disabled = false;
         };
   
@@ -1037,7 +1048,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
           } catch (e) {
             fetchBtn.disabled = false;
             fetchBtn.textContent = '拉取我的域名';
-            toast(e.message, 'err');
+            settingsFeedback(e.message, 'err');
           }
         };
       }
@@ -1068,8 +1079,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
       try {
         if (act === 'del') await api.del('/api/admin/subdomains/' + id);
         else await api.post(`/api/admin/subdomains/${id}/${act}`, body);
-        toast('操作成功'); load();
-      } catch (e) { toast(e.message, 'err'); }
+        settingsFeedback('操作成功'); load();
+      } catch (e) { settingsFeedback(e.message, 'err'); }
     };
     tb.querySelectorAll('[data-act]').forEach((b) => b.onclick = () => call(b.dataset.id, b.dataset.act));
   }

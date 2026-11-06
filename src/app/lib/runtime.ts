@@ -6,7 +6,7 @@
  */
 import type { LegacyCtx } from './types';
 import { mountMotionStandalone } from './motion';
-import { startI18n, currentLang } from './i18n';
+import { startI18n, currentLang, translateText } from './i18n';
 
 /* SPA 切页清理注册表：document / window 事件与定时器都登记在这里 */
 let cleanups: Array<() => void> = [];
@@ -371,12 +371,69 @@ export function openModal(title, html) {
   m.classList.add('show');
 }
 export function closeModal() {
-  document.getElementById('modal').classList.remove('show');
+  const m = document.getElementById('modal');
+  if (m) m.classList.remove('show');
 }
 window.closeModal = closeModal;
 
+/**
+ * 结果弹窗：替代底部的黑色药丸 toast。
+ * 文案按当前语言直接给出，并标记 data-no-i18n，避免运行时翻译再改写一次。
+ * 找不到 #modal 时降级为 toast，保证后台任何页面都不会静默无反馈。
+ */
+export function showDialog(opts: {
+  title?: string;
+  message: string;
+  detail?: string;
+  tone?: 'ok' | 'err';
+  okText?: string;
+  reloadText?: string;
+  onReload?: () => void;
+}) {
+  const m = document.getElementById('modal');
+  const box = m && (m.querySelector('.modal-card') || m.querySelector('.box'));
+  if (!m || !box) {
+    toast(opts.message, opts.tone === 'err' ? 'err' : 'ok');
+    return;
+  }
+  const en = currentLang() === 'en';
+  const tr = (s: string) => en ? translateText(s, 'en') : s;
+  const title = tr(opts.title || (opts.tone === 'err' ? '操作失败' : '操作完成'));
+  const message = tr(opts.message);
+  const detail = opts.detail ? tr(opts.detail) : '';
+  const okText = opts.okText || (en ? 'Done' : '知道了');
+  const reloadText = opts.reloadText || (en ? 'Refresh page' : '刷新页面');
+  const icon = opts.tone === 'err' ? '!' : '✓';
+  box.innerHTML = `<h2>${esc(title)}</h2>
+    <div class="dlg ${opts.tone === 'err' ? 'err' : 'ok'}" data-no-i18n>
+      <div class="dlg-icon" aria-hidden="true">${icon}</div>
+      <div class="dlg-msg">${esc(message)}</div>
+    </div>
+    ${detail ? `<div class="dlg-sub" data-no-i18n>${esc(detail)}</div>` : ''}
+    <div class="modal-foot" data-no-i18n>
+      ${opts.onReload ? `<button class="btn ghost" id="dlgReload" type="button">${esc(reloadText)}</button>` : ''}
+      <button class="btn primary" id="dlgOk" type="button">${esc(okText)}</button>
+    </div>`;
+  m.classList.add('show');
+  const ok = document.getElementById('dlgOk');
+  if (ok) {
+    ok.onclick = () => closeModal();
+    (ok as HTMLButtonElement).focus();
+  }
+  const reload = document.getElementById('dlgReload');
+  if (reload && opts.onReload) {
+    reload.onclick = () => { closeModal(); opts.onReload!(); };
+  }
+}
+
 document.addEventListener('click', (e) => {
   if (e.target.id === 'modal') closeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const m = document.getElementById('modal');
+    if (m && m.classList.contains('show')) closeModal();
+  }
 });
 
 /* ---------- WHOIS 子域名跳转 ----------

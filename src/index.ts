@@ -1,5 +1,4 @@
-import { listRoots } from './lib/roots.js';
-import { mergeRootEnv } from './lib/rootStore.js';
+import { mergeRootEnv, effectiveRootList } from './lib/rootStore.js';
 import { DEFAULT_MESSAGE } from './lib/applyGate.js';
 import { loadAiConfig } from './lib/aiReview.js';
 import { parseRootCosts } from './lib/points.js';
@@ -86,7 +85,18 @@ app.use('*', attachUser);
 app.use('*', async (c, next) => {
   try {
     const merged = await mergeRootEnv(c.env);
-    if (merged) c.env = merged;   // Hono Context.env 是普通属性，可安全替换
+    if (merged) {
+      // 关键：Hono 的 c.env 在部分运行时是受控属性，直接替换引用不一定会
+      // 传递到后续路由；后台导入的根域名因此会「有些加载不出来」。
+      // 同时把合并结果写回原对象，保证所有 c.env 读取都拿到完整列表。
+      Object.assign(c.env, {
+        ROOT_DOMAINS: merged.ROOT_DOMAINS,
+        ROOT_DOMAIN: merged.ROOT_DOMAIN,
+        CF_ZONE_ID: merged.CF_ZONE_ID,
+        CF_ZONE_IDS: merged.CF_ZONE_IDS,
+      });
+      try { c.env = merged; } catch {}
+    }
   } catch { /* settings 表尚未建立等异常：降级走原环境变量，不影响站点 */ }
   return next();
 });
@@ -120,6 +130,9 @@ app.get('/api/config', async (c) => {
     "SELECT key, value FROM settings WHERE key IN ('site_name','logo_url','favicon_url','font_body','font_display','mail_verify_required','mail_provider','mail_from','apply_paused','apply_paused_message','ai_review_roots','dns_unlimited_roots','root_point_costs','domain_cost','short_domain_cost','short_domain_len')"
   ).all();
   const s = Object.fromEntries(results.map((r) => [r.key, r.value]));
+  // 显式取「生效列表」：不依赖中间件是否成功替换 c.env 引用，
+  // 后台导入 / 移除 / 恢复的根域名都能立即出现在注册页与首页下拉。
+  const effectiveRoots = (await effectiveRootList(c.env)).map((r) => r.domain);
   // 注册是否需要邮箱验证码（后台开启且邮件服务已配置时才真正启用）
   const mailOk = !!(String(s.mail_provider || c.env.MAIL_PROVIDER || '').trim()
     && String(c.env.MAIL_API_KEY || '').trim());
@@ -131,8 +144,8 @@ app.get('/api/config', async (c) => {
   return ok(c, {
     signupEmailRule: emailRule,
     signupEmailHint: emailRuleHint(emailRule),
-    rootDomain: c.env.ROOT_DOMAIN,
-    rootDomains: listRoots(c.env).map((r) => r.domain),
+    rootDomain: effectiveRoots[0] || c.env.ROOT_DOMAIN,
+    rootDomains: effectiveRoots,
     // 注册页后缀菜单据此显示每个后缀的积分（0 = Free，未配置 = 按全局规则）
     rootPointCosts: parseRootCosts(s.root_point_costs),
     pointRules: {

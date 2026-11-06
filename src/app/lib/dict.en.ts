@@ -750,4 +750,12 @@ export const EXTRA_DICT: Record<string, string> = {
   '返回登录': 'Back to sign in',
   '版本': 'Version',
   '注册即视为同意本条款': 'By registering you accept these terms',
+  /* ── 站点设置保存结果弹窗 ── */
+  '设置已保存': 'Settings saved',
+  '保存失败': 'Save failed',
+  '操作完成': 'Done',
+  '操作失败': 'Action failed',
+  '知道了': 'Got it',
+  '刷新页面': 'Refresh page',
+  '已自动重新探测可用模型，并刷新了导航 Logo。': 'Available models were re-detected and the navigation logo was refreshed.',
 };
