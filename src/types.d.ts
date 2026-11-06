@@ -45,6 +45,8 @@ export interface Env {
   R2_PUBLIC_URL?: string;
   AVATAR_MAX_KB?: string;
   ALLOWED_EMAIL_DOMAINS?: string;
+  /** 注册邮箱规则默认模式：whitelist_edu（默认）/ whitelist / edu_only / any；后台设置优先 */
+  EMAIL_RULE?: string;
 
   // ── AI 自动审核（密钥走 Secret / 后台设置，不写进代码库）──
   AI_API_KEY?: string;

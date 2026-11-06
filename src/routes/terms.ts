@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { ok, fail, now, clientIp } from '../lib/util.js';
 import { langOf } from '../lib/i18nServer.js';
 import { VERIFY_PRESETS, RECORD_TYPES } from '../lib/records.js';
+import { allowedDomains, emailRuleHint, emailRuleOf } from '../lib/emailRule.js';
 
 const app = new Hono();
 
@@ -194,12 +195,12 @@ app.get('/terms', (c) => {
 // 规则摘要（登录页展示）
 app.get('/rules', async (c) => {
   const row = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'max_accounts_per_ip'").first();
+  const rule = await emailRuleOf(c.env);
   return ok(c, {
     maxAccountsPerIp: Number(row?.value || 2),
-    allowedEmailDomains: String(c.env.ALLOWED_EMAIL_DOMAINS || 'gmail.com,googlemail.com,qq.com,foxmail.com')
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
+    allowedEmailDomains: allowedDomains(c.env),
+    emailRule: rule,
+    emailRuleHint: emailRuleHint(rule),
     termsVersion: TERMS_VERSION,
   });
 });

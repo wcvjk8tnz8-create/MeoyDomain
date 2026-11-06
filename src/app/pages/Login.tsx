@@ -137,8 +137,8 @@ export default function LoginPage() {
 
             <div className="field">
               <label>邮箱</label>
-              <input id="rEmail" type="email" placeholder="yourname@gmail.com" autocomplete="username" />
-              <div className="hint" id="mailHint">仅支持 Gmail / QQ 邮箱</div>
+              <input id="rEmail" type="email" placeholder="name@school.edu" autocomplete="username" />
+              <div className="hint" id="mailHint">支持白名单邮箱，以及任何包含 "edu" 的邮箱注册</div>
             </div>
             <div className="field">
               <label>密码</label>

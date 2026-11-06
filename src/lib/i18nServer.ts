@@ -43,6 +43,17 @@ export const SERVER_DICT: Record<string, string> = {
   '角色不合法': 'Invalid role', '缺少 IP': 'Missing IP',
   '缺少 label': 'Missing label', '没有要更新的内容': 'Nothing to update',
   '缺少通知 id': 'Missing notification id',
+  /* 注册邮箱规则（默认：白名单 ∪ 任意含 edu 的邮箱） */
+  '支持白名单邮箱，以及任何包含 "edu" 的邮箱注册': 'Whitelisted mail, plus any email containing "edu"',
+  '仅支持白名单邮箱注册': 'Whitelisted mail only',
+  '仅支持包含 "edu" 的邮箱注册': 'Only emails containing "edu"',
+  '支持任意有效邮箱注册': 'Any valid email address is accepted',
+  '该邮箱不符合注册规则：仅支持白名单邮箱或包含 "edu" 的邮箱':
+    'This email is not allowed: use a whitelisted address or one containing "edu"',
+  '该邮箱不符合注册规则：仅支持白名单邮箱': 'This email is not allowed: whitelisted addresses only',
+  '该邮箱不符合注册规则：仅支持包含 "edu" 的邮箱': 'This email is not allowed: address must contain "edu"',
+  '该邮箱不符合注册规则': 'This email is not allowed for signup',
+  '注册邮箱规则不合法': 'Invalid signup email rule',
   '不能封禁管理员': 'Admin accounts cannot be banned',
   '用户不存在': 'User not found', '账号已封禁': 'Account banned',
   '请先阅读并同意《服务条款与免责声明》': 'Please read and accept the Terms & Disclaimer first',

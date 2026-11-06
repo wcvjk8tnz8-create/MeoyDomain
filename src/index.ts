@@ -4,6 +4,7 @@ import { DEFAULT_MESSAGE } from './lib/applyGate.js';
 import { loadAiConfig } from './lib/aiReview.js';
 import { parseRootCosts } from './lib/points.js';
 import { runAiReviewBatch } from './lib/aiBatch.js';
+import { emailRuleHint, emailRuleOf } from './lib/emailRule.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -126,7 +127,10 @@ app.get('/api/config', async (c) => {
     String(c.env.MAIL_VERIFY_REQUIRED || s.mail_verify_required || '0').trim() === '1';
   // AI 状态只给标志位，绝不下发地址与密钥
   const ai = await loadAiConfig(c.env).catch(() => null);
+  const emailRule = await emailRuleOf(c.env);
   return ok(c, {
+    signupEmailRule: emailRule,
+    signupEmailHint: emailRuleHint(emailRule),
     rootDomain: c.env.ROOT_DOMAIN,
     rootDomains: listRoots(c.env).map((r) => r.domain),
     // 注册页后缀菜单据此显示每个后缀的积分（0 = Free，未配置 = 按全局规则）

@@ -68,7 +68,7 @@
 
 - 独立的 `/terms.html` 页，含：服务条款、**禁止滥用清单（8 类）**、账号规则、免责声明、信息与处置、条款变更
 - 注册必须勾选同意条款，未勾选接口直接拒绝
-- **邮箱域名白名单**：默认仅 `gmail.com` / `googlemail.com` / `qq.com` / `foxmail.com`，可用 `ALLOWED_EMAIL_DOMAINS` 覆盖
+- **注册邮箱规则**：默认「白名单 ∪ 任何包含 `edu` 的邮箱」——邮箱地址任意位置出现这三个字符（不区分大小写，本地部分或域名都算）即可注册，例如 `student@school.edu.cn`、`edu@gmail.com`、`me@myedu.org`；原有 `gmail.com` / `googlemail.com` / `qq.com` / `foxmail.com` 继续放行，白名单可用 `ALLOWED_EMAIL_DOMAINS` 覆盖或扩展。后台「站点设置 → 注册邮箱规则」可切换四种模式（`whitelist_edu` / `whitelist` / `edu_only` / `any`），也可用环境变量 `EMAIL_RULE` 设默认值（后台设置优先）；重置密码等已有账号操作不受规则限制
 - **同 IP 最多注册 2 个账号**（后台可调 1-50），超出时注册接口直接拒绝
 - 后台「同 IP 账号」页按 IP 聚合，超标的 IP 标红显示，**一键封禁该 IP 下全部账号**：踢下线 + 停用子域名 + 可选清空 DNS + 可选封禁 IP（禁止再注册/登录）
 

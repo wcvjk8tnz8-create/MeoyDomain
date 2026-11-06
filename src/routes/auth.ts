@@ -4,17 +4,16 @@ import { ok, fail, now, audit, clientIp } from '../lib/util.js';
 import { createSession, setSessionCookie, clearSessionCookie, destroySession, UNLIMITED } from '../middleware/auth.js';
 import { notifyLoginIp, notify } from '../lib/notify.js';
 import { issueCode, checkCode, mailConfig, mailEnabled } from '../lib/mail.js';
+import { allowedDomains, emailAllowed, emailRuleOf, emailRuleReject } from '../lib/emailRule.js';
 
 const app = new Hono();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-/** 允许的邮箱域名（默认 Gmail / QQ 邮箱），可用 ALLOWED_EMAIL_DOMAINS 覆盖 */
-function allowedDomains(env) {
-  return String(env.ALLOWED_EMAIL_DOMAINS || 'gmail.com,googlemail.com,qq.com,foxmail.com')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+/** 注册邮箱是否放行：默认「白名单 ∪ 任意含 edu 的邮箱」，后台可切换规则 */
+async function signupEmailOk(env, mail) {
+  const rule = await emailRuleOf(env);
+  return { ok: emailAllowed(mail, rule, allowedDomains(env)), rule };
 }
 
 /** 同 IP 允许的账号数 */
@@ -39,11 +38,9 @@ app.post('/register', async (c) => {
   if (!password || String(password).length < 8) return fail(c, '密码至少 8 位');
   if (String(password).length > 128) return fail(c, '密码过长');
 
-  // 邮箱域名白名单：仅 Gmail / QQ 邮箱（含 googlemail.com、foxmail.com）
-  const domain = mail.split('@')[1] || '';
-  const allow = allowedDomains(env);
-  if (!allow.includes(domain))
-    return fail(c, `当前仅支持 ${allow.map((d) => d.split('.')[0]).join(' / ')} 邮箱注册，你填写的是 ${domain || '未知域名'}`);
+  // 注册邮箱规则：默认白名单 ∪ 任意含 "edu" 的邮箱（不区分大小写）
+  const gate = await signupEmailOk(env, mail);
+  if (!gate.ok) return fail(c, emailRuleReject(gate.rule));
 
   // 必须同意服务条款
   if (!agreeTerms) return fail(c, '请先阅读并同意《服务条款与免责声明》', 400, { needAgree: true });
@@ -224,6 +221,13 @@ app.post('/verify/send', async (c) => {
       503,
       { mailNotConfigured: true }
     );
+  }
+
+  // 注册场景：先按同一套规则校验邮箱，别给注定注册不了的邮箱发码；
+  // 重置场景不校验 —— 已有账号不该因为规则变更而被挡在门外。
+  if (scene === 'register') {
+    const gate = await signupEmailOk(c.env, mail);
+    if (!gate.ok) return fail(c, emailRuleReject(gate.rule));
   }
 
   // 注册场景：邮箱不能已注册；重置场景：邮箱必须已注册

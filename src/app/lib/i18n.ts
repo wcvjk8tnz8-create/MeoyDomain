@@ -93,6 +93,24 @@ const DICT: Record<string, string> = {
   '创建账号': 'Create your account',
   '注册后即可申请根域名下的二级子域名': 'Sign up to request a subdomain under any root domain',
   '仅支持 Gmail / QQ 邮箱': 'Gmail / QQ Mail only',
+  /* 注册邮箱规则（默认：白名单 ∪ 任意含 edu 的邮箱） */
+  '支持白名单邮箱，以及任何包含 "edu" 的邮箱注册': 'Whitelisted mail, plus any email containing "edu"',
+  '仅支持白名单邮箱注册': 'Whitelisted mail only',
+  '仅支持包含 "edu" 的邮箱注册': 'Only emails containing "edu"',
+  '支持任意有效邮箱注册': 'Any valid email address is accepted',
+  '该邮箱不符合注册规则：仅支持白名单邮箱或包含 "edu" 的邮箱':
+    'This email is not allowed: use a whitelisted address or one containing "edu"',
+  '该邮箱不符合注册规则：仅支持白名单邮箱': 'This email is not allowed: whitelisted addresses only',
+  '该邮箱不符合注册规则：仅支持包含 "edu" 的邮箱': 'This email is not allowed: address must contain "edu"',
+  '该邮箱不符合注册规则': 'This email is not allowed for signup',
+  '注册邮箱规则': 'Signup email rule',
+  '注册邮箱规则不合法': 'Invalid signup email rule',
+  '白名单邮箱 + 任何包含 "edu" 的邮箱（默认）': 'Whitelisted mail + any email containing "edu" (default)',
+  '仅白名单邮箱（旧规则）': 'Whitelisted mail only (legacy)',
+  '仅包含 "edu" 的邮箱（严格）': 'Only emails containing "edu" (strict)',
+  '任意有效邮箱（全放开）': 'Any valid email (open)',
+  '「包含 edu」按字面判定：邮箱地址任意位置出现这三个字符即放行，不区分大小写，本地部分与域名都算。白名单可用 ALLOWED_EMAIL_DOMAINS 扩展；本规则也可用 EMAIL_RULE 设默认值。修改后立即生效，已有账号不受影响。':
+    '"Contains edu" is literal: any position in the address counts, case-insensitive, including the local part and the domain. Extend the whitelist with ALLOWED_EMAIL_DOMAINS; set a default rule with EMAIL_RULE. Changes apply immediately and do not affect existing accounts.',
   '邮箱验证码': 'Email verification code', '注册前需先验证邮箱': 'Verify your email first',
   '同一网络最多注册 2 个账号，超限账号一经发现将被全部封禁。':
     'At most 2 accounts per network. Excess accounts will be banned.',

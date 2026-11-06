@@ -116,9 +116,10 @@ export async function mountLogin(_root: HTMLElement | null): Promise<void> {
   };
   
   api.get('/api/rules').then((r) => {
-    const names = r.allowedEmailDomains.map((d) => d.split('.')[0]);
+    // 文案由后端按当前规则下发（默认：白名单 ∪ 任意含 "edu" 的邮箱），
+    // 不在前端拼域名列表，避免英文模式下出现动态中文或中英夹生。
     document.getElementById('mailHint').textContent =
-      `仅支持 ${names.join(' / ')} 邮箱，其它域名无法注册`;
+      r.emailRuleHint || '支持白名单邮箱，以及任何包含 "edu" 的邮箱注册';
     document.getElementById('ipRule').textContent =
       `同一网络最多注册 ${r.maxAccountsPerIp} 个账号，超限账号一经发现将被全部封禁。`;
     document.getElementById('agreeLabel').innerHTML =

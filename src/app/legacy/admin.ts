@@ -280,6 +280,17 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
               <div class="hint">超出限制注册的账号，可在「同 IP 账号」页一键全部封禁。管理员账号不受影响。</div>
             </div>
             <div class="field">
+              <label>注册邮箱规则</label>
+              <select id="sEmailRule" style="max-width:420px">
+                <option value="whitelist_edu"${(d.emailRule || 'whitelist_edu') === 'whitelist_edu' ? ' selected' : ''}>白名单邮箱 + 任何包含 "edu" 的邮箱（默认）</option>
+                <option value="whitelist"${d.emailRule === 'whitelist' ? ' selected' : ''}>仅白名单邮箱（旧规则）</option>
+                <option value="edu_only"${d.emailRule === 'edu_only' ? ' selected' : ''}>仅包含 "edu" 的邮箱（严格）</option>
+                <option value="any"${d.emailRule === 'any' ? ' selected' : ''}>任意有效邮箱（全放开）</option>
+              </select>
+              <div class="hint">「包含 edu」按字面判定：邮箱地址任意位置出现这三个字符即放行，不区分大小写，本地部分与域名都算。白名单可用 ALLOWED_EMAIL_DOMAINS 扩展；本规则也可用 EMAIL_RULE 设默认值。修改后立即生效，已有账号不受影响。</div>
+              <div class="hint mono" style="margin-top:4px">student@school.edu.cn · edu@gmail.com · me@myedu.org</div>
+            </div>
+            <div class="field">
               <label>域名有效期</label>
               <div class="grid2">
                 <div><span class="dim">新域名有效期（天）</span><input id="sValidDays" type="number" min="1" max="3650" value="365"></div>
@@ -628,6 +639,7 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             faviconUrl: document.getElementById('sFav').value,
             announcement: document.getElementById('sAnno').value,
             maxAccountsPerIp: document.getElementById('sIpLimit').value,
+            emailRule: document.getElementById('sEmailRule').value,
             whoisHolder: document.getElementById('sWhois').value,
             checkinPoints: document.getElementById('sCheckin').value,
             initialPoints: document.getElementById('sInitial').value,

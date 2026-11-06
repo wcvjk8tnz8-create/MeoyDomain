@@ -14,6 +14,7 @@ import { addExtraRoots, removeRoot, restoreRoot, rootSources, effectiveRootList,
 import { aiTest, probeAiModels, chooseModel, loadAiConfig, AGNES_CHAT_MODELS, rootInAiList, endpointCandidates,
   normalizeProvider, WORKERS_AI_MODELS, DEFAULT_WORKERS_AI_MODEL } from '../lib/aiReview.js';
 import { runAiReviewBatch, aiBatchStatus, queueAiBatch, startAiBatch } from '../lib/aiBatch.js';
+import { EMAIL_RULES, emailRuleOf, type EmailRule } from '../lib/emailRule.js';
 
 const app = new Hono();
 
@@ -438,6 +439,9 @@ app.get('/settings', async (c) => {
   const envSecret = String(c.env.DNSHE_API_SECRET || '').trim();
   return ok(c, {
     items,
+    // 注册邮箱规则（后台可切换；环境变量 EMAIL_RULE 可覆盖默认值）
+    emailRule: await emailRuleOf(c.env),
+    emailRules: [...EMAIL_RULES],
     dnsProvider: {
       custom: prov.custom,
       url: prov.custom ? prov.base : '',
@@ -766,6 +770,13 @@ app.post('/settings', async (c) => {
   }
   if (String(body.aiApiKey || '').trim()) await set('ai_api_key', String(body.aiApiKey).trim().slice(0, 300));
   else if (body.aiClearKey === true) await set('ai_api_key', '');
+
+  // 注册邮箱规则（默认「白名单 ∪ 任意含 edu 的邮箱」）
+  if (body.emailRule !== undefined) {
+    const r = String(body.emailRule || '').trim().toLowerCase();
+    if (!EMAIL_RULES.includes(r as EmailRule)) return fail(c, '注册邮箱规则不合法');
+    await set('email_rule', r);
+  }
 
   // 同 IP 账号上限
   if (body.maxAccountsPerIp !== undefined && body.maxAccountsPerIp !== '') {
