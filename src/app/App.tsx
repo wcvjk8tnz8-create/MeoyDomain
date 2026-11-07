@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type JSX } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type JSX } from 'react';
 import { navigate, bumpPageGeneration } from './lib/runtime';
 import { startI18n } from './lib/i18n';
 import { beginTransition } from './lib/pageTransition';
@@ -93,6 +93,8 @@ async function mountPageVisuals(key: string) {
 
 export default function App() {
   const [key, setKey] = useState(() => keyOf(window.location.pathname));
+  // 首屏挂载（含刷新、直接打开）不算跳转，不播过渡；只有 key 真的变了才播
+  const prevKey = useRef(key);
 
   useEffect(() => {
     const onPop = () => setKey(keyOf(window.location.pathname));
@@ -134,8 +136,13 @@ export default function App() {
       });
     }, 3000);
 
-    // 每个页面组件挂载都算一次切页：不依赖 popstate，避免某些路由路径漏掉动画
-    beginTransition(undefined, prefetchRoute(location.href));
+    // 只有「路由真的变了」才播过渡：首屏挂载 / 刷新 / 直接打开都跳过。
+    // 不依赖 popstate，避免某些路由路径漏掉动画；站内链接点击已经先
+    // beginTransition(action, ready)，这里再调是幂等的，不会重播。
+    if (prevKey.current !== key) {
+      prevKey.current = key;
+      beginTransition(undefined, prefetchRoute(location.href));
+    }
     mountPageVisuals(key);
     // 语言切换器与翻译在每次切页后补挂（内部幂等）。
     // 用 layout effect 而非 effect：绘制前就完成首次翻译，英文模式不会先闪一帧中文。

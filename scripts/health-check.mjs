@@ -163,7 +163,14 @@ check(/takePrefetched/.test(prefetch) && /TTL\s*=\s*6000/.test(prefetch) && /cac
 check(/takePrefetched\(p\)/.test(runtime) && /api\.req\('GET', p\)/.test(runtime), 'api.get 优先消费预取，未命中走正常请求（401 逻辑不绕过）');
 check(/if \(!active && !starting\) return/.test(transition) && /t\?\.closest\?\.\('a\[href\]'\)/.test(transition), '过渡期间链接可点改目标，非链接交互被守卫拦下');
 check(/\.td-trans \{[^}]*pointer-events:\s*none/.test(glass), '遮罩不吞点击，链接能透传');
-check(/meoy\\\.top\|v-1\\\.top/.test(transition) && /if \(!hopped\) beginTransition\(\)/.test(transition), '根域名页跳过来的首屏不重播第二遍过渡');
+check(/meoy\\\.top\|v-1\\\.top/.test(transition) && /if \(hopped\)/.test(transition) && /shouldPlayOnLoad\(\)/.test(transition), '根域名页跳过来的首屏不重播第二遍过渡');
+/* 只有跳转才播：刷新 / 直接打开 / 外部进入一律不播 */
+check(/if \(shouldPlayOnLoad\(\)\) beginTransition\(\)/.test(transition) && !/mountTransition\(\)[\s\S]{0,40}\n\s*beginTransition\(\);/.test(transition), '入口首屏默认不播过渡，只有检测到跳转意图才播');
+check(/navigationType\(\) === 'reload'/.test(transition) && /return false/.test(transition), '刷新（reload）一律不播过渡');
+check(/NAV_INTENT_KEY/.test(transition) && /NAV_INTENT_TTL\s*=\s*6000/.test(transition) && /consumeNavigationIntent/.test(transition), '跨文档跳转用短效一次性意图标记，读完即删');
+check(/addEventListener\('pagehide'/.test(transition) && /markNavigation\(\)/.test(transition), '整页跳转卸载前写意图，SPA 换页不写');
+check(/addEventListener\('pageshow'/.test(transition) && /persisted/.test(transition) && /root\.hidden = true/.test(transition), 'bfcache 后退恢复时收掉残留遮罩，不重播');
+check(/prevKey\.current !== key/.test(read('src/app/App.tsx')) && /useRef\(key\)/.test(read('src/app/App.tsx')), 'App 首屏挂载不播过渡，只有路由 key 变化才播');
 check(/wasPending/.test(transition) && /重新排一次导航/.test(transition), '过渡中改点别的页面会重新排导航');
 check(/td-miku-rise/.test(glass) && /td-miku-breathe/.test(glass) && /td-trans-bubble/.test(glass), '玻璃层含冒出 / 呼吸 / 气泡样式');
 check(/\[data-theme="dark"\] \.td-trans/.test(glass) && /prefers-reduced-motion/.test(glass.split('页面切换过渡').pop() || ''), '过渡层深色与减少动态适配');

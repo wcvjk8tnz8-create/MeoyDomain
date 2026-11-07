@@ -1,7 +1,13 @@
 /**
  * 页面切换过渡：Miku 从下方冒出来，旁边一个「跳转中…」对话气泡。
- * 覆盖全站每一个页面，不只 SPA 站内链接 —— 浏览器后退、整页跳转、
- * 根域名静态页跳控制台都算切页。
+ * 只在「真的发生跳转」时出现：站内链接、后退/前进、整页跳转。
+ * 刷新（F5 / Cmd+R）、地址栏直接打开、从外部站点进来都算首屏，不播过渡。
+ *
+ * ── 导航意图判定 ──
+ * SPA 站内跳转不重载文档，由链接点击 / popstate / 路由 key 变化直接驱动。
+ * 整页跳转会销毁文档，卸载前在 sessionStorage 留一个短效意图标记；
+ * 新文档首屏读到标记才播。刷新同样是卸载，但 Navigation Timing 的
+ * type === 'reload' 一律排除，且标记读取后立即消费，不会残留误播。
  *
  * ── 为什么不能只听 refreshRuntime() ──
  * 15 个页面里有 9 个用 mountShell().then(...) 且没有 await（admin/domain/
@@ -85,6 +91,59 @@ let pendingHidden = 0;
 let forceTimer = 0;
 let observer: MutationObserver | null = null;
 let mediaWarm: Promise<void> | null = null;
+/** 本次文档生命周期里是否发生过「用户主动导航」的交互 */
+let navArmed = false;
+
+/* ── 导航意图：只有跳转才播，刷新不播 ── */
+const NAV_INTENT_KEY = 'td:nav-intent';
+const NAV_INTENT_TTL = 6000;
+
+function markNavigation() {
+  try { sessionStorage.setItem(NAV_INTENT_KEY, String(Date.now())); } catch {}
+}
+function clearNavigation() {
+  try { sessionStorage.removeItem(NAV_INTENT_KEY); } catch {}
+}
+function armNavigation() { navArmed = true; }
+
+/** 兼容旧浏览器的 navigation.type；reload 必须单独识别 */
+function navigationType(): string {
+  try {
+    const entries = performance.getEntriesByType?.('navigation') as unknown as
+      { type?: string }[] | undefined;
+    if (entries?.length && entries[0].type) return String(entries[0].type);
+  } catch { /* 老浏览器走下面的 performance.navigation */ }
+  try {
+    const legacy = (performance as any).navigation;
+    if (legacy) {
+      if (legacy.type === 1) return 'reload';
+      if (legacy.type === 2) return 'back_forward';
+      return 'navigate';
+    }
+  } catch { /* 拿不到就按普通首屏处理 */ }
+  return 'navigate';
+}
+
+/** 一次性消费意图标记；刷新 / 无标记 / 超时都返回 false */
+function consumeNavigationIntent(): boolean {
+  let raw: string | null = null;
+  try { raw = sessionStorage.getItem(NAV_INTENT_KEY); } catch {}
+  if (raw !== null) clearNavigation();
+  if (navigationType() === 'reload') return false;   // 刷新绝不播
+  const at = Number(raw);
+  return raw !== null && Number.isFinite(at) && Date.now() - at < NAV_INTENT_TTL;
+}
+
+/** 首屏要不要播：根域名页跳来时那一页已播过，这里不重播第二遍 */
+function shouldPlayOnLoad(): boolean {
+  let hopped = false;
+  try {
+    const h = new URL(document.referrer || '', location.href).hostname;
+    hopped = /(^|\.)(meoy\.top|v-1\.top)$/i.test(h);
+  } catch { /* referrer 被隐私策略掐掉时按普通首屏处理 */ }
+  if (hopped) { clearNavigation(); return false; }
+  return consumeNavigationIntent();
+}
 
 function lang(): 'zh' | 'en' {
   return document.documentElement.getAttribute('data-lang') === 'en' ? 'en' : 'zh';
@@ -270,12 +329,14 @@ function hide() {
 }
 
 /**
- * 切页开始。三个来源共同驱动，重复调用幂等：
+ * 切页开始。只有跳转才调用，重复调用幂等：
  *  - 站内链接点击：beginTransition(() => navigate(href))（延后换页）
  *  - popstate / App 路由 key 变化：beginTransition()（URL 已变，只播过渡）
- *  - mountTransition()：首次加载 / 整页跳转
+ *  - mountTransition()：仅当检测到「从别的页跳过来」的意图标记
+ *  刷新 / 直接打开 / 外部进入不会调用到这里。
  */
 export function beginTransition(action?: () => void, ready?: Promise<void>) {
+  if (action) armNavigation();
   // 过渡中又点了别的页面：改目标 + 重新预取，不重播动画、不吞点击
   if (active || starting) {
     if (action) {
@@ -350,12 +411,38 @@ export function mountTransition() {
   // 过渡盖着的时候仍能点别的页面链接（改目标并重新预取），
   // 但不要误触旧页面上的按钮 / 表单。捕获阶段先于页面自身的事件。
   document.addEventListener('click', (e) => {
+    // 用户主动交互后若文档被卸载（整页跳转），给新文档留一个导航意图。
+    // 刷新也会卸载，但新文档靠 navigation.type === 'reload' 排除。
+    if (!e.defaultPrevented && (e as MouseEvent).button === 0
+      && !(e as MouseEvent).metaKey && !(e as MouseEvent).ctrlKey
+      && !(e as MouseEvent).shiftKey && !(e as MouseEvent).altKey) armNavigation();
     if (!active && !starting) return;
     const t = e.target as HTMLElement | null;
     if (t?.closest?.('a[href]')) return;
     e.preventDefault();
     e.stopPropagation();
   }, true);
+  // 整页跳转会销毁文档：只在「刚发生导航交互 / 过渡正在进行」时留标记。
+  // SPA 换页不触发 pagehide，标记不会写进去，也就不会污染下一次刷新。
+  window.addEventListener('pagehide', (ev) => {
+    if (!(ev as PageTransitionEvent).persisted && (navArmed || active || starting)) {
+      markNavigation();
+    }
+  });
+  // bfcache 恢复不算新跳转：收掉残留遮罩、清掉意图，避免后退回来卡一层 Miku
+  window.addEventListener('pageshow', (ev) => {
+    if (!(ev as PageTransitionEvent).persisted) return;
+    clearNavigation();
+    clearTimeout(showTimer); clearTimeout(navTimer); clearTimeout(checkTimer);
+    clearTimeout(forceTimer); clearTimeout(pendingHidden);
+    stopWatching();
+    active = false; starting = false; navPending = false;
+    pendingAction = null; readySignaled = false;
+    if (root) {
+      root.hidden = true;
+      root.classList.remove('is-in', 'is-out');
+    }
+  });
   // 语言切换时气泡立刻跟着变（切换器改的是 html[data-lang]）
   try {
     new MutationObserver(applyLang).observe(document.documentElement, {
@@ -364,11 +451,7 @@ export function mountTransition() {
     });
   } catch { /* 老浏览器忽略 */ }
 
-  // 从两个根域名静态页跳过来时那一页已经播过 Miku，首屏不重播第二遍
-  let hopped = false;
-  try {
-    const h = new URL(document.referrer || '', location.href).hostname;
-    hopped = /(^|\.)(meoy\.top|v-1\.top)$/i.test(h);
-  } catch { /* referrer 被隐私策略掐掉时按普通首屏处理 */ }
-  if (!hopped) beginTransition();
+  // 首屏默认不播。只有检测到「从别的页跳过来」的意图标记才播；
+  // 刷新 / 直接打开 / 外部进入 / 根域名页已播过的情况全部跳过。
+  if (shouldPlayOnLoad()) beginTransition();
 }
