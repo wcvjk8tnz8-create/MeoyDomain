@@ -76,8 +76,14 @@ function whenPageFetchesIdle(): Promise<void> {
 }
 export function clearSharedGet() { sharedGet.clear(); }
 
+/* 切页世代：旧页面异步的「就绪」回调不能把新页面的骨架提前放出，
+   否则切页后又会出现一次分阶段露脸。每次路由挂载时递增。 */
+let pageGeneration = 0;
+export function bumpPageGeneration(): number { return ++pageGeneration; }
+
 /* 每次切页后重新扫描动效/装饰/页脚/主题按钮/语言 */
 export function refreshRuntime() {
+  const gen = pageGeneration;
   try { syncTopbarState(); } catch {}
   try { applyLayoutPrefs(); } catch {}
   try { mountDecor(); } catch {}
@@ -92,6 +98,7 @@ export function refreshRuntime() {
   // 就绪时统一把页面从隐藏态放出：所有卡片、数字、头像同一帧出现。
   void whenPageFetchesIdle().then(() => {
     const fire = () => {
+      if (gen !== pageGeneration) return;   // 已经切到别的页面，这次回调作废
       try {
         document.querySelectorAll('.page-root[data-ready="0"]').forEach((el) => {
           (el as HTMLElement).dataset.ready = '1';

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState, type JSX } from 'react';
-import { navigate } from './lib/runtime';
+import { navigate, bumpPageGeneration } from './lib/runtime';
 import { startI18n } from './lib/i18n';
 import { beginTransition } from './lib/pageTransition';
 import { prefetchRoute } from './lib/prefetch';
@@ -118,6 +118,9 @@ export default function App() {
   }, []);
 
   useLayoutEffect(() => {
+    // 每次路由挂载递增世代：上一页还没结算完的就绪回调随即作废，
+    // 不会把这一页的骨架提前放出来
+    bumpPageGeneration();
     // 首屏数据没到齐前整页先藏着：否则骨架里的占位「0 / 欢迎回来 /
     // 默认头像」会先露一帧，之后数据分几波补上，就是「一阶段二阶段三阶段」。
     // refreshRuntime() 在全部首屏 GET 结算后统一把 data-ready 置 1，整屏同帧出现。
