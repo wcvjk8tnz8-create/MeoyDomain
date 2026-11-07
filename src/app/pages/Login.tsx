@@ -27,7 +27,7 @@ export default function LoginPage() {
       {/* 顶部导航：只留必要入口，语言切换器由 i18n 运行时注入 */}
       <header className="site-nav">
         <div className="site-nav-in">
-          <a className="brand" href="/home">
+          <a className="brand" href="/">
             <img id="navLogo" src="/img/logo.jpg" alt="TerraDomain" />
             <span className="brand-name" data-site-name>TerraDomain</span>
           </a>
@@ -36,7 +36,7 @@ export default function LoginPage() {
             <a href="#" id="navReg">注册账号</a>
             <a href="/whois">WHOIS 查询</a>
             <a href="/terms">服务条款</a>
-            <a href="/home">返回首页</a>
+            <a href="/">返回首页</a>
             <span id="bgsw" hidden></span>
           </nav>
         </div>

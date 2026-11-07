@@ -28,7 +28,7 @@ export default function HomePage() {
       {/* ══ 顶栏 ══ */}
       <header className="home-top">
         <div className="home-top-in">
-          <a className="home-brand" href="/home">
+          <a className="home-brand" href="/">
             <img data-logo-img src="/img/logo.jpg" alt="" />
             <span><b data-site-name>TerraDomain</b><i>Free subdomains</i></span>
           </a>
@@ -36,8 +36,9 @@ export default function HomePage() {
             <a href="#features">特性</a>
             <a href="#pricing">价格</a>
             <a href="#faq">常见问题</a>
+            <a className="btn sm ghost zx-nav-btn" href="/login">登录</a>
             <a className="btn sm ghost zx-nav-btn" href="/dashboard">管理控制台</a>
-            <a className="btn sm primary zx-nav-cta" href="/">立即注册</a>
+            <a className="btn sm primary zx-nav-cta" href="/register">立即注册</a>
           </nav>
         </div>
       </header>

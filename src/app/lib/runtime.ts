@@ -80,7 +80,9 @@ export const api = {
       // 公开页（WHOIS / 条款）免登录，401 是正常现象，不能踢去登录页 ——
       // 否则在 whois 子域下会形成 /whois → / → /whois.html 的循环。
       if (window.MEOY_PUBLIC_PAGE) return data;   // 交给调用方自行处理
-      if (!['/', '/index'].includes(location.pathname)) location.href = '/';
+      // 根路径现在是主页，登录页独立在 /login；登录页自身的 401 也不能再跳，避免循环
+      const p = location.pathname.replace(/\/+$/, '') || '/';
+      if (!['/', '/index', '/index.html', '/login', '/login.html', '/home', '/home.html'].includes(p)) location.href = '/login';
     }
     if (!data.success) throw new Error(data.message || '请求失败');
     return data;
@@ -335,7 +337,7 @@ export async function mountNav(active, opts = {}) {
   try {
     user = (await api.get('/api/auth/me')).user;
   } catch {
-    if (!opts.optional) { location.href = '/'; return null; }
+    if (!opts.optional) { location.href = '/login'; return null; }
   }
   if (!user) {
     const b0 = await loadBranding();
@@ -350,7 +352,7 @@ export async function mountNav(active, opts = {}) {
         <a class="navlink ${active === 'terms' ? 'active' : ''}" href="/terms">条款</a>
         ${wallpaperSwitchHtml()}
         <span class="sep"></span>
-        <a class="btn sm primary" href="/">登录 / 注册</a>
+        <a class="btn sm primary" href="/login">登录 / 注册</a>
       </div>`;
     document.querySelectorAll('.bgswitch button').forEach((btn) => {
       btn.onclick = () => applyWallpaper(btn.dataset.wp);
@@ -378,7 +380,7 @@ export async function mountNav(active, opts = {}) {
     </div>`;
   document.getElementById('btnLogout').onclick = async () => {
     await api.post('/api/auth/logout', {});
-    location.href = '/?login=1';   // 带 login=1，避免被「已登录直入控制台」的逻辑带走
+    location.href = '/login';
   };
   document.querySelectorAll('.bgswitch button').forEach((b) => {
     b.onclick = () => applyWallpaper(b.dataset.wp);
@@ -1076,7 +1078,7 @@ export async function mountShell(active, opt = {}) {
     } catch { me = null; }
   }
   if (!me || !me.id) {
-    if (!opt.optional) { location.href = '/'; return; }
+    if (!opt.optional) { location.href = '/login'; return; }
     me = null;
   }
 
@@ -1156,7 +1158,7 @@ export async function mountShell(active, opt = {}) {
             <button class="btn sm ghost" id="btnLogout">退出登录</button>
           </div>
         </div>
-      ` : `<a class="btn sm" href="/">登录</a>`}
+      ` : `<a class="btn sm" href="/login">登录</a>`}
       <button class="tb-stow" id="tbStow" type="button" title="收起顶栏" aria-label="收起顶栏">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
       </button>
@@ -1271,7 +1273,7 @@ export async function mountShell(active, opt = {}) {
   const out = async () => {
     clearUserCache();
     try { await api.post('/api/auth/logout', {}); } catch {}
-    location.href = '/?login=1';
+    location.href = '/login';
   };
   const bl = document.getElementById('btnLogout');
   if (bl) bl.onclick = out;

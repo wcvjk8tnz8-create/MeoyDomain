@@ -56,7 +56,7 @@ export async function mountReport(_root: HTMLElement | null): Promise<void> {
     const box = $('rpMine');
     if (!box) return;
     if (!loggedIn) {
-      box.innerHTML = '<div class="empty">登录后可以查看自己的举报记录。<a href="/">去登录</a></div>';
+      box.innerHTML = '<div class="empty">登录后可以查看自己的举报记录。<a href="/login">去登录</a></div>';
       return;
     }
     try {

@@ -255,7 +255,7 @@ const SPA_PATHS = new Set([
   '/register.html', '/whois.html', '/admin.html', '/checkin.html',
   '/rewards.html', '/chat.html', '/tickets.html', '/transfer.html',
   '/profile.html', '/terms.html',
-  '/login', '/home', '/dashboard', '/domain', '/register', '/whois',
+  '/login', '/login.html', '/home', '/dashboard', '/domain', '/register', '/whois',
   '/admin', '/checkin', '/rewards', '/chat', '/tickets', '/transfer',
   '/profile', '/terms',
 ]);

@@ -125,6 +125,16 @@ check(/\.reg-field-head\s*\{[^}]*background:\s*transparent/s.test(glass), '字�
 check(/--lg-stroke:\s*rgba\(47, 125, 91/.test(glass), '浅色玻璃描边为可见淡绿');
 check(/:not\(\.side-toggle\)/.test(read('src/app/styles/theme-terra.css')), '汉堡按钮被排除出全局按钮基线（避免空灰块）');
 
+/* 8. 官网根路径 = 主页，登录页独立 */
+const appRoutes = read('src/app/App.tsx');
+check(/'\/\s*':\s*HomePage/.test(appRoutes) && /'\/login':\s*LoginPage/.test(appRoutes), '根路径渲染主页、/login 独立为登录页');
+check(/ROUTES\[key\]\s*\|\|\s*HomePage/.test(appRoutes), '未知路径回落主页而非登录页');
+check(/\['\/', '\/index\.html', '\/home', '\/home\.html'\]/.test(appRoutes), '根路径复用落地页视觉脚本');
+check(/\/login\.html/.test(read('src/index.ts')), 'SPA 回落包含 /login.html');
+check(/zx-nav-cta"\s+href="\/register"/.test(read('src/app/pages/Home.tsx')), '主页 CTA 指向注册页');
+check(!/href="\/">登录/.test(runtime) && !/location\.href\s*=\s*'\/\?login=1'/.test(runtime), '不再有把根路径当登录页的入口');
+check(/\/login\?q=/.test(read('src/app/legacy/whois.ts')) && /href="\/login"/.test(read('src/app/legacy/report.ts')), 'WHOIS / 举报的登录链接指向 /login');
+
 for (const m of ok) console.log('  ✓ ' + m);
 for (const m of errors) console.error('  ✗ ' + m);
 console.log(`健康巡检：${ok.length} 通过，${errors.length} 失败`);

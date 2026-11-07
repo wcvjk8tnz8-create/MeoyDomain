@@ -19,9 +19,12 @@ import ReportPage from './pages/Report';
 
 /* 保留旧 URL，书签 / 站内链接 / Worker 重定向全部继续可用 */
 const ROUTES: Record<string, () => JSX.Element> = {
-  '/': LoginPage,
-  '/index.html': LoginPage,
+  /* 官网根路径 = 主页（Zerexa 落地页）；登录独立成 /login，
+     未登录跳登录、退出登录都走它，不会再让访问域名时撞见登录表单。 */
+  '/': HomePage,
+  '/index.html': HomePage,
   '/login': LoginPage,
+  '/login.html': LoginPage,
   '/home': HomePage,
   '/home.html': HomePage,
   '/dashboard': DashboardPage,
@@ -74,7 +77,8 @@ function isInternal(href: string): boolean {
 /** 页面级的独立视觉脚本（已 TypeScript 化，切页时按需挂载） */
 let cloudMounted = false;
 async function mountPageVisuals(key: string) {
-  if (key !== '/home' && key !== '/home.html') return;
+  // 官网根路径现在就是主页，/home 保留为旧书签别名，两者用同一套视觉
+  if (!['/', '/index.html', '/home', '/home.html'].includes(key)) return;
   if (cloudMounted) return;
   cloudMounted = true;
   try {
@@ -116,7 +120,7 @@ export default function App() {
     try { startI18n(); } catch { /* 不影响页面功能 */ }
   }, [key]);
 
-  const Page = ROUTES[key] || LoginPage;
+  const Page = ROUTES[key] || HomePage;
   // key 变化会卸载旧页面：cleanupPage() 清掉旧控制器注册的事件与定时器
   return <Page key={key} />;
 }

@@ -50,7 +50,7 @@ export async function mountWhois(_root: HTMLElement | null): Promise<void> {
           </div>
           <div class="row end" style="margin-top:14px">
             ${isLoggedIn ? `<button class="btn primary" id="goApply"${r.enough || r.unlimited ? '' : ' disabled'}>${r.enough || r.unlimited ? '申请这个域名' : '积分不足'}</button>`
-                         : `<a class="btn primary" href="/?q=${encodeURIComponent(r.label)}">登录后申请</a>`}
+                         : `<a class="btn primary" href="/login?q=${encodeURIComponent(r.label)}">登录后申请</a>`}
           </div>` : ''}
         ${r.reclaimable ? '<div class="hint" style="margin-top:8px">这是你此前被驳回的申请，可直接重新提交。</div>' : ''}
       `;
