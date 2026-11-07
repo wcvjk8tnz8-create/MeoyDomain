@@ -189,6 +189,16 @@ export function loadBranding() {
   return brandPromise;
 }
 
+/**
+ * 清除品牌配置缓存，下一次 loadBranding() 会重新请求 /api/config。
+ * 后台保存站点名 / Logo 后调用，避免刷新整页才能看到新值。
+ * 注意：ES 模块的 import 绑定只读，外部不能直接给 brandPromise 赋值，
+ * 必须走这个函数（admin.ts 曾因直接赋值而抛 ReferenceError）。
+ */
+export function resetBranding() {
+  brandPromise = null;
+}
+
 /** 应用站点名与 favicon */
 /* ---------- 全局中文字体（后台可配，全站生效） ----------
    key: system | noto | lxgw | zcool

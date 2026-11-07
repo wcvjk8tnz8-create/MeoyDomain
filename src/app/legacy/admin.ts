@@ -2,7 +2,7 @@
  * Admin 页面控制器（由 admin.html 内联脚本平移）
  * 外部符号由 runtime 提供；DOM 查询作用于当前挂载的页面。
  */
-import { api, esc, fmtTime, openModal, closeModal, loadBranding, applyBranding, statusBadge, mountShell, showDialog } from '../lib/runtime';
+import { api, esc, fmtTime, openModal, closeModal, loadBranding, resetBranding, applyBranding, statusBadge, mountShell, showDialog } from '../lib/runtime';
 
 import type { LegacyCtx } from '../lib/types';
 
@@ -637,6 +637,8 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
       document.getElementById('sLogo').addEventListener('input', preview);
       document.getElementById('reloadLogo').onclick = preview;
       document.getElementById('saveSet').onclick = async () => {
+        // 只有「写入设置」这一步决定保存成败。模型探测 / Logo 刷新是附带动作，
+        // 以前和它共用一个 try，刷新一抛错就把已保存的设置报成「保存失败」。
         try {
           await api.post('/api/admin/settings', {
             siteName: document.getElementById('sName').value,
@@ -689,24 +691,30 @@ export async function mountAdmin(_root: HTMLElement | null): Promise<void> {
             aiRoots: document.getElementById('sAiRoots').value,
             aiDnsUnlimitedRoots: document.getElementById('sAiDnsRoots').value,
           });
-          showDialog({
-            title: '设置已保存',
-            message: '已保存，刷新页面后生效',
-            detail: '已自动重新探测可用模型，并刷新了导航 Logo。',
-            tone: 'ok',
-            onReload: () => location.reload(),
-          });
-          // 保存后自动探测 /models 并选定一个模型（可在下拉里改选后再次保存）
-          probeModels(false);
-          // 立即刷新导航 Logo
-          brandPromise = null;
-          const b = await loadBranding();
-          applyBranding(b);
-        } catch (e) { showDialog({ title: '保存失败', message: (e as any).message || String(e), tone: 'err' }); }
+        } catch (e) {
+          showDialog({ title: '保存失败', message: (e as any).message || String(e), tone: 'err' });
+          return;
+        }
+        showDialog({
+          title: '设置已保存',
+          message: '已保存，刷新页面后生效',
+          detail: '已尝试即时更新模型列表与导航 Logo；若没变化，点「刷新页面」即可。',
+          tone: 'ok',
+          onReload: () => location.reload(),
+        });
+        // 探测 /models 并自动选定模型（内部自带错误处理，失败不阻塞保存）
+        Promise.resolve(probeModels(false)).catch(() => {});
+        // 清掉品牌缓存再重拉一次，站点名 / Logo 不用刷新整页就能生效
+        try {
+          resetBranding();
+          applyBranding(await loadBranding());
+        } catch { /* 即时刷新失败只影响预览，设置已落库 */ }
       };
       document.getElementById('resetLogo').onclick = async () => {
         try {
           await api.post('/api/admin/settings/reset-logo', {});
+          resetBranding();
+          applyBranding(await loadBranding());
           settingsFeedback('已恢复默认 Logo'); load();
         } catch (e) { settingsFeedback((e as any).message || String(e), 'err'); }
       };
