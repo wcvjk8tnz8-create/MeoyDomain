@@ -242,6 +242,20 @@ check(/READY_FALLBACK/.test(read('src/app/lib/pageTransition.ts')) && /readySign
 check(/readySignaled = false/.test(read('src/app/lib/pageTransition.ts').split('if \(active \|\| starting\)').pop() || ''), '过渡中改点别的页面会作废旧页面的就绪信号');
 check(/\.page-root\[data-ready="0"\] \.main/.test(read('src/app/styles/liquid-glass.css')) && /tdPageIn/.test(read('src/app/styles/liquid-glass.css').split('首屏一次性显现').pop() || ''), '未就绪时只藏内容区，就绪后整屏一次淡入（壁纸与玻璃框架照常可见）');
 
+
+/* 13. 壁纸全站满铺：不再只有右下角一小块、不再把公共页整层隐藏 */
+const fullWp = read('src/app/styles/liquid-glass.css').split('BLOOM · 花束 Miku').pop() || '';
+check(/background-size:\s*cover\s*!important/.test(fullWp) && !/background-size:\s*auto\s+\d+vh/.test(fullWp), '主图 background-size: cover 满铺，不再 auto 84vh 只占右下角');
+check(!/right\s+-2vw\s+bottom\s+-2vh|linear-gradient\(96deg/.test(fullWp), '去掉右侧定位与左侧 86% 白遮罩');
+check(/html body\.page-home #bg/.test(fullWp) && /html body\.page-login #bg/.test(fullWp) && /html body\.page-home\.has-cloud #bg/.test(fullWp), '首页 / 登录页 / has-cloud 都启用壁纸，覆盖整个站点');
+check(/height:\s*100dvh\s*!important/.test(fullWp) && /inset:\s*0\s*!important/.test(fullWp), '#bg 固定铺满整个视口');
+check(/html\[data-wp-loaded="1"\] body #bg/.test(fullWp), '解码状态写在 html 上，切页新建的 #bg 也能换上高清主图');
+check(/html\[data-theme="dark"\] body #bg\[data-wp-loaded="1"\]/.test(fullWp), '深色用独立夜色版，满铺不被白底洗亮');
+check(/root\.setAttribute\('data-wallpaper'/.test(gate) && /root\.style\.setProperty\('--bg-img'/.test(gate), '壁纸变量挂在 html 上，所有页面 #bg 继承');
+check(/function syncWallpaperNodes\(\)/.test(gate) && /refreshRuntime\(\)[\s\S]{0,160}syncWallpaperNodes\(\)/.test(gate), '切页后同步新 #bg 节点，不再叠出两层满屏壁纸');
+check(!/document\.body\.prepend\(el\)/.test(gate), '不再额外造一个 body 级 #bg 与页面节点重叠');
+check(/syncWallpaperNodes\(\)/.test(gate) && /data-wallpaper/.test(gate), '壁纸切换器对全站所有页面即时生效');
+
 for (const m of ok) console.log('  ✓ ' + m);
 for (const m of errors) console.error('  ✗ ' + m);
 console.log(`健康巡检：${ok.length} 通过，${errors.length} 失败`);

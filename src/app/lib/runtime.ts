@@ -84,6 +84,7 @@ export function bumpPageGeneration(): number { return ++pageGeneration; }
 /* 每次切页后重新扫描动效/装饰/页脚/主题按钮/语言 */
 export function refreshRuntime() {
   const gen = pageGeneration;
+  try { syncWallpaperNodes(); } catch {}
   try { syncTopbarState(); } catch {}
   try { applyLayoutPrefs(); } catch {}
   try { mountDecor(); } catch {}
@@ -226,25 +227,40 @@ export const WALLPAPERS = [
 ];
 
 let wpSeq = 0;
+
+/** 把 <html> 上的壁纸状态同步到页面里每一个 #bg。
+    React 每次切页都会新建 #bg，旧实现只在模块加载时造的那一个上写变量，
+    于是首页 / 登录页永远换不了图，而且会多出一层叠在一起的满屏壁纸。 */
+function syncWallpaperNodes() {
+  const root = document.documentElement;
+  const wp = root.getAttribute('data-wp') || 'bouquet';
+  const loaded = root.getAttribute('data-wp-loaded') || '0';
+  document.querySelectorAll('#bg').forEach((el) => {
+    const node = el as HTMLElement;
+    node.dataset.wp = wp;
+    node.dataset.wpLoaded = loaded;
+  });
+}
+
 export function applyWallpaper(key) {
   const w = WALLPAPERS.find((x) => x.key === key) || WALLPAPERS[0];
-  let el = document.getElementById('bg');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'bg';
-    document.body.prepend(el);
-  }
-  const node = el as HTMLElement;
-  node.style.setProperty('--bg-img', `url('${w.url}')`);
-  node.style.setProperty('--bg-img-dark', `url('${w.dark || w.url}')`);
-  node.style.setProperty('--bg-haze', `url('${w.haze || w.url}')`);
-  node.dataset.wp = w.key;
+  /* 全站满铺：变量与状态写在 <html> 上，任何页面 React 自己渲染的 #bg
+     都会继承；不再在 body 里另造一个 #bg 和页面节点撞成两层。 */
+  const root = document.documentElement;
+  root.style.setProperty('--bg-img', `url('${w.url}')`);
+  root.style.setProperty('--bg-img-dark', `url('${w.dark || w.url}')`);
+  root.style.setProperty('--bg-haze', `url('${w.haze || w.url}')`);
+  root.setAttribute('data-wallpaper', w.key);
+  root.setAttribute('data-wp', w.key);
   // 先用 5.8KB 的 haze 氛围图顶上，高清主图解码完成再淡入。
   // 以前 CSS 直接引用 179KB 主图，切页时要等它下载+解码，观感就是「东西加载慢」。
-  node.dataset.wpLoaded = '0';
+  root.setAttribute('data-wp-loaded', '0');
+  syncWallpaperNodes();
   const seq = ++wpSeq;
   const mark = () => {
-    if (seq === wpSeq && node.dataset.wp === w.key) node.dataset.wpLoaded = '1';
+    if (seq !== wpSeq || root.getAttribute('data-wp') !== w.key) return;
+    root.setAttribute('data-wp-loaded', '1');
+    syncWallpaperNodes();
   };
   [w.url, w.dark].filter(Boolean).forEach((src) => {
     const img = new Image();
@@ -252,7 +268,6 @@ export function applyWallpaper(key) {
     if (typeof img.decode === 'function') img.decode().then(mark, mark);
     else { img.onload = mark; img.onerror = mark; }
   });
-  document.documentElement.setAttribute('data-wallpaper', w.key);
   try { localStorage.setItem('meoy_wallpaper', w.key); } catch {}
   document.querySelectorAll('.bgswitch button').forEach((b) => b.classList.toggle('on', b.dataset.wp === w.key));
 }

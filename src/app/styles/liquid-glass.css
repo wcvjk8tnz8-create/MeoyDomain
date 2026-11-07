@@ -88,8 +88,8 @@
   --lg-muted: #9aaca1;
   --lg-hair: rgba(190, 230, 205, .12);
   --lg-paper: #0d1511;
-  --lg-glass: linear-gradient(152deg, rgba(34, 50, 42, .76), rgba(20, 32, 26, .58) 60%, rgba(16, 28, 22, .62));
-  --lg-glass-soft: linear-gradient(152deg, rgba(34, 50, 42, .62), rgba(20, 32, 26, .42));
+  --lg-glass: linear-gradient(152deg, rgba(34, 50, 42, .86), rgba(20, 32, 26, .72) 60%, rgba(16, 28, 22, .76));
+  --lg-glass-soft: linear-gradient(152deg, rgba(34, 50, 42, .78), rgba(20, 32, 26, .60));
   --lg-stroke: rgba(190, 230, 205, .16);
   --lg-input-line: rgba(190, 230, 205, .22);
   --lg-shadow: 0 24px 60px rgba(0, 0, 0, .48), 0 4px 14px rgba(0, 0, 0, .30), inset 0 1px 0 rgba(255, 255, 255, .10);
@@ -1027,8 +1027,8 @@ html:not([data-theme="dark"]) {
   --lg-ink: #1d2c2a;
   --lg-muted: #708683;
   --lg-paper: #fbfaf6;
-  --lg-glass: linear-gradient(152deg, rgba(255, 255, 255, .50) 0%, rgba(249, 253, 251, .30) 56%, rgba(232, 246, 242, .24) 100%);
-  --lg-glass-soft: linear-gradient(152deg, rgba(255, 255, 255, .46), rgba(240, 250, 247, .24));
+  --lg-glass: linear-gradient(152deg, rgba(255, 255, 255, .86) 0%, rgba(249, 253, 251, .74) 56%, rgba(232, 246, 242, .70) 100%);
+  --lg-glass-soft: linear-gradient(152deg, rgba(255, 255, 255, .80), rgba(240, 250, 247, .62));
   --lg-input-line: rgba(31, 107, 98, .17);
   --lg-blur: blur(18px) saturate(172%);
   --lg-blur-sm: blur(13px) saturate(158%);
@@ -1114,80 +1114,138 @@ html:not([data-theme="dark"]) body { color: var(--bl-ink) !important; }
 html:not([data-theme="dark"]) ::selection { background: rgba(111, 201, 195, .28); color: var(--bl-ink); }
 html ::-webkit-scrollbar-thumb { background: rgba(47, 143, 131, .26); }
 
-/* ── 壁纸：历史层把 #bg 整体 display:none，这里在控制台重新启用 ──
-   公共落地页 / 登录页保持纯纸面，不铺图，留白优先。 */
-html body:not(.page-home):not(.page-login) #bg,
-html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg {
+/* ── 壁纸：全站满铺（最后权威层） ───────────────────────────────
+   旧实现只在控制台 body:not(.page-home):not(.page-login) 启用 #bg，
+   主图 auto 84vh 靠右下，::after 左侧 86% 白遮罩 —— 实际只有右下角
+   一小块看得到；公共主页 / 登录页更是整层 display:none。
+   现在所有页面统一 fixed 满屏 + background-size: cover 铺满每个像素，
+   只留一层极淡均匀薄纱，玻璃浮岛负责文字可读性。
+   公共页 class 由页面组件写死，故选择器必须显式覆盖
+   page-home / page-login / has-cloud，压过历史层的隐藏规则。 */
+html body #bg,
+html body.page-home #bg,
+html body.page-login #bg,
+html body.page-home.has-cloud #bg,
+html[data-theme="dark"] body #bg,
+html[data-theme="dark"] body.page-home #bg,
+html[data-theme="dark"] body.page-login #bg,
+html[data-theme="dark"] body.page-home.has-cloud #bg {
   display: block !important;
   position: fixed !important;
   inset: 0 !important;
+  width: 100% !important;
+  height: 100dvh !important;
   z-index: -1 !important;
-  /* 先用 5.8KB 氛围图立刻铺底，不让 179KB 主图阻塞首屏 */
+  overflow: hidden;
+  /* 先用 5.8KB 氛围图立刻铺满，179KB 主图解码完再换，不阻塞首屏 */
   background-image: var(--bg-haze, url('/img/wallpaper/miku-bouquet-haze.webp')) !important;
+  background-size: cover !important;
+  background-position: center !important;
   background-repeat: no-repeat !important;
-  background-size: auto 84vh !important;
-  background-position: right -2vw bottom -2vh !important;
   mix-blend-mode: multiply;
-  opacity: .90;
-  filter: saturate(.92) contrast(.96);
-  transform: translateZ(0);
+  opacity: var(--wp-opacity, .82);
+  filter: saturate(.94) contrast(.97);
+  transform: none !important;
 }
-/* 高清主图解码完成后（runtime.ts 打 data-wp-loaded="1"）才换上并柔和淡入 */
-html body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"] {
+/* 公共页正文直接压在壁纸上，浓度再收一点，保住 Zerexa 的留白 */
+html body #bg { --wp-opacity: .82; }
+html body.page-home #bg,
+html body.page-login #bg,
+html body.page-home.has-cloud #bg { --wp-opacity: .66; }
+/* 高清主图解码完成后淡入；状态同时写在 html 与 #bg 上，
+   React 每次切页新建的 #bg 也能立刻吃到，不会永远停在氛围图。 */
+html body #bg[data-wp-loaded="1"],
+html body.page-home #bg[data-wp-loaded="1"],
+html body.page-login #bg[data-wp-loaded="1"],
+html body.page-home.has-cloud #bg[data-wp-loaded="1"],
+html[data-wp-loaded="1"] body #bg,
+html[data-wp-loaded="1"] body.page-home #bg,
+html[data-wp-loaded="1"] body.page-login #bg,
+html[data-wp-loaded="1"] body.page-home.has-cloud #bg {
   background-image: var(--bg-img, url('/img/wallpaper/miku-bouquet.webp')) !important;
   animation: bl-wp-fade .62s cubic-bezier(.22, 1, .36, 1) both;
 }
-html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg {
+/* 深色用压暗过的夜色版，整页满铺也不会被白底洗亮 */
+html[data-theme="dark"] body #bg,
+html[data-theme="dark"] body.page-home #bg,
+html[data-theme="dark"] body.page-login #bg,
+html[data-theme="dark"] body.page-home.has-cloud #bg {
   mix-blend-mode: normal;
-  opacity: .40;
-  filter: saturate(.76) brightness(.74);
+  opacity: var(--wp-opacity, .72);
+  filter: none;
 }
-html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"] {
+html[data-theme="dark"] body #bg,
+html[data-theme="dark"] body.page-home #bg,
+html[data-theme="dark"] body.page-login #bg,
+html[data-theme="dark"] body.page-home.has-cloud #bg { --wp-opacity: .72; }
+html[data-theme="dark"] body.page-home #bg,
+html[data-theme="dark"] body.page-login #bg,
+html[data-theme="dark"] body.page-home.has-cloud #bg { --wp-opacity: .58; }
+html[data-theme="dark"] body #bg[data-wp-loaded="1"],
+html[data-theme="dark"] body.page-home #bg[data-wp-loaded="1"],
+html[data-theme="dark"] body.page-login #bg[data-wp-loaded="1"],
+html[data-theme="dark"] body.page-home.has-cloud #bg[data-wp-loaded="1"],
+html[data-wp-loaded="1"][data-theme="dark"] body #bg,
+html[data-wp-loaded="1"][data-theme="dark"] body.page-home #bg,
+html[data-wp-loaded="1"][data-theme="dark"] body.page-login #bg,
+html[data-wp-loaded="1"][data-theme="dark"] body.page-home.has-cloud #bg {
   background-image: var(--bg-img-dark, url('/img/wallpaper/miku-bouquet-dark.webp')) !important;
   animation: bl-wp-fade-dark .62s cubic-bezier(.22, 1, .36, 1) both;
 }
-@keyframes bl-wp-fade { from { opacity: .35; } to { opacity: .90; } }
-@keyframes bl-wp-fade-dark { from { opacity: .14; } to { opacity: .40; } }
-/* 老壁纸（樱花喵 / Miku / GUMI）是满屏照片，不能按插画方式裁切 */
-html body:not(.page-home):not(.page-login) #bg:not([data-wp="bouquet"]) {
+@keyframes bl-wp-fade { from { opacity: .28; } to { opacity: var(--wp-opacity, .82); } }
+@keyframes bl-wp-fade-dark { from { opacity: .24; } to { opacity: var(--wp-opacity, .72); } }
+/* 老壁纸（樱花喵 / Miku / GUMI）是满屏照片，同样满铺，不加左侧白遮罩 */
+html[data-wp]:not([data-wp="bouquet"]) body #bg,
+html[data-wp]:not([data-wp="bouquet"]) body.page-home #bg,
+html[data-wp]:not([data-wp="bouquet"]) body.page-login #bg,
+html[data-theme="dark"][data-wp]:not([data-wp="bouquet"]) body #bg {
   background-size: cover !important;
-  background-position: center 28% !important;
   mix-blend-mode: normal;
-  opacity: .34;
+  opacity: .52;
 }
-html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg:not([data-wp="bouquet"]) { opacity: .18; }
+html[data-theme="dark"][data-wp]:not([data-wp="bouquet"]) body #bg { opacity: .30; }
 
-/* 花瓣光点：极淡、极慢，不用 SVG 画角色，只是几片颜色的呼吸 */
-html body:not(.page-home):not(.page-login) #bg::before,
-html body:not(.page-home):not(.page-login) #bg::after { display: block !important; }
-html body:not(.page-home):not(.page-login) #bg::before {
+/* 花瓣光点：极淡、极慢，满屏呼吸 */
+html body #bg::before,
+html body.page-home #bg::before,
+html body.page-login #bg::before,
+html body.page-home.has-cloud #bg::before {
+  display: block !important;
   content: '' !important;
   position: absolute !important;
   inset: 0 !important;
   z-index: 1 !important;
+  opacity: 1 !important;
   background-image:
-    radial-gradient(9px 15px at 72% 18%, rgba(226, 104, 111, .30), transparent 72%),
-    radial-gradient(8px 13px at 88% 34%, rgba(232, 169, 75, .26), transparent 72%),
-    radial-gradient(7px 12px at 64% 62%, rgba(111, 201, 195, .28), transparent 72%),
-    radial-gradient(6px 11px at 95% 74%, rgba(226, 104, 111, .22), transparent 72%);
+    radial-gradient(9px 15px at 72% 18%, rgba(226, 104, 111, .26), transparent 72%),
+    radial-gradient(8px 13px at 88% 34%, rgba(232, 169, 75, .22), transparent 72%),
+    radial-gradient(7px 12px at 64% 62%, rgba(111, 201, 195, .24), transparent 72%),
+    radial-gradient(6px 11px at 95% 74%, rgba(226, 104, 111, .18), transparent 72%);
   background-repeat: no-repeat;
   animation: bl-petals 26s ease-in-out infinite alternate;
 }
-/* 左侧渐白遮罩：保证表格与正文始终清晰，右侧留给插画 */
-html body:not(.page-home):not(.page-login) #bg::after {
+/* 均匀薄纱：不再把左半屏刷成白板，整页都能看到壁纸 */
+html body #bg::after,
+html body.page-home #bg::after,
+html body.page-login #bg::after,
+html body.page-home.has-cloud #bg::after {
+  display: block !important;
   content: '' !important;
   position: absolute !important;
   inset: 0 !important;
   z-index: 2 !important;
-  background: linear-gradient(96deg,
-    rgba(251, 250, 246, .86) 0%, rgba(251, 250, 246, .56) 34%,
-    rgba(251, 250, 246, .18) 62%, rgba(251, 250, 246, .02) 100%) !important;
+  background: rgba(251, 250, 246, .24) !important;
   backdrop-filter: none !important;
 }
-html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg::after {
-  background: linear-gradient(96deg,
-    rgba(10, 24, 23, .86) 0%, rgba(10, 24, 23, .56) 36%,
-    rgba(10, 24, 23, .18) 66%, rgba(10, 24, 23, .02) 100%) !important;
+/* 公共页正文直接压在壁纸上，薄纱稍厚一点保住 Zerexa 的留白感 */
+html body.page-home.has-cloud #bg::after,
+html body.page-home #bg::after,
+html body.page-login #bg::after { background: rgba(251, 250, 246, .44) !important; }
+html[data-theme="dark"] body #bg::after,
+html[data-theme="dark"] body.page-home #bg::after,
+html[data-theme="dark"] body.page-login #bg::after,
+html[data-theme="dark"] body.page-home.has-cloud #bg::after {
+  background: rgba(8, 22, 21, .30) !important;
 }
 @keyframes bl-petals {
   0%   { transform: translate3d(0, 0, 0) rotate(0deg); opacity: .7; }
@@ -1292,27 +1350,44 @@ html body .bgswitch button.on {
 }
 html[data-theme="dark"] body .bgswitch button.on { border-color: #8fd8ce !important; box-shadow: 0 0 0 2px rgba(143, 216, 206, .38) !important; }
 
-/* ── 响应式：窄屏 / 21:9 让壁纸退到背景，不压正文 ── */
+/* ── 响应式：满屏不变，只微调薄纱与浓度，不压正文 ── */
 @media (max-width: 900px) {
-  html body:not(.page-home):not(.page-login) #bg { opacity: .42 !important; background-size: auto 74vh !important; }
-  html body:not(.page-home):not(.page-login) #bg::after {
-    background: linear-gradient(180deg, rgba(251, 250, 246, .92) 0%, rgba(251, 250, 246, .62) 46%, rgba(251, 250, 246, .30) 100%) !important;
+  html body #bg { opacity: .76 !important; background-size: cover !important; }
+  html body.page-home #bg,
+  html body.page-login #bg,
+  html body.page-home.has-cloud #bg { opacity: .60 !important; background-size: cover !important; }
+  html[data-theme="dark"] body #bg,
+  html[data-theme="dark"] body.page-home #bg,
+  html[data-theme="dark"] body.page-login #bg,
+  html[data-theme="dark"] body.page-home.has-cloud #bg { opacity: .66 !important; }
+  html body #bg::after,
+  html body.page-home #bg::after,
+  html body.page-login #bg::after,
+  html body.page-home.has-cloud #bg::after {
+    background: linear-gradient(180deg, rgba(251, 250, 246, .44), rgba(251, 250, 246, .24)) !important;
   }
-  html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg::after {
-    background: linear-gradient(180deg, rgba(10, 24, 23, .92) 0%, rgba(10, 24, 23, .60) 46%, rgba(10, 24, 23, .28) 100%) !important;
+  html[data-theme="dark"] body #bg::after,
+  html[data-theme="dark"] body.page-home #bg::after,
+  html[data-theme="dark"] body.page-login #bg::after,
+  html[data-theme="dark"] body.page-home.has-cloud #bg::after {
+    background: linear-gradient(180deg, rgba(8, 22, 21, .40), rgba(8, 22, 21, .20)) !important;
   }
   html body .bgswitch { gap: 5px !important; padding: 3px 6px !important; }
   html body .bgswitch button { width: 21px !important; height: 21px !important; min-width: 21px !important; }
 }
 @media (max-height: 460px) and (orientation: landscape) {
-  html body:not(.page-home):not(.page-login) #bg { opacity: .28 !important; background-size: auto 120vh !important; }
+  html body #bg,
+  html body.page-home #bg,
+  html body.page-login #bg,
+  html body.page-home.has-cloud #bg { opacity: .62 !important; background-size: cover !important; }
 }
 @media (prefers-reduced-motion: reduce) {
-  html body:not(.page-home):not(.page-login) #bg::before { animation: none !important; }
-  html body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"],
-  html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"] {
-    animation: none !important;
-  }
+  html body #bg::before,
+  html body.page-home #bg::before,
+  html body.page-login #bg::before,
+  html body.page-home.has-cloud #bg::before { animation: none !important; }
+  html body #bg[data-wp-loaded="1"],
+  html[data-theme="dark"] body #bg[data-wp-loaded="1"] { animation: none !important; }
   html body .bgswitch button { transition: none !important; }
 }
 
