@@ -27,9 +27,12 @@
   --lg-paper: #f5f8f3;
 
   /* ── 玻璃材质 ── */
-  --lg-glass: linear-gradient(152deg, rgba(255, 255, 255, .76) 0%, rgba(255, 255, 255, .48) 58%, rgba(240, 248, 242, .44) 100%);
-  --lg-glass-soft: linear-gradient(152deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .34));
-  --lg-stroke: rgba(255, 255, 255, .86);
+  /* 浅色下白色 alpha 过高压在浅色纸面上会变成一块白板（线上顶栏
+     看起来「不像预览图」的原因）。降低不透明度、掺入绿调，让底下的
+     绿色柔光真正透过玻璃；描边改成可见的淡绿细线而非纯白。 */
+  --lg-glass: linear-gradient(152deg, rgba(255, 255, 255, .62) 0%, rgba(244, 252, 246, .38) 58%, rgba(224, 241, 230, .34) 100%);
+  --lg-glass-soft: linear-gradient(152deg, rgba(255, 255, 255, .50), rgba(236, 248, 240, .28));
+  --lg-stroke: rgba(47, 125, 91, .18);
   --lg-input-line: rgba(31, 91, 67, .18);
   --lg-blur: blur(30px) saturate(180%);
   --lg-blur-sm: blur(18px) saturate(160%);
@@ -173,6 +176,49 @@ html[data-theme="dark"] body.page-login {
 .topbar-in { padding: 0 6px !important; }
 /* 侧栏岛里已有品牌，顶栏不再重复一个 logo */
 .top-brand { display: none !important; }
+
+/* 桌面 / 平板：侧栏是常驻浮岛，汉堡按钮没有对应抽屉，只会在面包屑
+   左侧留下一个空灰色方块（截图里的「不明按钮」）。抽屉仅在 ≤700px 生效。 */
+.side-toggle { display: none !important; }
+
+/* ── 顶栏自动缩走：滚动先收成窄胶囊，继续下滑滑出视口，上滑即刻回来 ──
+   只由 body.topbar-compact / topbar-hidden 两个 class 驱动，JS 不碰样式。 */
+.topbar, .home-top {
+  transition: top .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+              left .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+              right .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+              margin .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+              height .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+              border-radius .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+              box-shadow .42s ease,
+              opacity .28s ease !important;
+}
+body.topbar-compact .topbar {
+  height: 46px !important;
+  left: calc(var(--lg-inset) + var(--safe-l, 0px) + 5vw) !important;
+  right: calc(var(--lg-inset) + var(--safe-r, 0px) + 5vw) !important;
+  border-radius: 999px !important;
+  padding: 0 14px !important;
+  box-shadow: 0 16px 38px rgba(22, 62, 44, .16), inset 0 1px 0 rgba(255, 255, 255, .9) !important;
+  backdrop-filter: blur(38px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(38px) saturate(190%) !important;
+}
+body.topbar-compact .home-top {
+  height: 46px !important;
+  margin-left: calc(var(--lg-inset) + var(--safe-l, 0px) + 5vw) !important;
+  margin-right: calc(var(--lg-inset) + var(--safe-r, 0px) + 5vw) !important;
+  border-radius: 999px !important;
+  padding: 0 14px !important;
+}
+body.topbar-compact .top-search span,
+body.topbar-compact .top-search kbd { display: none !important; }
+body.topbar-compact .crumb { font-size: 12px !important; opacity: .78; }
+body.topbar-hidden .topbar,
+body.topbar-hidden .home-top {
+  top: calc(-1 * (var(--lg-top-h) + 44px)) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
 
 .sidebar {
   position: fixed !important;
@@ -371,9 +417,20 @@ td.cell-detail { max-width: 340px; }
   backdrop-filter: var(--lg-blur-sm) !important;
   -webkit-backdrop-filter: var(--lg-blur-sm) !important;
 }
-.input:focus, .textarea:focus, .zx-search:focus-within {
+/* 聚焦只保留「一层」：玻璃阴影 + 一圈很淡的内发光。
+   历史规则在 1px 边框外再叠 3px 光环，加上标题区的灰色背景块，
+   看起来就是截图里的双重外框。这里把光环全部收掉。 */
+.input:focus, .textarea:focus, .zx-search:focus-within,
+.reg-domain-box:focus-within,
+input:focus, select:focus, textarea:focus {
   border-color: var(--lg-green) !important;
-  box-shadow: 0 0 0 3px rgba(47, 125, 91, .16) !important;
+  box-shadow: var(--lg-shadow-sm), inset 0 0 0 1px rgba(47, 125, 91, .18) !important;
+}
+/* 字段标题不再是一张「卡片里的小卡片」：去掉灰底，只留图标与文字 */
+.reg-field-head {
+  background: transparent !important;
+  padding: 0 0 14px !important;
+  margin-bottom: 14px !important;
 }
 .zx-search { overflow: hidden; }
 .zx-root-wrap select, .suffix select { color: var(--lg-green) !important; }
@@ -500,7 +557,13 @@ body.side-open .page-root::after {
     border-radius: 20px !important;
   }
   .topbar-in { padding: 0 4px !important; gap: 8px !important; }
-  .side-toggle { display: inline-flex !important; align-items: center !important; justify-content: center !important; width: 44px !important; height: 44px !important; flex: 0 0 44px !important; }
+  .side-toggle { display: inline-flex !important; align-items: center !important; justify-content: center !important; width: 44px !important; height: 44px !important; flex: 0 0 44px !important; color: var(--lg-ink) !important; }
+  /* 窄屏不再左右各收 5vw，否则汉堡 + 面包屑 + 图标会挤在一起 */
+  body.topbar-compact .topbar {
+    left: calc(10px + var(--safe-l, 0px)) !important;
+    right: calc(10px + var(--safe-r, 0px)) !important;
+    height: 42px !important;
+  }
 
   .sidebar {
     top: calc(48px + 10px + var(--safe-t, 0px) + 8px) !important;

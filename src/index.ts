@@ -183,8 +183,8 @@ app.get('/api/config', async (c) => {
     siteName: s.site_name || 'TerraDomain',
     logoUrl: s.logo_url || '/img/logo.jpg',
     faviconUrl: s.favicon_url || '/favicon.ico',
-    fontBody: s.font_body || 'zcool',
-    fontDisplay: s.font_display || 'zcool',
+    fontBody: s.font_body || 'system',
+    fontDisplay: s.font_display || 'system',
     // 仅名单，不含任何 AI 接口地址或密钥
     aiReviewRoots: String(s.ai_review_roots || 'v-1.top').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
     dnsUnlimitedRoots: String(s.dns_unlimited_roots || 'v-1.top').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),

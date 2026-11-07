@@ -66,10 +66,12 @@
   --shadow-md: 0 4px 6px -1px hsl(240 6% 10% / .08), 0 2px 4px -2px hsl(240 6% 10% / .06);
   --shadow-lg: 0 10px 15px -3px hsl(240 6% 10% / .08), 0 4px 6px -4px hsl(240 6% 10% / .06);
   --glow: none;
-  --cn-body: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
-  --cn-display: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  /* 后台「站点设置 → 字体」通过 applyFonts() 覆盖这两个变量；
+     --sans 过去写死系统字体栈，导致选了霞鹜文楷却仍渲染苹方 / Noto。
+     现在让全站正文、表单、侧栏、表格统一引用它。 */
+  --cn-body: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --cn-display: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --sans: var(--cn-body);
   --cn: var(--sans);
   --display: 'Redaction 35', var(--cn-display);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;

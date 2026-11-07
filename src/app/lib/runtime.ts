@@ -47,6 +47,7 @@ export function navigate(path: string) {
 
 /* 每次切页后重新扫描动效/装饰/页脚/主题按钮/语言 */
 export function refreshRuntime() {
+  try { syncTopbarState(); } catch {}
   try { mountDecor(); } catch {}
   try { mountMotion(); } catch {}
   try { mountSiteFooter(); } catch {}
@@ -180,8 +181,8 @@ export function loadBranding() {
         siteName: d.siteName || DEFAULT_BRAND.siteName,
         logoUrl: d.logoUrl || DEFAULT_BRAND.logoUrl,
         faviconUrl: d.faviconUrl || DEFAULT_BRAND.faviconUrl,
-        fontBody: d.fontBody || 'zcool',
-        fontDisplay: d.fontDisplay || 'zcool',
+        fontBody: d.fontBody || 'system',
+        fontDisplay: d.fontDisplay || 'system',
       }))
       .catch(() => ({ ...DEFAULT_BRAND }));
   }
@@ -203,7 +204,7 @@ export function resetBranding() {
    key: system | noto | lxgw | zcool
    拉丁与数字始终由 Redaction 35 接管，这里只决定中文字符用哪个字体。 */
 export const CN_FONTS = {
-  system: "'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
+  system: "'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
   noto: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
   lxgw: "'LXGW WenKai TC', 'LXGW WenKai', 'PingFang SC', 'Microsoft YaHei', sans-serif",
   zcool: "'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -213,9 +214,18 @@ export function applyFonts(fontBody, fontDisplay) {
   const root = document.documentElement;
   const body = CN_FONTS[fontBody] || CN_FONTS.system;
   const disp = CN_FONTS[fontDisplay] || CN_FONTS.zcool;
-  // 覆盖 CSS 变量 → 所有页面（前台 / WHOIS / 后台 / 条款）立即全局生效
+  // 覆盖 CSS 变量 → 所有页面（前台 / WHOIS / 后台 / 条款）立即全局生效。
+  // --sans 现在引用 --cn-body，所以正文、表单、侧栏、表格都会跟着换字体。
   root.style.setProperty('--cn-body', body);
   root.style.setProperty('--cn-display', disp);
+  // Zerexa 的衬线标题走 --td-serif；显式选了非系统字体时让它一起跟随，
+  // 否则「选了霞鹜文楷，标题仍是 Noto Serif」会看起来像没生效。
+  // 选 system 时移除内联覆盖，恢复 Georgia / 宋体的高雅衬线。
+  if (fontBody && fontBody !== 'system' && fontBody !== 'default') {
+    root.style.setProperty('--td-serif', body);
+  } else {
+    root.style.removeProperty('--td-serif');
+  }
 }
 
 /** 写入站点名：长名自动缩字号并保留 title 全文，避免侧栏被截成「TerraD…」 */
@@ -658,10 +668,16 @@ export function mountSiteFooter() {
       document.querySelector('.home-top-in .home-nav');
     if (!host) return;
     var b = makeBtn();
-    // 放到铃铛前面，与其它图标按钮成一组
-    var bell = host.querySelector('.bell');
+    // 放到右侧图标组（铃铛 / 搜索 / 头像前）。历史上找的是 .bell，
+    // 但真实节点是 #bellBtn，于是永远落回 firstChild —— 顶栏面包屑左边
+    // 多出一个孤立按钮，与预览图不一致。
+    var bell = host.querySelector('#bellBtn');
+    var search = host.querySelector('#topSearch');
+    var chip = host.querySelector('#userChip');
     if (bell) host.insertBefore(b, bell);
-    else host.insertBefore(b, host.firstChild);
+    else if (search) host.insertBefore(b, search);
+    else if (chip) host.insertBefore(b, chip);
+    else host.appendChild(b);
     apply(current(), false);
   }
 
@@ -782,8 +798,28 @@ export function mountDecor() {
    ══════════════════════════════════════════════════════════ */
 let __motionBoot: { io: IntersectionObserver | null; reduced: boolean } | null = null;
 
+/* ── 顶栏自动缩走 ──
+   向下滚先收成窄胶囊，继续滚则滑出视口；上滑立刻回来，回到顶部完全展开。
+   只切 body class，过渡交给 CSS（减少动态时自动不播动画）。
+   全局只注册一次监听，切页由 refreshRuntime() 重算一次当前状态。 */
+let __lastTopbarY = 0;
+function syncTopbarState() {
+  const y = Math.max(window.scrollY || 0, 0);
+  const b = document.body;
+  const compact = y > 24;
+  const down = y > __lastTopbarY + 4;
+  const up = y < __lastTopbarY - 4;
+  if (compact) b.classList.add('topbar-compact');
+  else b.classList.remove('topbar-compact', 'topbar-hidden');
+  if (compact && down && y > 160) b.classList.add('topbar-hidden');
+  else if (up || y <= 24) b.classList.remove('topbar-hidden');
+  __lastTopbarY = y;
+}
+
 function bootMotion() {
   if (__motionBoot) return __motionBoot;
+  window.addEventListener('scroll', syncTopbarState, { passive: true });
+  syncTopbarState();
   const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   let io: IntersectionObserver | null = null;
   if (!reduced) {

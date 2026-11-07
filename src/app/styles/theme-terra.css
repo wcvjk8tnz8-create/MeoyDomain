@@ -389,7 +389,10 @@ table td a, .cell-fqdn, td:first-child { font-family: var(--td-mono); }
    ══════════════════════════════════════════════════════════ */
 
 /* 普通按钮：统一 flex 居中，杜绝「文字偏上/偏左」 */
-button:not(.root-opt):not(.op-btn):not(.iconbtn),
+/* side-toggle 必须排除：这条 (0,3,1) 的 !important 会盖过所有
+   .side-toggle { display:none !important }，导致桌面/平板顶栏多出一个
+   空灰色方块（抽屉按钮在没有抽屉的宽度上显示了）。 */
+button:not(.root-opt):not(.op-btn):not(.iconbtn):not(.side-toggle),
 .zx-search-btn, .pc-av-btn {
   display: inline-flex !important;
   align-items: center !important;
