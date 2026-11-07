@@ -57,11 +57,24 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
 
-      # 类型检查：存量 .js 不参与检查（tsconfig checkJs=false），
-      # 只对 .ts 生效。当前为非阻断，纯提示；稳定后可去掉 continue-on-error。
+      # 类型检查：存量 .js 不参与检查（tsconfig checkJs=false）。
+      # 全量类型错误暂作提示，但 TS2304（未声明标识符）必须阻断：
+      # esbuild / Vite 不做名字解析，这类代码能打包成功，线上运行时却直接抛
+      # ReferenceError（例：后台保存设置里给未 import 的 brandPromise 赋值）。
       - name: 类型检查（TypeScript）
-        continue-on-error: true
-        run: npm run typecheck
+        run: |
+          set +e
+          npm run typecheck > /tmp/tsc.log 2>&1
+          code=$?
+          cat /tmp/tsc.log
+          if grep -qE 'error TS2304' /tmp/tsc.log; then
+            grep -E 'error TS2304' /tmp/tsc.log | while IFS= read -r line; do echo "::error::$line"; done
+            echo "✘ 存在未声明标识符：打包不会报错，但运行到该处必然抛 ReferenceError"
+            exit 1
+          fi
+          if [ "$code" -ne 0 ]; then
+            echo "⚠ 其它类型问题（非阻断，退出码 $code）"
+          fi
 
       # 构建 React 前端（产物 dist/client，由 wrangler [assets] 托管）
       # 日志端点有时被网络策略挡住，失败时把关键行同时发成 annotation 方便排查

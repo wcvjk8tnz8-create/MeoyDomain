@@ -757,5 +757,6 @@ export const EXTRA_DICT: Record<string, string> = {
   '操作失败': 'Action failed',
   '知道了': 'Got it',
   '刷新页面': 'Refresh page',
-  '已自动重新探测可用模型，并刷新了导航 Logo。': 'Available models were re-detected and the navigation logo was refreshed.',
+  '已保存，刷新页面后生效': 'Saved. Refresh the page for all changes to take effect.',
+  '已尝试即时更新模型列表与导航 Logo；若没变化，点「刷新页面」即可。': 'Tried to update the model list and navigation logo immediately; if nothing changed, click "Refresh page".',
 };
