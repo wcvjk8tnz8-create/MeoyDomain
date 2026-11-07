@@ -171,7 +171,14 @@ export function applyWallpaper(key) {
 
 export function mountWallpaper() {
   let saved = 'bouquet';
-  try { saved = localStorage.getItem('meoy_wallpaper') || 'bouquet'; } catch {}
+  try {
+    // 花束重构版上线时，把旧存档一次性升级到新默认；之后仍完全尊重用户选择
+    if (!localStorage.getItem('meoy_wallpaper_v2')) {
+      localStorage.setItem('meoy_wallpaper_v2', '1');
+      localStorage.setItem('meoy_wallpaper', 'bouquet');
+    }
+    saved = localStorage.getItem('meoy_wallpaper') || 'bouquet';
+  } catch {}
   applyWallpaper(saved);
 }
 
