@@ -5,8 +5,8 @@
   "type": "module",
   "description": "二级域名分发系统 · React + TypeScript + Cloudflare Workers / D1",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "tsx scripts/emit-html-shell.ts && vite",
+    "build": "tsx scripts/emit-html-shell.ts && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
     "worker:dev": "wrangler dev",
@@ -14,7 +14,8 @@
     "db:create": "wrangler d1 create subdomain-hub-db",
     "db:init": "wrangler d1 execute subdomain-hub-db --remote --file=./schema.sql",
     "db:init:local": "wrangler d1 execute subdomain-hub-db --local --file=./schema.sql",
-    "admin": "node scripts/admin.mjs",
+    "emit:root-pages": "tsx scripts/emit-static-pages.ts",
+    "admin": "tsx scripts/admin.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
     "@cloudflare/workers-types": "^4.20260702.1",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.9.3",
+    "tsx": "^4.19.2",
     "vite": "^5.4.11",
     "wrangler": "^3.90.0",
     "tailwindcss": "^3.4.17",

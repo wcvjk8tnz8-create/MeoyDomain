@@ -57,7 +57,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
 
-      # 类型检查：存量 .js 不参与检查（tsconfig checkJs=false）。
+      # 类型检查：scripts/ 下的 .ts 运维脚本不参与 tsc（不在 include 内）。
       # 全量类型错误暂作提示，但 TS2304（未声明标识符）必须阻断：
       # esbuild / Vite 不做名字解析，这类代码能打包成功，线上运行时却直接抛
       # ReferenceError（例：后台保存设置里给未 import 的 brandPromise 赋值）。
@@ -76,10 +76,10 @@ jobs:
             echo "⚠ 其它类型问题（非阻断，退出码 $code）"
           fi
 
-      # 固化历次线上踩过的坑：CSS 括号、词典重复键、明文密钥、
+      # 固化历次线上踩过的坑：CSS 括号、词典重复键、明文密钥、零 HTML / 零 JS、
       # 弹窗遮罩 / Toast / 抽屉动效、双动效引擎、未声明标识符。
       - name: 静态健康巡检
-        run: node scripts/health-check.mjs
+        run: npx tsx scripts/health-check.ts
 
       # 构建 React 前端（产物 dist/client，由 wrangler [assets] 托管）
       # 日志端点有时被网络策略挡住，失败时把关键行同时发成 annotation 方便排查
@@ -97,7 +97,7 @@ jobs:
 
       # D1 数据库：存在就复用，不存在自动创建，并把 uuid 传给下一步
       - name: 准备 D1 数据库
-        run: node scripts/ensure-d1.mjs
+        run: npx tsx scripts/ensure-d1.ts
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -110,7 +110,7 @@ jobs:
       # 站点功能不受影响（仅上传自定义头像不可用），不应阻断部署。
       - name: 准备 R2 存储桶
         continue-on-error: true
-        run: node scripts/ensure-r2.mjs
+        run: npx tsx scripts/ensure-r2.ts
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.CF_AUTH_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -123,7 +123,7 @@ jobs:
       # 把 Variables 写进 wrangler.toml
       # database_id 由上一步自动写入环境，此处不再覆盖
       - name: 注入配置
-        run: node scripts/inject-config.mjs
+        run: npx tsx scripts/inject-config.ts
         env:
           ROOT_DOMAIN: ${{ vars.ROOT_DOMAIN }}
           DEFAULT_QUOTA: ${{ vars.DEFAULT_QUOTA }}

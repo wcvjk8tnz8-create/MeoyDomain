@@ -1,14 +1,13 @@
-#!/usr/bin/env node
 // 运维小工具：把指定邮箱设为管理员 / 解封用户
 // 用法：
-//   node scripts/admin.mjs a@b.com
-//   node scripts/admin.mjs a@b.com --unban
-//   node scripts/admin.mjs a@b.com --local
+//   node scripts/admin.ts a@b.com
+//   node scripts/admin.ts a@b.com --unban
+//   node scripts/admin.ts a@b.com --local
 import { execSync } from 'node:child_process';
 
 const [email, ...flags] = process.argv.slice(2);
 if (!email) {
-  console.log('用法： node scripts/admin.mjs <email> [--unban] [--local]');
+  console.log('用法： node scripts/admin.ts <email> [--unban] [--local]');
   process.exit(1);
 }
 const target = flags.includes('--local') ? '--local' : '--remote';

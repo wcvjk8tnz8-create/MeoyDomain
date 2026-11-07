@@ -1,11 +1,12 @@
-<!doctype html>
+/** meoy.top 根域名落地页（自包含，供静态托管导出或 Worker 按 Host 直出） */
+export const meoyTopHtml = String.raw`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#fbfaf7">
-<title>v-1.top · TerraDomain</title>
-<meta name="description" content="v-1.top — TerraDomain public subdomain service">
+<title>meoy.top · TerraDomain</title>
+<meta name="description" content="meoy.top — TerraDomain public subdomain service">
 <style>
 :root{
   --paper:#fbfaf7;--paper2:#f4f2ec;--card:#fff;--ink:#16191c;--body:#40474f;
@@ -241,7 +242,7 @@ body{
     <div class="status rise" style="--d:.22s">
       <span class="pill"><span data-i18n="rootLabel">Current public domain</span> <b id="curRoot">meoy.top</b></span>
       <span class="pill live"><span class="dot"></span><span data-i18n="liveLabel">Open for registration</span></span>
-      <span class="pill" id="rootNote" data-i18n="rootNote">AI auto-review · unlimited DNS records</span>
+      <span class="pill" id="rootNote" data-i18n="rootNote">Default root · 12 DNS record types</span>
     </div>
 
     <div class="metrics rise" style="--d:.26s">
@@ -271,8 +272,8 @@ var PANEL = "https://nic.299282.xyz";   /* 官网 / 控制台地址，不带结�
 /* 过渡角色提前预热：点链接时图片已在缓存，不会等 760ms 才冒出来 */
 var pl = document.createElement("link"); pl.rel = "preload"; pl.as = "image";
 pl.href = PANEL + "/img/transition/miku-pop.png"; document.head.appendChild(pl);
-var ABUSE_EMAIL = "abuse@v-1.top";     /* 举报邮箱，改成你能收信的地址 */
-var ROOT = "v-1.top";                  /* 本页对应的根域名 */
+var ABUSE_EMAIL = "abuse@meoy.top";     /* 举报邮箱，改成你能收信的地址 */
+var ROOT = "meoy.top";                  /* 本页对应的根域名 */
 /* 跨域拉不到官网 /api/config 时的兜底清单；新增根域名时请同步加进来 */
 var KNOWN_ROOTS = ["meoy.top", "v-1.top"];
 
@@ -284,7 +285,7 @@ var DICT = {
     sub:"Check a prefix, pick a root domain, and put your service online in minutes — free of charge.",
     prefixPh:"your-name",checkBtn:"Check availability →",
     rootLabel:"Current public domain",liveLabel:"Open for registration",
-    rootNote:"AI auto-review · unlimited DNS records",
+    rootNote:"Default root · 12 DNS record types",
     m1:"12 record types",m2:"Global Anycast",m3:"Free, forever",
     legal:"DNS resolution only. Owners are solely responsible for their content.",
     legalReport:"Report abuse",legalMail:"abuse@" + ROOT,legalTos:"Terms",legalReg:"Register →"
@@ -296,7 +297,7 @@ var DICT = {
     sub:"输入前缀、选好根域名，几分钟就能把服务挂上线 —— 完全免费。",
     prefixPh:"输入前缀",checkBtn:"查询可用性 →",
     rootLabel:"当前公共域名",liveLabel:"开放注册中",
-    rootNote:"AI 自动审核 · DNS 记录数不限",
+    rootNote:"默认根后缀 · 12 种 DNS 记录",
     m1:"12 种记录类型",m2:"全球 Anycast",m3:"永久免费",
     legal:"本站仅提供 DNS 解析，各子域名的内容与用途由所有者独立负责。",
     legalReport:"举报滥用",legalMail:"abuse@" + ROOT,legalTos:"服务条款",legalReg:"免费注册 →"
@@ -612,3 +613,4 @@ document.querySelectorAll("[data-lang]").forEach(function(b){
 </script>
 </body>
 </html>
+`;

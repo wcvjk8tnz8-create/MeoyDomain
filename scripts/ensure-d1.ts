@@ -1,9 +1,8 @@
-#!/usr/bin/env node
 /**
  * 确保 D1 数据库存在，并把 database_id 交给后续步骤。
  *  - 已存在（按名字查找）→ 直接复用
  *  - 不存在 → 通过 Cloudflare API 自动创建
- *  - 在 CI 中会把 uuid 写入 $GITHUB_ENV，供 inject-config.mjs 使用
+ *  - 在 CI 中会把 uuid 写入 $GITHUB_ENV，供 inject-config.ts 使用
  *
  * 依赖环境变量：CLOUDFLARE_ACCOUNT_ID、CLOUDFLARE_API_TOKEN
  * 可选：D1_DATABASE_NAME（默认 subdomain-hub-db）

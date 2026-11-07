@@ -1,4 +1,9 @@
-<!doctype html>
+/**
+ * SPA 外壳：唯一挂载点与首屏同步预置脚本。
+ * 仓库不跟踪 .html；Vite 在 config 阶段由本模板生成 index.html（已 gitignore），
+ * Worker 亦可直接用此字符串响应，浏览器收到的仍是标准 HTML 文档。
+ */
+export const spaShellHtml = String.raw`<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -36,3 +41,4 @@
   <script type="module" src="/src/app/main.tsx"></script>
 </body>
 </html>
+`;

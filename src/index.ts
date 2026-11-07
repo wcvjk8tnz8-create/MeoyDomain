@@ -4,6 +4,7 @@ import { loadAiConfig } from './lib/aiReview.js';
 import { parseRootCosts } from './lib/points.js';
 import { runAiReviewBatch } from './lib/aiBatch.js';
 import { emailRuleHint, emailRuleOf } from './lib/emailRule.js';
+import { rootPageFor } from './html/rootPages.js';
 import { Hono } from 'hono';
 import { attachUser, requireAuth, requireAdmin } from './middleware/auth.js';
 import { ok, fail } from './lib/util.js';
@@ -260,7 +261,14 @@ const SPA_PATHS = new Set([
   '/profile', '/terms',
 ]);
 app.all('*', async (c) => {
-  const path = new URL(c.req.url).pathname.replace(/\/+$/, '') || '/';
+  const reqUrl = new URL(c.req.url);
+  const path = reqUrl.pathname.replace(/\/+$/, '') || '/';
+  // 根域名落地页由 TypeScript 模板直出：两个域名既可以指到本 Worker，
+  // 也可以 npm run emit:root-pages 导出后继续挂静态托管，不必再往仓库放 .html。
+  if (path === '/' || path === '/index.html') {
+    const rootPage = rootPageFor(reqUrl.hostname);
+    if (rootPage) return c.html(rootPage);
+  }
   if (SPA_PATHS.has(path) || SPA_PATHS.has(path + '.html')) {
     const url = new URL('/', c.req.url);
     return c.env.ASSETS.fetch(new Request(url, c.req.raw));

@@ -1,0 +1,11 @@
+# 语言统计口径：页面壳、根域名页、CI/运维脚本全部是 TypeScript
+*.ts   linguist-language=TypeScript
+*.tsx  linguist-language=TypeScript
+*.css  linguist-language=CSS
+
+# 图片不计入语言条
+*.svg  binary
+*.webp binary
+*.png  binary
+*.jpg  binary
+*.ico  binary

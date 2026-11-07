@@ -1,0 +1,4 @@
+# 旧提交用的占位邮箱没有绑定任何 GitHub 账号，导致 Contributors 为空。
+# 统一归并到仓库 owner 的 noreply 身份（配合历史重写，GitHub 归因到该账号）。
+wcvjk8tnz8-create <wcvjk8tnz8-create@users.noreply.github.com> <yuanbao@tencent.com>
+wcvjk8tnz8-create <wcvjk8tnz8-create@users.noreply.github.com> <yuanbao@local>

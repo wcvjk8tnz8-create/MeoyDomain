@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * 确保 R2 存储桶存在，并**自动绑定到 wrangler.toml**。
  *

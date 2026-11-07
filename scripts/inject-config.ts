@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // 把 GitHub Secrets / Variables 注入 wrangler.toml（只在 CI 中运行）
 // 支持覆盖：D1_DATABASE_ID 及 [vars] 区块里的任意键（ROOT_DOMAIN / DEFAULT_QUOTA / ...）
 import { readFileSync, writeFileSync } from 'fs';
@@ -38,7 +37,7 @@ if (d1) {
 // 其余可选变量
 const KEYS = [
   'ROOT_DOMAIN', 'DEFAULT_QUOTA', 'ALLOW_SIGNUP', 'REQUIRE_APPROVAL', 'RESERVED_LABELS', 'CF_MOCK',
-  // R2：桶名（需与 ensure-r2.mjs 创建的一致）、公开外链地址
+  // R2：桶名（需与 ensure-r2.ts 创建的一致）、公开外链地址
   'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'AVATAR_MAX_KB',
   // 多根域名
   'ROOT_DOMAINS', 'CF_ZONE_IDS',

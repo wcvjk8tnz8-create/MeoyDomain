@@ -98,7 +98,7 @@
 - DNSHE 支持「检查委派」按钮（调其 `/v1/zones/{id}/delegation`）
 - 未托管时本站正常解析；托管后本站 DNS 记录页对该域名不再生效
 
-新增服务商：编辑 `src/lib/delegation.js` 的 `DELEGATION_PROVIDERS` 即可。
+新增服务商：编辑 `src/lib/delegation.ts` 的 `DELEGATION_PROVIDERS` 即可。
 
 ### 8. 积分与每日签到
 
@@ -192,7 +192,7 @@
 
 CNAME 探测走 DoH（cloudflare-dns.com → dns.google 双端点降级），5 秒超时，失败不影响主查询。
 
-新增数据源：编辑 `src/lib/whoisExt.js`。
+新增数据源：编辑 `src/lib/whoisExt.ts`。
 
 > 注意：Cloudflare Workers 有真实出网能力，上述接口在部署后可正常访问。
 > 本地沙盒若禁止外部出站，会走「查询失败 + 外链引导」分支，属正常降级。
@@ -207,9 +207,9 @@ CNAME 探测走 DoH（cloudflare-dns.com → dns.google 双端点降级），5 �
 | `reason` | 驳回或停用原因 |
 
 **whois 子域名自动跳转**：访问 `whois.<根域名>`（如 `whois.meoy.top`）自动进入查询页；`whois.meoy.top/<名称>` 直接查询该名称。
-**服务端重定向**（`src/index.js` 中间件，不依赖前端 JS，最可靠）：Worker 检测 Host 首段为 `whois`，把 `/` 与 `/<名称>` 302 到 WHOIS 页。**只接管入口页** —— `/dashboard`、`/admin`、`/whois`、`/domain` 等一律放行。
+**服务端重定向**（`src/index.ts` 中间件，不依赖前端 JS，最可靠）：Worker 检测 Host 首段为 `whois`，把 `/` 与 `/<名称>` 302 到 WHOIS 页。**只接管入口页** —— `/dashboard`、`/admin`、`/whois`、`/domain` 等一律放行。
 
-> ⚠️ 曾经踩过的坑：跳转逻辑写了两份（前端 `api.js` 一份、服务端一份），前端那份会在**每个页面**执行，于是访问 `/dashboard` 被踢去 `/whois.html?name=dashboard`，而登录页又把已登录的人送回 `/dashboard`，两边互相抢夺形成死循环。
+> ⚠️ 曾经踩过的坑：跳转逻辑写了两份（前端请求层一份、服务端一份），前端那份会在**每个页面**执行，于是访问 `/dashboard` 被踢去 `/whois.html?name=dashboard`，而登录页又把已登录的人送回 `/dashboard`，两边互相抢夺形成死循环。
 > 现在**前端不再做任何 whois 跳转**，只由服务端处理。新增跳转逻辑时务必只写一处。
 
 **WHOIS 页豁免规则**（它必须完全不受影响）：
@@ -223,7 +223,7 @@ CNAME 探测走 DoH（cloudflare-dns.com → dns.google 双端点降级），5 �
 条款页同样按公开页处理。
 为此 `wrangler.toml` 设了 `run_worker_first = true`，Worker 处理完后通过 `ASSETS.fetch()` 回落静态资源。**不要再手动改写路径**（补 `index.html`、去 `.html`）—— ASSETS 自带 `/xxx.html ⇄ /xxx` 规范化，两边都改会形成自指 307 死循环。
 
-**入口分流**（`index.html` 头部同步脚本，早于页面渲染，作为前端兜底）：
+**入口分流**（`src/html/spa.ts` 里的同步预置脚本，早于页面渲染，作为前端兜底）：
 
 | 访问 | 结果 |
 |---|---|
@@ -238,7 +238,7 @@ CNAME 探测走 DoH（cloudflare-dns.com → dns.google 双端点降级），5 �
 **WHOIS 是免登录页面**（`mountNav(..., { optional: true })`）。这一点很关键：早期版本它要求登录，未登录就跳 `/`，而 whois 子域又把 `/` 跳回 `/whois.html`，形成死循环。现在它不要求登录，并有计数熔断兜底。
 
 防循环三重保护：只在入口页（`/`、`/index.html`）触发；识别 `whois` 与 `whois.html` 两种形态（部分托管会规范化掉 `.html`）；同一次会话内对同一目标只跳一次，落地后即清除标记。即使 `whois.html` 缺失被回退到首页也不会无限刷新。
-需要先把 `whois` 这个主机名指向本 Worker —— 在 Cloudflare 的 Worker 设置里添加**自定义域/路由** `whois.meoy.top/*`（或在 DNS 里加一条指向 Worker 的记录并开启代理）。前缀可在 `public/js/api.js` 顶部的 `WHOIS_SUBDOMAIN` 改。
+需要先把 `whois` 这个主机名指向本 Worker —— 在 Cloudflare 的 Worker 设置里添加**自定义域/路由** `whois.meoy.top/*`（或在 DNS 里加一条指向 Worker 的记录并开启代理）。前缀由 `src/index.ts` 的 WHOIS 中间件按 Host 首段判断，无需前端配置。
 
 持有人显示策略（后台「站点设置」可改）：`masked` 脱敏（默认）/ `none` 不显示 / `full` 完整公开；**本人与管理员始终可见完整地址**。
 
@@ -285,7 +285,7 @@ subdomain-hub/
 │   │   └── util.ts              统一响应、审计日志
 │   ├── middleware/auth.ts       会话解析、requireAuth / requireAdmin
 │   └── routes/*.ts              注册 / 域名 / 记录 / 后台 / 工单 / 转移 …
-├── index.html                   唯一的 HTML 壳（挂载 React，Vite 入口）
+├── src/html/spa.ts             SPA 外壳模板（构建前生成 index.html，不入库）
 ├── src/app/                     React 前端
 │   ├── main.tsx / App.tsx       入口 + SPA 路由（14 个页面）
 │   ├── pages/*.tsx              14 个页面组件
@@ -462,11 +462,12 @@ npm run dev
 
 ## 开发语言：全量 TypeScript + React
 
-前后端**全部 TypeScript**，无存量 `.js`：
+前后端与运维脚本**全部 TypeScript**，无存量 `.js` / `.mjs` / `.html`：
 
 - 前端：React 18 + Vite，`src/app/pages/*.tsx` 共 14 个页面组件；全站只有一个
-  `index.html` 作为挂载壳，由 `src/app/main.tsx` 渲染。旧的 14 个静态 HTML 页面已删除。
+  SPA 壳由 `src/html/spa.ts` 导出，`npm run build` 前生成 `index.html`（不入库），再由 `src/app/main.tsx` 渲染。旧的 14 个静态 HTML 页面已删除。
 - 后端：Hono on Workers，`src/**/*.ts`，Wrangler 内置 esbuild 直接打包。
+- 页面壳与落地页：`src/html/*.ts` 导出模板字符串；`scripts/*.ts` 由 `tsx` 执行。
 - 全局类型在 `src/types.d.ts`：`Env`（D1/R2/ASSETS/Secrets/Vars）、数据行类型、`SessionUser`。
 - `tsconfig.json` 用 `moduleResolution: Bundler`、`jsx: react-jsx`、`allowJs: false`。
 
@@ -483,7 +484,7 @@ npm run deploy      # build + wrangler deploy
 
 **SPA 路由**：站内链接为 `/dashboard`、`/register` 这类干净路径；`App.tsx` 仍保留
 `/xxx.html` 别名，老书签与 `whois.` 子域的服务端重定向继续可用。
-Worker 的 `SPA_PATHS` 白名单把这些路径统一回落到 `index.html`，由 React 接管。
+Worker 的 `SPA_PATHS` 白名单把这些路径统一回落到 SPA 外壳，由 React 接管。
 
 
 ---
@@ -543,7 +544,7 @@ Worker 的 `SPA_PATHS` 白名单把这些路径统一回落到 `index.html`，�
 > 以下为**历史记录**：当时项目还是原生 HTML/CSS/JS，现已迁移到 React + TypeScript；
 > 结论（手写着色器）保留，但「无 React」的前提已不成立。
 
-**样式**：Tailwind CSS 3（PostCSS）+ 一份合并后的组件表。早期版本叠加过两套手写 CSS（同名 `.sidebar` 被定义 16 次），已收敛为 `src/app/styles/components.css`（每选择器一条规则）+ `src/app/styles/index.css`（Tailwind 指令与权威层）。主题令牌通过 `tailwind.config.js` 映射，深色自动跟随 `data-theme`。
+**样式**：Tailwind CSS 3（PostCSS）+ 一份合并后的组件表。早期版本叠加过两套手写 CSS（同名 `.sidebar` 被定义 16 次），已收敛为 `src/app/styles/components.css`（每选择器一条规则）+ `src/app/styles/index.css`（Tailwind 指令与权威层）。主题令牌通过 `vite.config.ts` 内联的 Tailwind 配置映射，深色自动跟随 `data-theme`。
 
 早期曾试过第三方云层组件，但 registry 被网络策略挡住、且需要 React + Tailwind 运行时，与当时的原生结构不兼容，因此改为自绘 WebGL 体积云（FBM 噪声 + 时间动画，深浅主题各一套配色）。
 
@@ -627,7 +628,7 @@ DPR 上限 1.75 以照顾移动端性能；主题切换后自动重取配色。
 | VOCALOID | 4 | 镜音铃、镜音连、巡音流歌 ×2 |
 | Ave Mujica | 8 | 三角初音、丰川祥子 ×2、若叶睦 ×3、祐天寺若麦 ×2 |
 
-- 清单：`src/lib/avatars.js`（后端白名单）/ `src/lib/avatars.json`
+- 清单：`src/lib/avatars.ts`（后端白名单）/ `src/lib/avatars.json`
 - 图片：`public/img/avatar/*.webp`，256×256，共约 220 KB
 - 默认头像 `/img/avatar/miku-headset.webp`；顶栏、资料卡、下拉菜单共用同一地址
 - 图片加载失败会回落旧版自绘猫脸 SVG（`_default.svg` 等仍保留）
@@ -638,7 +639,7 @@ DPR 上限 1.75 以照顾移动端性能；主题切换后自动重取配色。
 ## 自定义头像上传（当前默认关闭）
 
 头像上传**默认按未启用处理**：`wrangler.toml` 不绑定 `[[r2_buckets]]`，
-`scripts/ensure-r2.mjs` 仍会预先寻找/创建桶，但**不会写入绑定** —— 即使账号里存在桶也不启用，
+`scripts/ensure-r2.ts` 仍会预先寻找/创建桶，但**不会写入绑定** —— 即使账号里存在桶也不启用，
 避免因 R2 未就绪导致部署失败。
 
 用户可使用内置头像库或填写外链头像。要启用上传需同时：
@@ -681,7 +682,7 @@ DPR 上限 1.75 以照顾移动端性能；主题切换后自动重取配色。
 后台 → 站点设置 → **R2 头像公网地址**。留空则头像走 `/api/avatar/<key>` 由 Worker 代理读取
 （桶无需开启公开访问）。填写后头像直接外链，省 Worker 流量。
 
-`scripts/ensure-r2.mjs` 会自动寻找/创建桶并**自动写入 `[[r2_buckets]]` 绑定**；
+`scripts/ensure-r2.ts` 会自动寻找/创建桶并**自动写入 `[[r2_buckets]]` 绑定**；
 失败（权限不足）则移除绑定并降级，不阻断部署。
 
 ---
@@ -777,7 +778,7 @@ npx wrangler secret put AI_API_KEY
 
 **默认中文**：不会跟随浏览器语言自动变英文，只有用户点过切换才生效；
 选择存 `localStorage.terradata_lang`，`<html lang>` / `data-lang` 由
-`index.html` 里的同步脚本预置，刷新不闪。
+`src/html/spa.ts` 里的同步预置脚本预置，刷新不闪。
 
 ## 登录页与落地页版式
 

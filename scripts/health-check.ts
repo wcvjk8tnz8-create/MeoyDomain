@@ -177,9 +177,12 @@ check(/\[data-theme="dark"\] \.td-trans/.test(glass) && /prefers-reduced-motion/
 check(fs.existsSync(path.join(root, 'public/img/transition/miku-pop.png')), 'Miku 透明素材已入库');
 
 /* 10. 根域名静态页：跳控制台时也走同一套过渡，且副本同步 */
-const rootPages = ['meoy.top.html', 'v-1.top.html'];
-for (const f of rootPages) {
-  const rp = read(`root-pages/${f}`);
+const rootPages = [
+  ['meoy.top.html', 'src/html/root-meoy.ts'],
+  ['v-1.top.html', 'src/html/root-v1.ts'],
+];
+for (const [f, src] of rootPages) {
+  const rp = read(src);
   check(/id="tdTransition"/.test(rp) && /td-miku-rise/.test(rp), `${f} 含 Miku 跳页过渡`);
   check(/addEventListener\("click"/.test(rp) && /preventDefault\(\)/.test(rp), `${f} 拦截控制台链接`);
   check(/prefers-color-scheme: dark/.test(rp), `${f} 深色跟随系统`);
@@ -208,7 +211,7 @@ check(/prefers-reduced-motion[\s\S]{0,300}#bg\[data-wp-loaded="1"\][\s\S]{0,160}
 check(/dataset\.wpLoaded/.test(runtimeJs) && /img\.decode/.test(runtimeJs), 'runtime 解码完主图才打上淡入标记');
 check(/brandValue/.test(runtimeJs) && /brandRefreshing/.test(runtimeJs) && /Promise\.resolve\(brandValue\)/.test(runtimeJs), '品牌配置走 stale-while-revalidate，切页不再 await 接口');
 check(/brandPromise\s*=\s*null/.test(runtimeJs.split('resetBranding').pop() || ''), '后台保存后清缓存，下次切页拉新值');
-const shellHtml = read('index.html');
+const shellHtml = read('src/html/spa.ts');
 check(/rel="preload" as="image" href="\/img\/transition\/miku-pop\.png"/.test(shellHtml), '首屏 preload 过渡角色');
 check(/miku-bouquet-haze\.webp/.test(shellHtml) && /miku-bouquet-dark\.webp/.test(shellHtml), '首屏 preload 壁纸浅/深/氛围版');
 check(/html\[data-theme="dark"\] body[\s\S]{0,400}background:\s*transparent\s*!important/.test(bloom), '深色 body 以同等特异性压成透明（否则盖住壁纸）');
@@ -262,6 +265,31 @@ check(/root\.setAttribute\('data-wallpaper'/.test(gate) && /root\.style\.setProp
 check(/function syncWallpaperNodes\(\)/.test(gate) && /refreshRuntime\(\)[\s\S]{0,160}syncWallpaperNodes\(\)/.test(gate), '切页后同步新 #bg 节点，不再叠出两层满屏壁纸');
 check(!/document\.body\.prepend\(el\)/.test(gate), '不再额外造一个 body 级 #bg 与页面节点重叠');
 check(/syncWallpaperNodes\(\)/.test(gate) && /data-wallpaper/.test(gate), '壁纸切换器对全站所有页面即时生效');
+
+/* 14. 全 TypeScript：仓库不再跟踪 .html / .js / .mjs，页面壳与脚本都由 TS 提供 */
+const emitShell = read('scripts/emit-html-shell.ts');
+const emitRoot = read('scripts/emit-static-pages.ts');
+const pkg = read('package.json');
+check(/export const spaShellHtml = String\.raw`/.test(shellHtml), 'SPA 外壳以 TS 模板字符串导出');
+check(/export const meoyTopHtml = String\.raw`/.test(read('src/html/root-meoy.ts')) && /export const v1TopHtml = String\.raw`/.test(read('src/html/root-v1.ts')), '两份根域名页同为 TS 模板字符串');
+check(/writeFileSync/.test(emitShell) && /spaShellHtml/.test(emitShell), '构建前由 TS 模板生成 index.html');
+check(/meoyTopHtml/.test(emitRoot) && /v1TopHtml/.test(emitRoot) && /dist\/root-pages/.test(emitRoot), '静态托管仍可一键导出两份 HTML');
+check(/tsx scripts\/emit-html-shell\.ts && vite build/.test(pkg) && /tsx scripts\/emit-html-shell\.ts && vite/.test(pkg), 'build / dev 都先生成外壳');
+check(/tsx/.test(pkg) && /"tsx":/.test(pkg), 'tsx 已声明为开发依赖，CI 能执行 .ts 脚本');
+check(/rootPageFor/.test(read('src/index.ts')) && /c\.html\(rootPage\)/.test(read('src/index.ts')), 'Worker 按 Host 直出根域名页，不依赖静态 .html');
+check(/tailwindcss\(tailwindConfig/.test(read('vite.config.ts')) && !fs.existsSync(path.join(root, 'postcss.config.js')) && !fs.existsSync(path.join(root, 'tailwind.config.js')), 'PostCSS / Tailwind 配置内联进 vite.config.ts，无 .js 配置');
+check(fs.existsSync(path.join(root, '.gitattributes')) && fs.existsSync(path.join(root, '.mailmap')) && fs.existsSync(path.join(root, '.gitignore')), '语言统计与贡献者归并配置齐备');
+// 用 git ls-files 判定「仓库里跟踪了什么」，构建产物 index.html 不应被误判
+try {
+  const { execFileSync } = await import('node:child_process');
+  const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' });
+  const lines = tracked.split('\n').filter(Boolean);
+  check(!lines.some((f) => f.endsWith('.html')), '仓库不跟踪任何 .html');
+  check(!lines.some((f) => /\.(m?js|cjs)$/.test(f)), '仓库不跟踪任何 .js/.mjs/.cjs');
+  check(!lines.some((f) => f.startsWith('root-pages/')), 'root-pages/ 已移除');
+} catch {
+  check(true, '非 git 环境：跳过 tracked 文件判定');
+}
 
 for (const m of ok) console.log('  ✓ ' + m);
 for (const m of errors) console.error('  ✗ ' + m);
