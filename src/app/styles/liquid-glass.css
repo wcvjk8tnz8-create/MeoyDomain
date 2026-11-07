@@ -746,6 +746,9 @@ body.topbar-hidden .sidebar {
   }
   #sideCollapse svg { width: 15px; height: 15px; flex: 0 0 15px; transition: transform .36s var(--td-ease, ease); }
   #sideCollapse:hover { color: var(--lg-green) !important; background: var(--lg-green-soft) !important; }
+  #sideCollapse .sc-label-open { display: none !important; }
+  body.side-collapsed #sideCollapse .sc-label:not(.sc-label-open) { display: none !important; }
+  body.side-collapsed #sideCollapse .sc-label-open { display: inline !important; }
 
   body.side-collapsed .sidebar {
     width: 72px !important;

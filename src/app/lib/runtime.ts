@@ -829,18 +829,10 @@ function setSideCollapsed(on) {
 }
 
 function syncLayoutButtons(collapsed: boolean) {
+  // 文案全部交给 i18n 静态翻译，这里只切状态：动态改写文本节点会被
+  // MutationObserver 当成「新原文」，切回中文时可能停在英文上。
   const b = document.getElementById('sideCollapse');
-  if (b) {
-    const en = currentLang() === 'en';
-    const label = collapsed
-      ? (en ? 'Expand sidebar' : '展开侧边栏')
-      : (en ? 'Collapse sidebar' : '收起侧边栏');
-    b.setAttribute('aria-pressed', String(collapsed));
-    b.setAttribute('aria-label', label);
-    b.setAttribute('title', label);
-    const txt = b.querySelector('.sc-label');
-    if (txt) txt.textContent = collapsed ? (en ? 'Expand' : '展开侧边栏') : (en ? 'Collapse sidebar' : '收起侧边栏');
-  }
+  if (b) b.setAttribute('aria-pressed', String(collapsed));
 }
 
 function setTopbarHidden(on) {
@@ -1213,9 +1205,10 @@ export async function mountShell(active, opt = {}) {
         ${me ? `<a class="side-item" href="#" id="sideLogout" title="退出登录" data-tip="退出登录"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.logout}</svg></span><span class="side-txt">退出登录</span></a>` : ''}
       </div>
     </div>
-    <button class="side-collapse" id="sideCollapse" type="button" title="收起侧边栏" aria-label="收起侧边栏" aria-pressed="false">
+    <button class="side-collapse" id="sideCollapse" type="button" title="收起 / 展开侧边栏" aria-label="收起 / 展开侧边栏" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
       <span class="sc-label">收起侧边栏</span>
+      <span class="sc-label sc-label-open">展开侧边栏</span>
     </button>`;
   side.querySelectorAll('[data-brand-name]').forEach((el) => setBrandName(el, brand.siteName));
 
