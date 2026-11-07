@@ -135,11 +135,19 @@ export const PAW_SVG =
   '<path d="M12 12c3.4 0 6 2.1 6 4.6 0 2.2-1.9 3.6-4.2 3.6h-3.6C8 20.2 6 18.8 6 16.6 6 14.1 8.6 12 12 12Z"/>' +
   '</svg>';
 
-/* ---------- 壁纸：樱花猫 ---------- */
+/* ---------- 壁纸：花束 Miku 为控制台默认 ----------
+   历史遗留：components.css 末尾曾把 #bg 整体 display:none，切换器形同虚设。
+   现在由 liquid-glass.css 末尾的「花束重构层」在控制台页重新启用 #bg，
+   且每张壁纸可带独立的深色版与缩略图，CSS 按变量自动取用。 */
 export const WALLPAPERS = [
+  {
+    key: 'bouquet', name: '花与 Miku', url: '/img/wallpaper/miku-bouquet.webp',
+    dark: '/img/wallpaper/miku-bouquet-dark.webp',
+    thumb: '/img/wallpaper/miku-bouquet-thumb.webp',
+    haze: '/img/wallpaper/miku-bouquet-haze.webp',
+  },
   { key: 'sakura1', name: '樱花喵 1', url: '/img/sakura1.jpg' },
   { key: 'sakura2', name: '樱花喵 2', url: '/img/sakura2.jpg' },
-  // 想换回 Miku / GUMI 主题时，在切换器里直接选即可（壁纸与主题互相独立）
   { key: 'miku', name: 'Miku', url: '/img/miku.jpg' },
   { key: 'gumi', name: 'GUMI', url: '/img/gumi.jpg' },
 ];
@@ -153,19 +161,24 @@ export function applyWallpaper(key) {
     document.body.prepend(el);
   }
   el.style.setProperty('--bg-img', `url('${w.url}')`);
+  el.style.setProperty('--bg-img-dark', `url('${w.dark || w.url}')`);
+  el.style.setProperty('--bg-haze', `url('${w.haze || w.url}')`);
+  el.dataset.wp = w.key;
+  document.documentElement.setAttribute('data-wallpaper', w.key);
   try { localStorage.setItem('meoy_wallpaper', w.key); } catch {}
   document.querySelectorAll('.bgswitch button').forEach((b) => b.classList.toggle('on', b.dataset.wp === w.key));
 }
 
 export function mountWallpaper() {
-  let saved = 'sakura1';
-  try { saved = localStorage.getItem('meoy_wallpaper') || 'sakura1'; } catch {}
+  let saved = 'bouquet';
+  try { saved = localStorage.getItem('meoy_wallpaper') || 'bouquet'; } catch {}
   applyWallpaper(saved);
 }
 
 export function wallpaperSwitchHtml() {
-  return `<span class="bgswitch">${WALLPAPERS.map(
-    (w) => `<button data-wp="${w.key}" title="切换背景：${w.name}">${w.name}</button>`
+  return `<span class="bgswitch" data-no-i18n aria-label="控制台壁纸">${WALLPAPERS.map(
+    (w) => `<button data-wp="${w.key}" title="切换背景：${w.name}" aria-label="${w.name}"
+      style="${w.thumb ? `--wp-thumb:url('${w.thumb}')` : `--wp-thumb:url('${w.url}')`}"><i></i><span>${w.name}</span></button>`
   ).join('')}</span>`;
 }
 

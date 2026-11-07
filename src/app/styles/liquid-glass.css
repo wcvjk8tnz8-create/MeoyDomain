@@ -995,3 +995,342 @@ body.topbar-hidden .sidebar {
   .td-miku-media, .td-bubble-dots i, .td-trans-bar span { animation: none !important; }
   .td-trans.is-out .td-miku-rise { transform: none !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BLOOM · 花束 Miku 壁纸 / UI 重构层（本文件末尾，唯一权威）
+   ----------------------------------------------------------------------------
+   以用户提供的「捧花初音」插画为控制台壁纸与取色源：
+   · 青瓷绿（发色与枝叶）为主色，珊瑚红 / 鹅黄 / 淡紫只作极淡点缀；
+   · 白底插画用 multiply 融入象牙纸面，不叠一层生硬的图片方块；
+   · 玻璃更透、描边带一丝虹彩，呼应画里的棱镜高光；
+   · 保留 iOS 26 浮岛侧栏、胶囊顶栏、全圆角、Zerexa 衬线大字与全部交互 id，
+     只换材质与色彩，不动布局尺寸与任何 JS 绑定。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+html:not([data-theme="dark"]) {
+  --bl-jade: #2f8f83;
+  --bl-jade-deep: #1f6b62;
+  --bl-cyan: #6fc9c3;
+  --bl-coral: #e2686f;
+  --bl-amber: #e8a94b;
+  --bl-lilac: #eee8f6;
+  --bl-paper: #fbfaf6;
+  --bl-ink: #1d2c2a;
+  --bl-muted: #708683;
+
+  --lg-green: #2f8f83;
+  --lg-green-deep: #1f6b62;
+  --lg-green-bright: #47a89c;
+  --lg-green-soft: rgba(47, 143, 131, .10);
+  --lg-ink: #1d2c2a;
+  --lg-muted: #708683;
+  --lg-paper: #fbfaf6;
+  --lg-glass: linear-gradient(152deg, rgba(255, 255, 255, .50) 0%, rgba(249, 253, 251, .30) 56%, rgba(232, 246, 242, .24) 100%);
+  --lg-glass-soft: linear-gradient(152deg, rgba(255, 255, 255, .46), rgba(240, 250, 247, .24));
+  --lg-input-line: rgba(31, 107, 98, .17);
+  --lg-blur: blur(18px) saturate(172%);
+  --lg-blur-sm: blur(13px) saturate(158%);
+  --lg-shadow: 0 24px 60px rgba(24, 76, 70, .10), 0 4px 14px rgba(24, 76, 70, .05),
+               inset 0 1px 0 rgba(255, 255, 255, .92),
+               inset 0 0 0 1px rgba(255, 255, 255, .24);
+  --lg-shadow-sm: 0 10px 26px rgba(24, 76, 70, .07), inset 0 1px 0 rgba(255, 255, 255, .84);
+  --lg-active: linear-gradient(140deg, rgba(47, 143, 131, .18), rgba(111, 201, 195, .11));
+  --td-accent: #2f8f83;
+  --td-accent-soft: rgba(47, 143, 131, .10);
+  --td-ok: #228573;
+  --td-warn: #b07a33;
+  --td-bad: #c05b62;
+  --td-line: rgba(31, 107, 98, .12);
+  --td-line-2: rgba(31, 107, 98, .07);
+  --td-ink: #1d2c2a;
+  --td-muted: #708683;
+  --td-surface: rgba(255, 255, 255, .70);
+  --td-paper: transparent;
+  --td-shadow: 0 18px 44px rgba(24, 76, 70, .09);
+  --primary: 174 49% 37%;
+  --ring: 174 49% 37%;
+  --info: 174 49% 37%;
+  --success: 170 55% 33%;
+  --c1: #2f8f83;
+  --blue: #2f8f83;
+  --blue2: #58b3a8;
+  --blue-soft: #e6f4f1;
+  --shadow: 0 18px 44px rgba(24, 76, 70, .09);
+}
+
+html[data-theme="dark"] {
+  --lg-paper: #0c1919;
+  --lg-glass: linear-gradient(152deg, rgba(30, 52, 50, .72), rgba(16, 32, 31, .54) 60%, rgba(14, 28, 28, .60));
+  --lg-glass-soft: linear-gradient(152deg, rgba(30, 52, 50, .58), rgba(16, 32, 31, .40));
+  --lg-active: linear-gradient(140deg, rgba(111, 201, 195, .20), rgba(47, 143, 131, .10));
+  --td-accent: #8fd8ce;
+  --td-accent-soft: rgba(111, 201, 195, .13);
+  --td-surface: rgba(24, 44, 42, .68);
+  --td-ink: #edf5f2;
+  --td-muted: #9aadaa;
+  --primary: 174 52% 65%;
+  --ring: 174 52% 65%;
+  --info: 174 52% 65%;
+  --success: 170 50% 60%;
+  --c1: #8fd8ce;
+  --blue: #8fd8ce;
+  --blue2: #63bdb2;
+  --blue-soft: #17312e;
+}
+
+/* ── 纸面：花束氛围柔光，从玻璃缝隙透出来 ── */
+/* 纸面渐变必须放在根元素上：#bg 是 body 的负 z-index 子元素，
+   若 body 自己刷不透明底色，会按 CSS 绘制顺序把壁纸整层盖掉。 */
+html:not([data-theme="dark"]) {
+  background-color: var(--bl-paper) !important;
+  background-image:
+    radial-gradient(760px 560px at 88% 92%, rgba(111, 201, 195, .20), transparent 68%),
+    radial-gradient(680px 520px at 96% 8%, rgba(238, 232, 246, .46), transparent 66%),
+    radial-gradient(620px 460px at 4% -10%, rgba(232, 169, 75, .10), transparent 68%),
+    linear-gradient(158deg, #fdfcf9 0%, #f8f9f5 54%, #f2f6f2 100%) !important;
+  background-attachment: fixed !important;
+}
+html[data-theme="dark"] {
+  background-color: #0c1919 !important;
+  background-image:
+    radial-gradient(760px 560px at 88% 92%, rgba(47, 143, 131, .24), transparent 68%),
+    radial-gradient(680px 520px at 96% 8%, rgba(90, 78, 116, .18), transparent 66%),
+    linear-gradient(158deg, #0e1e1d 0%, #0b1818 56%, #091514 100%) !important;
+  background-attachment: fixed !important;
+}
+html body,
+html body.page-home,
+html body.page-login,
+/* components.css 的 html[data-theme="dark"] body 特异性是 (0,1,2)，
+   必须用同等特异性才能压住，否则深色下不透明底色会把壁纸整层盖掉 */
+html[data-theme="dark"] body,
+html[data-theme="dark"] body.page-home,
+html[data-theme="dark"] body.page-login {
+  background: transparent !important;
+}
+html:not([data-theme="dark"]) body { color: var(--bl-ink) !important; }
+html:not([data-theme="dark"]) ::selection { background: rgba(111, 201, 195, .28); color: var(--bl-ink); }
+html ::-webkit-scrollbar-thumb { background: rgba(47, 143, 131, .26); }
+
+/* ── 壁纸：历史层把 #bg 整体 display:none，这里在控制台重新启用 ──
+   公共落地页 / 登录页保持纯纸面，不铺图，留白优先。 */
+html body:not(.page-home):not(.page-login) #bg,
+html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg {
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: -1 !important;
+  background-image: var(--bg-img, url('/img/wallpaper/miku-bouquet.webp')) !important;
+  background-repeat: no-repeat !important;
+  background-size: auto 84vh !important;
+  background-position: right -2vw bottom -2vh !important;
+  mix-blend-mode: multiply;
+  opacity: .90;
+  filter: saturate(.92) contrast(.96);
+  transform: translateZ(0);
+}
+html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg {
+  background-image: var(--bg-img-dark, url('/img/wallpaper/miku-bouquet-dark.webp')) !important;
+  mix-blend-mode: normal;
+  opacity: .40;
+  filter: saturate(.76) brightness(.74);
+}
+/* 老壁纸（樱花喵 / Miku / GUMI）是满屏照片，不能按插画方式裁切 */
+html body:not(.page-home):not(.page-login) #bg:not([data-wp="bouquet"]) {
+  background-size: cover !important;
+  background-position: center 28% !important;
+  mix-blend-mode: normal;
+  opacity: .34;
+}
+html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg:not([data-wp="bouquet"]) { opacity: .18; }
+
+/* 花瓣光点：极淡、极慢，不用 SVG 画角色，只是几片颜色的呼吸 */
+html body:not(.page-home):not(.page-login) #bg::before,
+html body:not(.page-home):not(.page-login) #bg::after { display: block !important; }
+html body:not(.page-home):not(.page-login) #bg::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  background-image:
+    radial-gradient(9px 15px at 72% 18%, rgba(226, 104, 111, .30), transparent 72%),
+    radial-gradient(8px 13px at 88% 34%, rgba(232, 169, 75, .26), transparent 72%),
+    radial-gradient(7px 12px at 64% 62%, rgba(111, 201, 195, .28), transparent 72%),
+    radial-gradient(6px 11px at 95% 74%, rgba(226, 104, 111, .22), transparent 72%);
+  background-repeat: no-repeat;
+  animation: bl-petals 26s ease-in-out infinite alternate;
+}
+/* 左侧渐白遮罩：保证表格与正文始终清晰，右侧留给插画 */
+html body:not(.page-home):not(.page-login) #bg::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2 !important;
+  background: linear-gradient(96deg,
+    rgba(251, 250, 246, .86) 0%, rgba(251, 250, 246, .56) 34%,
+    rgba(251, 250, 246, .18) 62%, rgba(251, 250, 246, .02) 100%) !important;
+  backdrop-filter: none !important;
+}
+html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg::after {
+  background: linear-gradient(96deg,
+    rgba(10, 24, 23, .86) 0%, rgba(10, 24, 23, .56) 36%,
+    rgba(10, 24, 23, .18) 66%, rgba(10, 24, 23, .02) 100%) !important;
+}
+@keyframes bl-petals {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); opacity: .7; }
+  100% { transform: translate3d(-14px, 18px, 0) rotate(4deg); opacity: 1; }
+}
+
+/* ── 玻璃：更透 + 一丝虹彩描边（画里的棱镜高光） ── */
+html body:not(.page-home) .sidebar,
+html body:not(.page-home) .topbar,
+html body:not(.page-home) .card,
+html body:not(.page-home) .panel,
+html body:not(.page-home) .welcome,
+html body:not(.page-home) .stat-card,
+html body:not(.page-home) .tablewrap,
+html body:not(.page-home) .modal-card,
+html body:not(.page-home) .dialog {
+  border-color: rgba(47, 143, 131, .16) !important;
+  box-shadow:
+    0 24px 60px rgba(24, 76, 70, .10),
+    0 3px 12px rgba(24, 76, 70, .05),
+    inset 0 1px 0 rgba(255, 255, 255, .90),
+    inset 1px 0 0 rgba(111, 201, 195, .12),
+    inset -1px 0 0 rgba(238, 180, 190, .10) !important;
+}
+html[data-theme="dark"] body:not(.page-home) .sidebar,
+html[data-theme="dark"] body:not(.page-home) .topbar,
+html[data-theme="dark"] body:not(.page-home) .card,
+html[data-theme="dark"] body:not(.page-home) .panel,
+html[data-theme="dark"] body:not(.page-home) .welcome {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, .46),
+    inset 0 1px 0 rgba(255, 255, 255, .10),
+    inset 1px 0 0 rgba(111, 201, 195, .10),
+    inset -1px 0 0 rgba(232, 169, 75, .07) !important;
+}
+
+/* 侧栏浮岛：青瓷激活条 + 极淡花色柔光 */
+html body:not(.page-home) .sidebar {
+  background-image:
+    radial-gradient(180px 240px at 12% 6%, rgba(111, 201, 195, .13), transparent 70%),
+    radial-gradient(160px 200px at 92% 94%, rgba(238, 232, 246, .22), transparent 72%),
+    var(--lg-glass) !important;
+}
+html body:not(.page-home) .side-item.active,
+html body:not(.page-home) .navlink.active {
+  background: linear-gradient(100deg, rgba(47, 143, 131, .20), rgba(111, 201, 195, .08)) !important;
+  color: var(--lg-green-deep) !important;
+}
+html body:not(.page-home) .side-item.active::before,
+html body:not(.page-home) .navlink.active::before { background: var(--lg-green) !important; }
+
+/* 主按钮：青瓷绿实色，圆角保持全站统一；悬停只做 2px 微抬 */
+html body:not(.page-home) .btn.primary,
+html body:not(.page-home) button.primary,
+html body:not(.page-home) .btn-primary {
+  background: linear-gradient(140deg, #2f8f83, #247a70) !important;
+  border-color: rgba(31, 107, 98, .28) !important;
+  color: #fff !important;
+  border-radius: 999px !important;
+}
+html[data-theme="dark"] body:not(.page-home) .btn.primary,
+html[data-theme="dark"] body:not(.page-home) button.primary {
+  background: linear-gradient(140deg, #6fc9c3, #3f9d92) !important;
+  color: #08211f !important;
+}
+/* 小点缀：状态点与强调文字用花色，不铺大面积 */
+html body:not(.page-home) .badge.warn,
+html body:not(.page-home) .a-warn { border-left-color: var(--bl-amber) !important; }
+html body:not(.page-home) .badge.err,
+html body:not(.page-home) .badge.bad { border-left-color: var(--bl-coral) !important; }
+
+/* ── 壁纸切换器：从一排文字按钮重构成缩略圆点 ── */
+html body .bgswitch {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, .38) !important;
+  border: 1px solid rgba(47, 143, 131, .14) !important;
+  backdrop-filter: blur(10px);
+}
+html[data-theme="dark"] body .bgswitch { background: rgba(20, 40, 38, .46) !important; }
+html body .bgswitch button {
+  width: 25px !important; height: 25px !important;
+  min-width: 25px !important; padding: 0 !important; margin: 0 !important;
+  display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(255, 255, 255, .72) !important;
+  background: var(--wp-thumb) center/cover no-repeat !important;
+  box-shadow: 0 2px 8px rgba(24, 76, 70, .12) !important;
+  cursor: pointer;
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), box-shadow .28s ease, border-color .28s ease;
+}
+html body .bgswitch button span { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+html body .bgswitch button i { display: none !important; }
+html body .bgswitch button:hover { transform: translateY(-2px) scale(1.06); }
+html body .bgswitch button.on {
+  border-color: #2f8f83 !important;
+  box-shadow: 0 0 0 2px rgba(47, 143, 131, .34), 0 4px 12px rgba(24, 76, 70, .18) !important;
+  transform: scale(1.10);
+}
+html[data-theme="dark"] body .bgswitch button.on { border-color: #8fd8ce !important; box-shadow: 0 0 0 2px rgba(143, 216, 206, .38) !important; }
+
+/* ── 响应式：窄屏 / 21:9 让壁纸退到背景，不压正文 ── */
+@media (max-width: 900px) {
+  html body:not(.page-home):not(.page-login) #bg { opacity: .42 !important; background-size: auto 74vh !important; }
+  html body:not(.page-home):not(.page-login) #bg::after {
+    background: linear-gradient(180deg, rgba(251, 250, 246, .92) 0%, rgba(251, 250, 246, .62) 46%, rgba(251, 250, 246, .30) 100%) !important;
+  }
+  html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg::after {
+    background: linear-gradient(180deg, rgba(10, 24, 23, .92) 0%, rgba(10, 24, 23, .60) 46%, rgba(10, 24, 23, .28) 100%) !important;
+  }
+  html body .bgswitch { gap: 5px !important; padding: 3px 6px !important; }
+  html body .bgswitch button { width: 21px !important; height: 21px !important; min-width: 21px !important; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  html body:not(.page-home):not(.page-login) #bg { opacity: .28 !important; background-size: auto 120vh !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html body:not(.page-home):not(.page-login) #bg::before { animation: none !important; }
+  html body .bgswitch button { transition: none !important; }
+}
+
+/* 顶栏搜索框：历史 HSL 令牌在深色下会变蓝紫，统一收口到青瓷玻璃 */
+html body:not(.page-home) .top-search,
+html[data-theme="dark"] body:not(.page-home) .top-search {
+  background: var(--lg-glass-soft) !important;
+  border: 1px solid rgba(47, 143, 131, .16) !important;
+  color: var(--lg-ink) !important;
+  border-radius: 999px !important;
+}
+html[data-theme="dark"] body:not(.page-home) .top-search kbd {
+  background: rgba(111, 201, 195, .14) !important;
+  border-color: rgba(111, 201, 195, .18) !important;
+  color: #cfeae5 !important;
+}
+
+/* 窄屏表格：之前只为「详情列长串」加了 anywhere 折行，列宽被压到 20px 后
+   连域名都竖排断字。给表格一个最小宽度，交给 .tablewrap 横向拖动。 */
+@media (max-width: 760px) {
+  html body .tablewrap table,
+  html body .tablewrap > table {
+    min-width: 620px !important;
+    table-layout: auto !important;
+  }
+  html body .tablewrap th,
+  html body .tablewrap td {
+    white-space: nowrap !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+  }
+  /* 详情列仍允许折行显示全文，不裁 */
+  html body .tablewrap td:last-child {
+    white-space: normal !important;
+    min-width: 190px !important;
+    overflow-wrap: anywhere !important;
+  }
+}
