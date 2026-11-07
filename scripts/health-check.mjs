@@ -157,11 +157,12 @@ check(fs.existsSync(path.join(root, 'public/img/transition/miku-pop.png')), 'Mik
 const rootPages = ['meoy.top.html', 'v-1.top.html'];
 for (const f of rootPages) {
   const rp = read(`root-pages/${f}`);
-  const wp = fs.readFileSync(path.join(root, '..', f), 'utf8');
   check(/id="tdTransition"/.test(rp) && /td-miku-rise/.test(rp), `${f} 含 Miku 跳页过渡`);
   check(/addEventListener\("click"/.test(rp) && /preventDefault\(\)/.test(rp), `${f} 拦截控制台链接`);
   check(/prefers-color-scheme: dark/.test(rp), `${f} 深色跟随系统`);
-  check(wp === rp, `${f} 工作区副本与仓库一致`);
+  // 只做仓库内自校验：CI 里没有仓库外的工作区交付副本，不能读它
+  check(/location\.href\s*=\s*url/.test(rp) && /setTimeout/.test(rp), `${f} 过渡结束后才跳转`);
+  check((rp.match(/id="tdTransition"/g) || []).length === 1, `${f} 过渡层只挂一份`);
 }
 
 for (const m of ok) console.log('  ✓ ' + m);
