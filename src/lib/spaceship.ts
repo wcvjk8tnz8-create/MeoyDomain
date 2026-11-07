@@ -53,7 +53,8 @@ function normalizeDomain(v) {
  * 支持 GET / PUT / DELETE，供域名列表与 DNS 记录写入共用。
  * 注意：写操作不改变「不注册、不续费、不改 NS」的原则，只动 DNS 记录。
  */
-export async function spaceshipRequest(cfg, path, { method = 'GET', body } = {}) {
+export async function spaceshipRequest(cfg, path, opts: { method?: string; body?: unknown } = {}) {
+  const { method = 'GET', body } = opts;
   const url = cfg.base + path;
   let r;
   const headers = {

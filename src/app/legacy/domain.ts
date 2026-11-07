@@ -331,7 +331,7 @@ export async function mountDomain(_root: HTMLElement | null): Promise<void> {
     return p ? p.label : key;
   }
   
-  function openRecordForm(rec, presetBody) {
+  function openRecordForm(rec, presetBody = null) {
     const types = cfg.recordTypes;
     const cur = rec ? rec.type : (presetBody ? presetBody.type : 'A');
     const spec = types.find((t) => t.key === cur);

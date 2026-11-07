@@ -5,7 +5,6 @@
  * 后续可按页面逐步改成 hooks，不影响其它页面。
  */
 import type { LegacyCtx } from './types';
-import { mountMotionStandalone } from './motion';
 import { startI18n, currentLang, translateText } from './i18n';
 
 /* SPA 切页清理注册表：document / window 事件与定时器都登记在这里 */
@@ -52,17 +51,17 @@ export function refreshRuntime() {
   try { mountMotion(); } catch {}
   try { mountSiteFooter(); } catch {}
   try { (window as any).MeoyTheme?.remount?.(); } catch {}
-  try { mountMotionStandalone(); } catch {}
+  // 动效已由 mountMotion() 统一为全局单例，不再叠加第二套引擎
   // 语言常驻监听只需启动一次；每次切页补挂顶栏切换器并翻译新 DOM
   try { startI18n(); } catch (e) { console.warn('[i18n]', e); }
 }
 
 // 前端通用工具：接口封装、提示、渲染辅助、壁纸切换
 export const api = {
-  async req(method, path, body) {
+  async req(method, path, body = undefined) {
     // 带上界面语言：后端统一响应出口据此把 message / 通知 / 条款等
     // 服务端生成的中文换成英文。不传时后端默认中文。
-    const opt = {
+    const opt: RequestInit = {
       method,
       headers: { 'Content-Type': 'application/json', 'X-Lang': currentLang() },
       credentials: 'same-origin',
@@ -263,7 +262,12 @@ export function toast(msg, type = 'ok', ms = 2600) {
   d.className = 'toast ' + (type === 'err' ? 'err' : '');
   d.textContent = msg;
   box.appendChild(d);
-  setTimeout(() => d.remove(), ms);
+  // 先播退出动画再移除，别让提示「啪」地消失
+  setTimeout(() => {
+    if (!d.isConnected) return;
+    d.classList.add('out');
+    setTimeout(() => d.remove(), 240);
+  }, ms);
 }
 
 export function esc(s) {
@@ -378,13 +382,27 @@ export function openModal(title, html) {
   const box = m.querySelector('.modal-card') || m.querySelector('.box');
   if (!box) return;
   box.innerHTML = `<h2>${esc(title)}</h2>${html}`;
+  // 上一次关闭动画可能还没走完，先复位再打开；
+  // 同时作废旧的延时回调，否则它会在 240ms 后把这个新弹窗一起关掉。
+  m.classList.remove('closing');
+  delete (m as HTMLElement).dataset.closeToken;
   m.classList.add('show');
 }
 export function closeModal() {
   const m = document.getElementById('modal');
-  if (m) m.classList.remove('show');
+  if (!m || !m.classList.contains('show') || m.classList.contains('closing')) return;
+  // 保留 .show 直到退出动画播完：直接移除会触发 display:none，弹窗是硬切消失
+  m.classList.add('closing');
+  const token = String(Date.now()) + Math.random().toString(36).slice(2, 7);
+  (m as HTMLElement).dataset.closeToken = token;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  setTimeout(() => {
+    if ((m as HTMLElement).dataset.closeToken !== token) return;  // 期间又打开了新弹窗
+    m.classList.remove('show', 'closing');
+    delete (m as HTMLElement).dataset.closeToken;
+  }, reduced ? 0 : 240);
 }
-window.closeModal = closeModal;
+(window as any).closeModal = closeModal;
 
 /**
  * 结果弹窗：替代底部的黑色药丸 toast。
@@ -753,57 +771,70 @@ export function mountDecor() {
 }
 
 /* ══════════════════════════════════════════════════════════
-   动效引擎（文档风）
+   动效引擎（全局单例）
    - 顶部 2px 滚动进度条
    - 元素滚动到视口才播入场（IntersectionObserver）
    - 表格行错峰淡入
-   只动 transform / opacity，不触发重排；reduced-motion 下全部跳过
+   历史上有 shell 版与 standalone 版两套引擎，refreshRuntime() 每次切页
+   把它们都调一遍；standalone 用裸 addEventListener，不随切页注销，
+   滚动监听会一直累积。这里收口成一份：进度条 / scroll / IO 只建一次，
+   每次切页只重新扫描 DOM。只动 transform / opacity，不触发重排。
    ══════════════════════════════════════════════════════════ */
-export function mountMotion() {
-  const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let __motionBoot: { io: IntersectionObserver | null; reduced: boolean } | null = null;
 
-  /* 滚动进度条 */
-  if (!REDUCED) {
-    let bar = document.getElementById('docProgress');
+function bootMotion() {
+  if (__motionBoot) return __motionBoot;
+  const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  let io: IntersectionObserver | null = null;
+  if (!reduced) {
+    let bar = document.getElementById('docProgress') as HTMLElement | null;
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'docProgress';
       bar.setAttribute('aria-hidden', 'true');
       document.body.appendChild(bar);
     }
+    const el = bar;
     const onScroll = () => {
       const h = document.documentElement.scrollHeight - window.innerHeight;
-      bar.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+      el.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
     };
-    __winOn('scroll', onScroll, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-  }
-
-  /* 错峰入场 */
-  const io = (!REDUCED && 'IntersectionObserver' in window)
-    ? new IntersectionObserver((entries) => {
+    if ('IntersectionObserver' in window) {
+      io = new IntersectionObserver((entries) => {
         entries.forEach((e) => {
           if (!e.isIntersecting) return;
           e.target.classList.add('in');
-          io.unobserve(e.target);
+          io && io.unobserve(e.target);
         });
-      }, { threshold: .06, rootMargin: '0px 0px -28px 0px' })
-    : null;
+      }, { threshold: .06, rootMargin: '0px 0px -28px 0px' });
+    }
+  }
+  __motionBoot = { io, reduced };
+  return __motionBoot;
+}
 
-  const play = (root) => {
+export function mountMotion() {
+  const { io } = bootMotion();
+  const play = (root?) => {
     const scope = root || document;
-    scope.querySelectorAll('tbody').forEach((tb, i) => {
+    scope.querySelectorAll('tbody').forEach((tb) => {
       Array.prototype.forEach.call(tb.rows, (tr, j) => {
         tr.style.transitionDelay = (j * 55) + 'ms';
       });
       tb.classList.add('in');
     });
     const reveal = scope.querySelectorAll('.reveal');
-    if (!reveal.length) return;
-    if (!io) { reveal.forEach((el) => el.classList.add('in')); return; }
     reveal.forEach((el, i) => {
+      if (el.classList.contains('in')) return;
+      // 首屏元素直接显示：只靠 IntersectionObserver 回调时，若回调被浏览器
+      // 延后或元素卡在阈值边缘，.reveal{opacity:0} 会让标题整块消失。
+      const r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight * .95) { el.classList.add('in'); return; }
       el.style.transitionDelay = (i * 45) + 'ms';
-      io.observe(el);
+      if (io) io.observe(el);
+      else el.classList.add('in');
     });
   };
 
@@ -1089,21 +1120,31 @@ export async function mountShell(active, opt = {}) {
     setSide(false);   // 点遮罩/其它区域 → 关闭
   });
   __docOn('keydown', (e) => {
-    if (e.key === 'Escape') { setSide(false); const mm = document.getElementById('userMenu'); if (mm) { mm.classList.remove('on'); document.getElementById('userChip')?.classList.remove('on'); } }
+    if (e.key === 'Escape') { setSide(false); setMenu(false); }
   });
 
-  /* 用户菜单：点 chip 展开，点外部或按 Esc 关闭 */
+  /* 用户菜单：点 chip 展开，点外部或按 Esc 关闭（关闭也播一段淡出） */
   const chip = document.getElementById('userChip');
   const menu = document.getElementById('userMenu');
+  const menuOpen = () => !!menu && menu.classList.contains('on') && !menu.classList.contains('out');
   const setMenu = (open) => {
     if (!chip || !menu) return;
-    chip.classList.toggle('on', open);
-    menu.classList.toggle('on', open);
+    if (open) {
+      menu.classList.remove('out');
+      chip.classList.add('on');
+      menu.classList.add('on');
+      return;
+    }
+    chip.classList.remove('on');
+    if (!menu.classList.contains('on') || menu.classList.contains('out')) return;
+    menu.classList.add('out');
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    setTimeout(() => menu.classList.remove('on', 'out'), reduced ? 0 : 160);
   };
   if (chip && menu) {
     chip.onclick = (e) => {
       e.stopPropagation();
-      setMenu(!menu.classList.contains('on'));
+      setMenu(!menuOpen());
     };
     menu.addEventListener('click', (e) => e.stopPropagation());
     __docOn('click', () => setMenu(false));
@@ -1142,10 +1183,22 @@ export async function mountShell(active, opt = {}) {
   }
 
   if (bellBtn) {
+    /** 统一关闭：先播退出动画，动画结束再移除节点 */
+    const closeNotif = (panel) => {
+      if (!panel || !panel.isConnected || panel.classList.contains('out')) return;
+      panel.classList.add('out');
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      setTimeout(() => panel.remove(), reduced ? 0 : 160);
+    };
     bellBtn.onclick = async (e) => {
       e.stopPropagation();
       let panel = document.getElementById('notifPanel');
-      if (panel) { panel.remove(); return; }
+      if (panel) {
+        // 退出动画中途再点铃铛：取消退出、直接复用面板
+        if (panel.classList.contains('out')) { panel.classList.remove('out'); return; }
+        closeNotif(panel);
+        return;
+      }
 
       panel = document.createElement('div');
       panel.id = 'notifPanel';
@@ -1159,7 +1212,7 @@ export async function mountShell(active, opt = {}) {
       panel.onclick = (ev) => ev.stopPropagation();
       __docOn('click', function close(ev) {
         if (!panel.isConnected) return document.removeEventListener('click', close);
-        if (!panel.contains(ev.target)) { panel.remove(); document.removeEventListener('click', close); }
+        if (!panel.contains(ev.target)) { closeNotif(panel); document.removeEventListener('click', close); }
       });
 
       try {

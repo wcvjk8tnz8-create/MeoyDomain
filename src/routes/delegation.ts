@@ -104,7 +104,7 @@ app.post('/:id/delegation', async (c) => {
       content: ns,
       ttl: 1,
       comment: `NS delegation → ${provider.name}`,
-    });
+    }, sub.fqdn || sub.root_domain);
     if (r.ok) written.push({ ns, cfId: r.result.id });
     else errs.push(`${ns}: ${cfErrorMessage(r)}`);
   }
@@ -188,12 +188,12 @@ app.post('/:id/delegation/check', async (c) => {
 
 /** 从父区域删除某条 NS 记录（按 name + content 精确匹配） */
 async function deleteNsRecord(env, fqdn, ns) {
-  const list = await cfList(env, { type: 'NS', name: fqdn });
+  const list = await cfList(env, { type: 'NS', name: fqdn }, fqdn);
   if (!list.ok) return null;
   const arr = Array.isArray(list.result) ? list.result : [];
   const target = arr.find((r) => String(r.content || '').toLowerCase().replace(/\.+$/, '') === String(ns).toLowerCase());
   if (!target) return null;
-  return cfDelete(env, target.id);
+  return cfDelete(env, target.id, fqdn);
 }
 
 export default app;

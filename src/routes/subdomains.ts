@@ -255,7 +255,7 @@ const createMine = async (c) => {
       .bind(dup.id)
       .all();
     for (const r of oldRecs.results || []) {
-      if (r.cf_record_id) await cfDelete(c.env, r.cf_record_id);
+      if (r.cf_record_id) await cfDelete(c.env, r.cf_record_id, dup.fqdn || reqRoot);
     }
     await c.env.DB.prepare('DELETE FROM dns_records WHERE subdomain_id = ?').bind(dup.id).run();
     await c.env.DB.prepare('DELETE FROM subdomains WHERE id = ?').bind(dup.id).run();
@@ -465,7 +465,7 @@ app.delete('/:id', async (c) => {
   const errs = [];
   for (const r of recs.results) {
     if (r.cf_record_id) {
-      const res = await cfDelete(c.env, r.cf_record_id);
+      const res = await cfDelete(c.env, r.cf_record_id, row.fqdn || row.root_domain);
       if (!res.ok) errs.push(`${r.name}/${r.type}: ${cfErrorMessage(res)}`);
     }
   }

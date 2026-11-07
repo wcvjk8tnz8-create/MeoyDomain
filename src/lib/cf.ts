@@ -117,8 +117,12 @@ export function backendFor(env, p, domain) {
 
 /** 未显式传 domain 时，从记录名反推根域名（NS 委派等旧调用点没传） */
 function resolveDomain(env, domain, nameHint) {
-  if (domain) return normalizeDomain(domain);
-  return matchRoot(env, nameHint || '')?.domain || normalizeDomain(env.ROOT_DOMAIN);
+  const raw = domain ? normalizeDomain(domain)
+    : (matchRoot(env, nameHint || '')?.domain || normalizeDomain(env.ROOT_DOMAIN));
+  if (!raw) return raw;
+  // 调用点常传 FQDN（lol.v-1.top）而非根域名；backendFor / zoneFor 按根域名
+  // 匹配，不归一就会把记录删到默认 Zone —— 多根域名下「DNS 改不了」的根因。
+  return matchRoot(env, raw)?.domain || raw;
 }
 
 /**
@@ -144,7 +148,7 @@ export function clearDnsProviderCache() {
 
 /** 按提供商构造请求头：有 key/secret 用 X-API-Key/Secret，否则沿用 Bearer */
 function authHeaders(env, p) {
-  const h = { 'Content-Type': 'application/json' };
+  const h: Record<string, string> = { 'Content-Type': 'application/json' };
   if (p.custom && p.auth && (p.auth.key || p.auth.secret)) {
     if (p.auth.key) h['X-API-Key'] = p.auth.key;
     if (p.auth.secret) h['X-API-Secret'] = p.auth.secret;
@@ -281,7 +285,7 @@ export async function cfList(env, params = {}, domain) {
     return { ok: true, result: arr };
   }
   const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, v);
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v));
   if (p.custom) qs.set('zone', p.zone);
   const r = await fetch(`${recordsPath(p)}?${qs.toString()}`, {
     headers: authHeaders(env, p),

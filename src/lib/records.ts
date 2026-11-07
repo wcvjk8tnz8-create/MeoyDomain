@@ -235,7 +235,8 @@ export function buildRecord(type, input, fqdn) {
   if (!content && !spec.struct) return { ok: false, error: '记录值不能为空' };
   if (spec.struct && !content && type !== 'NAPTR') return { ok: false, error: '记录值不能为空' };
 
-  const payload = { type, ttl: ttlRaw, comment: (input.comment || '').slice(0, 200) || undefined };
+  // 不同记录类型会追加 priority / data / proxied / content，先声明为开放字典
+  const payload: Record<string, any> = { type, ttl: ttlRaw, comment: (input.comment || '').slice(0, 200) || undefined };
   let priority = null;
   let data = null;
 

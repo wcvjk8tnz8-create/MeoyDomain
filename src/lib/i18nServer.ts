@@ -274,7 +274,7 @@ export const SERVER_DICT: Record<string, string> = {
   '个。超出限制的账号一经发现将被全部封禁。': '. Excess accounts will be banned.',
   '该 IP 下没有可封禁的账号': 'No bannable accounts found under this IP',
   '新用户初始积分': 'Initial points for new users',
-  '域名消耗': 'Domain cost', '积分为 0，免费开通': '0 points — free to register',
+  '域名消耗': 'Domain cost',
 
   /* AI 审核 / 诊断 */
   '自检异常': 'Self-check failed', '模型探测异常': 'Model probe failed',
@@ -295,7 +295,6 @@ export const SERVER_DICT: Record<string, string> = {
   '连接异常（超时或网络不可达）': 'Connection failed (timeout or unreachable)',
   '后台未选定审核模型；请先点「探测模型」并从网关清单里选一个':
     'No review model selected. Probe models first, then pick one from the gateway list',
-  '模型探测异常': 'Model probe failed',
   '审核接口调用失败': 'Review API call failed',
   '（真实模型往返）': '(real model round-trip)', '（失败前的探测）': '(probing before failure)',
   '候选模型逐项：': 'Candidate models: ', '/models 请求明细：': '/models request details: ',
@@ -351,7 +350,6 @@ export const SERVER_DICT: Record<string, string> = {
   '。若非本人操作，请立即修改密码。': '. If this was not you, change your password immediately.',
   '你的域名': 'Your domain ',
   '已审核通过并开通': ' was approved and activated',
-  '如有疑问可提交工单。': 'Open a support ticket if you have questions.',
 
   /* 状态 / 标签 / 通用短词 */
   '待审核': 'Pending', '已开通': 'Active', '已驳回': 'Rejected',

@@ -69,7 +69,7 @@ export async function mountRewards(_root: HTMLElement | null): Promise<void> {
     const btn = document.getElementById('btnRedeem');
     btn.disabled = true;
     try {
-      const body = { code };
+      const body: Record<string, any> = { code };
       if (previewType === 'permanent') {
         const sid = document.getElementById('permSel').value;
         if (!sid) { btn.disabled = false; return toast('请选择要永久化的域名', 'err'); }

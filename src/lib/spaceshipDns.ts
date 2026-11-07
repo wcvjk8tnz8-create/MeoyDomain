@@ -128,7 +128,7 @@ export function parseSpRecordId(id) {
 }
 
 /** 通用：尝试所有路径/请求体写法，成功后缓存 */
-async function withFallback(cfg, domain, method, records) {
+async function withFallback(cfg, domain, method, records = []) {
   const styles = pathStyle ? [pathStyle] : ['slash', 'dash'];
   let lastErr = '';
   for (const ps of styles) {

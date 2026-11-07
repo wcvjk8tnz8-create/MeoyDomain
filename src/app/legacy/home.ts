@@ -9,7 +9,8 @@ import type { LegacyCtx } from '../lib/types';
 export async function mountHome(_root: HTMLElement | null): Promise<void> {
   
   loadBranding().then(applyBranding).catch(() => {});
-  document.getElementById('yr').textContent = new Date().getFullYear();
+  const yrEl = document.getElementById('yr');
+  if (yrEl) yrEl.textContent = String(new Date().getFullYear());
   
   let ROOTS = [];
   let RT = [];

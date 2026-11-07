@@ -14,6 +14,8 @@
   --serif:"Noto Serif CJK SC","Songti SC","STSong",Georgia,"Times New Roman",serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
   --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.22,1,.36,1);--easeSoft:cubic-bezier(.4,0,.2,1);
+  --dur1:160ms;--dur2:280ms;--dur3:420ms;--dur4:620ms;
 }
 @media(prefers-color-scheme:dark){
   :root{--paper:#101315;--paper2:#171b1e;--card:#171b1e;--ink:#f2f0e9;--body:#c8cdd2;
@@ -86,8 +88,22 @@ h1 em{font-style:italic;color:var(--acc)}
 /* ── 页脚 ── */
 .foot{flex-shrink:0;border-top:1px solid var(--line);padding-top:12px;display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--muted)}
 .foot a:hover{color:var(--acc)}
+/* ── 交互：与控制台共用同一组缓动，只动颜色 / 边框 / 阴影 / 滤镜 ── */
+a,.lang button,.nav a,.legal a,.foot a,.checker button.check,.suffix select,.pill{
+  transition:color var(--dur1) var(--easeSoft),background-color var(--dur1) var(--easeSoft),
+             border-color var(--dur1) var(--easeSoft),box-shadow var(--dur2) var(--ease),
+             filter var(--dur2) var(--ease),opacity var(--dur1) var(--easeSoft);
+}
+.checker{transition:box-shadow var(--dur2) var(--ease),border-color var(--dur1) var(--easeSoft)}
+.checker:focus-within{border-color:var(--acc);box-shadow:0 18px 52px rgba(24,38,30,.10)}
+.checker button.check:hover{filter:brightness(1.10)}
+.checker button.check:active{filter:brightness(.94)}
+.lang button:hover{color:var(--ink)}
+.pill.live .dot{animation:tdPulse 2.4s var(--easeSoft) infinite}
+@keyframes tdPulse{0%,100%{opacity:.55}50%{opacity:1}}
+:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:6px}
 /* ── 入场 ── */
-.rise{animation:rise .7s cubic-bezier(.2,.7,.3,1) both;animation-delay:var(--d,0s)}
+.rise{animation:rise var(--dur4) var(--ease) both;animation-delay:var(--d,0s)}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 /* ── 紧凑屏：压缩间距，仍然一屏 ── */
 @media(max-height:760px){
@@ -117,7 +133,11 @@ h1 em{font-style:italic;color:var(--acc)}
 /* 极矮屏才允许局部滚动，避免内容被切 */
 @media(max-height:430px){body{overflow:auto}.stage{min-height:100dvh;height:auto}}
 @media(max-aspect-ratio:9/19) and (max-width:520px){h1{font-size:clamp(32px,9vw,44px)}}
-@media(prefers-reduced-motion:reduce){.rise{animation:none}}
+@media(prefers-reduced-motion:reduce){
+  .rise{animation:none}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-delay:0ms!important;
+    transition-duration:.001ms!important;transition-delay:0ms!important;scroll-behavior:auto!important}
+}
 </style>
 </head>
 <body>

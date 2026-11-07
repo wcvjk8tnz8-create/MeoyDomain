@@ -143,7 +143,7 @@ app.delete('/subdomains/:id', async (c) => {
   const sub = await c.env.DB.prepare('SELECT * FROM subdomains WHERE id = ?').bind(id).first();
   if (!sub) return fail(c, '子域名不存在', 404);
   const recs = await c.env.DB.prepare('SELECT * FROM dns_records WHERE subdomain_id = ?').bind(id).all();
-  for (const r of recs.results) if (r.cf_record_id) await cfDelete(c.env, r.cf_record_id);
+  for (const r of recs.results) if (r.cf_record_id) await cfDelete(c.env, r.cf_record_id, sub.fqdn || sub.root_domain);
   await c.env.DB.prepare('DELETE FROM dns_records WHERE subdomain_id = ?').bind(id).run();
   await c.env.DB.prepare('DELETE FROM subdomains WHERE id = ?').bind(id).run();
   await audit(c, u.id, 'admin.subdomain.delete', sub.fqdn);
@@ -217,12 +217,12 @@ app.post('/users/:id/ban', async (c) => {
 
   let purged = 0;
   if (purgeDns) {
-    const subs = await c.env.DB.prepare('SELECT id FROM subdomains WHERE user_id = ?').bind(id).all();
+    const subs = await c.env.DB.prepare('SELECT id, fqdn, root_domain FROM subdomains WHERE user_id = ?').bind(id).all();
     for (const s of subs.results) {
       const recs = await c.env.DB.prepare('SELECT * FROM dns_records WHERE subdomain_id = ?').bind(s.id).all();
       for (const r of recs.results) {
         if (r.cf_record_id) {
-          const res = await cfDelete(c.env, r.cf_record_id);
+          const res = await cfDelete(c.env, r.cf_record_id, s.fqdn || s.root_domain);
           if (!res.ok) continue;
         }
         purged++;
@@ -377,13 +377,13 @@ app.post('/ips/ban', async (c) => {
 
     if (purgeDns) {
       const recs = await c.env.DB.prepare(
-        `SELECT r.id, r.cf_record_id FROM dns_records r
+        `SELECT r.id, r.cf_record_id, s.fqdn, s.root_domain FROM dns_records r
          JOIN subdomains s ON s.id = r.subdomain_id WHERE s.user_id = ?`
       )
         .bind(row.id)
         .all();
       for (const r of recs.results || []) {
-        await cfDelete(c.env, r.cf_record_id);
+        await cfDelete(c.env, r.cf_record_id, r.fqdn || r.root_domain);
         await c.env.DB.prepare('DELETE FROM dns_records WHERE id = ?').bind(r.id).run();
         purged++;
       }
@@ -652,7 +652,7 @@ app.post('/ai-test', async (c) => {
     const r = await aiTest(c.env);
     await audit(c, c.get('user')?.id, 'admin.ai-test', 'ai',
       r.ok ? `可用 · ${r.model} · ${r.latencyMs}ms` : `失败 · ${r.message}`);
-    return ok(c, r);
+    return ok(c, { ...r });
   } catch (e) {
     return ok(c, { ok: false, model: '', latencyMs: 0, sample: '',
       message: '自检异常', detail: String((e as Error)?.message || e).slice(0, 200) });
@@ -671,7 +671,7 @@ app.post('/ai-review-run', async (c) => {
     });
     await audit(c, c.get('user')?.id, 'admin.ai-batch', 'ai',
       `${r.reason} · 触发 manual · ${r.elapsedMs}ms`);
-    return ok(c, r);
+    return ok(c, { ...r });
   } catch (e) {
     return ok(c, {
       trigger: 'manual', scanned: 0, approved: 0, rejected: 0, failed: 0, skipped: 0,

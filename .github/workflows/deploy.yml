@@ -76,6 +76,11 @@ jobs:
             echo "⚠ 其它类型问题（非阻断，退出码 $code）"
           fi
 
+      # 固化历次线上踩过的坑：CSS 括号、词典重复键、明文密钥、
+      # 弹窗遮罩 / Toast / 抽屉动效、双动效引擎、未声明标识符。
+      - name: 静态健康巡检
+        run: node scripts/health-check.mjs
+
       # 构建 React 前端（产物 dist/client，由 wrangler [assets] 托管）
       # 日志端点有时被网络策略挡住，失败时把关键行同时发成 annotation 方便排查
       - name: 构建前端（Vite）

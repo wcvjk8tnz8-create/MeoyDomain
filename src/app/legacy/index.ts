@@ -54,7 +54,7 @@ export async function mountLogin(_root: HTMLElement | null): Promise<void> {
     if (password.length < 8) return toast('密码至少 8 位', 'err');
     if (!document.getElementById('rAgree').checked) return toast('请先勾选同意《服务条款与免责声明》', 'err');
     try {
-      const body = { email, password, agreeTerms: true };
+      const body: Record<string, any> = { email, password, agreeTerms: true };
       const codeEl = document.getElementById('rCode');
       if (codeEl && codeEl.offsetParent !== null) {
         if (!codeEl.value.trim()) return toast('请填写邮箱验证码', 'err');

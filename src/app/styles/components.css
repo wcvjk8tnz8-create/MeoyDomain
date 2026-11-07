@@ -6031,8 +6031,4 @@ table .mono, .tablewrap .mono {
 @keyframes npIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
 @keyframes dropIn { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
-
-@keyframes riseIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: none; }
-}
+/* riseIn 已在文件上方定义过一次，这里原为重复副本，已移除 */

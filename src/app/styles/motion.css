@@ -1,0 +1,332 @@
+/* ==========================================================================
+   TerraDomain · 统一动效层（最后加载，权威）
+   --------------------------------------------------------------------------
+   四层历史样式（components.css / index.css / responsive.css / theme-terra.css）
+   各写各的时长与缓动，theme-terra 又用 6 处 transform:none!important 禁掉 hover
+   反馈；另有若干历史覆盖把「全屏遮罩」画成不透明白卡片、把 Toast 画成黑色药丸。
+   本层做三件事：
+   1) 全站动效收口到同一组令牌（快起慢收、位移 ≤ 4px、只动 transform/opacity）；
+   2) 修掉遮罩 / Toast / 抽屉遮罩这几处被覆盖坏的样式；
+   3) 给弹窗、通知、用户菜单、Toast 补齐对称的进入与退出动画。
+
+   原则：入场比出场慢；系统开启「减少动态」时全部关闭；
+   !important 只用于压过同优先级的历史覆盖，不扩大选择器范围。
+   ========================================================================== */
+
+:root {
+  /* 快起慢收：接近 easeOutQuint，收尾不弹跳 */
+  --td-ease: cubic-bezier(.22, 1, .36, 1);
+  --td-ease-soft: cubic-bezier(.4, 0, .2, 1);
+  --td-ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --td-dur-1: 160ms;
+  --td-dur-2: 280ms;
+  --td-dur-3: 420ms;
+  --td-dur-4: 620ms;
+  --td-shadow-rest: 0 2px 10px rgba(17, 24, 39, .045);
+  --td-shadow-hover: 0 14px 32px rgba(17, 24, 39, .10), 0 2px 8px rgba(17, 24, 39, .05);
+}
+[data-theme="dark"] {
+  --td-shadow-rest: 0 2px 12px rgba(0, 0, 0, .22);
+  --td-shadow-hover: 0 16px 36px rgba(0, 0, 0, .46), 0 2px 8px rgba(0, 0, 0, .30);
+}
+
+/* 页面级只做纯 opacity 淡入：.page-root 内含 position:fixed 的顶栏/侧栏，
+   给父级加 transform 会成为 fixed 的包含块，切页那 0.4s 骨架会整体错位。 */
+@keyframes tdPageIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tdRevealIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tdPopIn {
+  from { opacity: 0; transform: translateY(8px) scale(.975); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tdPopOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(6px) scale(.985); }
+}
+@keyframes tdDropIn {
+  from { opacity: 0; transform: translateY(-8px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tdDropOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-6px) scale(.985); }
+}
+@keyframes tdFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tdFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes tdToastIn {
+  from { opacity: 0; transform: translateY(14px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tdToastOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(8px) scale(.97); }
+}
+@keyframes tdSpin { to { transform: rotate(360deg); } }
+@keyframes tdShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+@keyframes tdPulseSoft { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* ── 结构修复：这些被历史层覆盖坏，与是否开启动效无关 ─────────────────── */
+
+/* 1) #modal 是「全屏遮罩」，不是卡片。历史层把 .modal 一起设成了不透明
+   表面色 + 1px 边框，弹窗一开整屏变白。这里只改遮罩，卡片样式仍交给主题层。 */
+.modal {
+  background: rgba(12, 18, 30, .52) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+[data-theme="dark"] .modal { background: rgba(4, 7, 14, .68) !important; }
+
+/* 2) #toast 是容器：历史层给它刷了 hsl(foreground) 黑底，才有了「黑色药丸」。
+   容器透明，由子项各自成卡片。 */
+#toast {
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+.toast {
+  background: hsl(var(--card, 0 0% 100%)) !important;
+  color: hsl(var(--foreground, 220 9% 10%)) !important;
+  border: 1px solid hsl(var(--border, 220 13% 91%)) !important;
+  border-radius: 14px !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+  line-height: 1.45;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, .12) !important;
+  max-width: min(420px, calc(100vw - 32px));
+}
+.toast.err {
+  border-color: rgba(214, 69, 87, .45) !important;
+  border-left: 3px solid #d64557 !important;
+}
+[data-theme="dark"] .toast { box-shadow: 0 12px 34px rgba(0, 0, 0, .46) !important; }
+
+/* 3) 侧栏抽屉的遮罩是 body.side-open::after 伪元素，历史写法只在展开时
+   才生成 content，关闭就是硬切。改为常驻 + opacity 过渡，开合都柔和。 */
+body::after {
+  content: '' !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 240 !important;
+  background: rgba(18, 24, 38, .40) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+body.side-open::after {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  animation: none !important;   /* 压掉历史层的 fadeIn，改走下面的过渡 */
+  height: 100dvh !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+
+  /* ── 1. 页面进入：整体淡入，内部区块按序错峰 ───────────────────────── */
+  .page-root { animation: tdPageIn var(--td-dur-3) var(--td-ease) both !important; }
+  .page-root .wrap > .welcome,
+  .page-root .wrap > .card,
+  .page-root .wrap > .panel,
+  .page-root .wrap > .section,
+  .page-root .wrap > .tablewrap,
+  .page-root .nk-wrap > .zx-kicker,
+  .page-root .nk-wrap > .zx-title,
+  .page-root .nk-wrap > .zx-sub,
+  .page-root .nk-wrap > .zx-search,
+  .page-root .auth-card,
+  .page-root .auth-wrap > .auth-intro,
+  .page-root .nk-sec,
+  .page-root .zx-metrics > *,
+  .page-root .auth-feats > *,
+  .stat-row > *, .quick-row > *, .card-grid > * {
+    animation: tdRevealIn var(--td-dur-3) var(--td-ease) both !important;
+    animation-delay: calc(var(--td-i, 0) * 55ms) !important;
+  }
+  /* 登录页左陈述 / 右表单，落地页指标卡按序错峰 */
+  .page-root .auth-wrap > :nth-child(1) { animation-delay: 40ms !important; }
+  .page-root .auth-wrap > :nth-child(2) { animation-delay: 120ms !important; }
+  .page-root .auth-feats > :nth-child(1), .page-root .zx-metrics > :nth-child(1) { animation-delay: 80ms !important; }
+  .page-root .auth-feats > :nth-child(2), .page-root .zx-metrics > :nth-child(2) { animation-delay: 140ms !important; }
+  .page-root .auth-feats > :nth-child(3), .page-root .zx-metrics > :nth-child(3) { animation-delay: 200ms !important; }
+  .page-root .auth-feats > :nth-child(n+4), .page-root .zx-metrics > :nth-child(n+4) { animation-delay: 260ms !important; }
+  .stat-row > :nth-child(1), .quick-row > :nth-child(1), .card-grid > :nth-child(1) { --td-i: 0; }
+  .stat-row > :nth-child(2), .quick-row > :nth-child(2), .card-grid > :nth-child(2) { --td-i: 1; }
+  .stat-row > :nth-child(3), .quick-row > :nth-child(3), .card-grid > :nth-child(3) { --td-i: 2; }
+  .stat-row > :nth-child(4), .quick-row > :nth-child(4), .card-grid > :nth-child(4) { --td-i: 3; }
+  .stat-row > :nth-child(5), .quick-row > :nth-child(5), .card-grid > :nth-child(5) { --td-i: 4; }
+  .stat-row > :nth-child(6), .quick-row > :nth-child(6), .card-grid > :nth-child(6) { --td-i: 5; }
+  .stat-row > :nth-child(n+7), .quick-row > :nth-child(n+7), .card-grid > :nth-child(n+7) { --td-i: 6; }
+  .page-root .wrap > :nth-child(2) { animation-delay: 55ms !important; }
+  .page-root .wrap > :nth-child(3) { animation-delay: 110ms !important; }
+  .page-root .wrap > :nth-child(4) { animation-delay: 165ms !important; }
+  .page-root .wrap > :nth-child(n+5) { animation-delay: 220ms !important; }
+
+  /* 表格行错峰：异步渲染的列表不再「啪」地整块出现。
+     延迟压在 180ms 内，避免 fill-mode 让行长时间空白。 */
+  .page-root tbody tr {
+    animation: tdRevealIn var(--td-dur-2) var(--td-ease) both !important;
+  }
+  .page-root tbody tr:nth-child(1) { animation-delay: 24ms !important; }
+  .page-root tbody tr:nth-child(2) { animation-delay: 48ms !important; }
+  .page-root tbody tr:nth-child(3) { animation-delay: 72ms !important; }
+  .page-root tbody tr:nth-child(4) { animation-delay: 96ms !important; }
+  .page-root tbody tr:nth-child(5) { animation-delay: 120ms !important; }
+  .page-root tbody tr:nth-child(n+6) { animation-delay: 150ms !important; }
+
+  /* ── 2. 交互基线：全站同一套时长/缓动 ─────────────────────────────── */
+  .btn, .btn.sm, .iconbtn, .side-toggle, .top-search,
+  .zx-search-btn, .zx-nav-cta, .zx-nav-btn,
+  .quick, .card, .stat-card, .panel, .tablewrap,
+  .side-item, .nav, .tab, .preset, .root-opt, .pill, .badge,
+  .input, .textarea, select.input,
+  .np-item, .dlg, .modal-foot .btn, .toast, .root-picker-btn {
+    transition:
+      transform var(--td-dur-2) var(--td-ease),
+      box-shadow var(--td-dur-2) var(--td-ease),
+      background-color var(--td-dur-1) var(--td-ease-soft),
+      border-color var(--td-dur-1) var(--td-ease-soft),
+      color var(--td-dur-1) var(--td-ease-soft),
+      opacity var(--td-dur-1) var(--td-ease-soft) !important;
+  }
+  /* 卡片默认极淡投影，hover 才抬升；避免「贴纸感」又不喧宾夺主 */
+  .card, .stat-card, .panel, .quick {
+    box-shadow: var(--td-shadow-rest) !important;
+  }
+  .card:hover, .stat-card:hover, .panel:hover, .quick:hover {
+    box-shadow: var(--td-shadow-hover) !important;
+  }
+  .input:focus, .textarea:focus, select.input:focus {
+    outline: none !important;
+    transition: border-color var(--td-dur-1) var(--td-ease-soft),
+                box-shadow var(--td-dur-2) var(--td-ease) !important;
+  }
+
+  /* ── 3. 悬停 / 按压：压过 theme-terra 的 transform:none !important ─── */
+  .btn:hover:not(:disabled),
+  .btn.sm:hover:not(:disabled),
+  .iconbtn:hover:not(:disabled),
+  .zx-search-btn:hover,
+  .zx-nav-cta:hover,
+  .zx-nav-btn:hover,
+  .quick:hover,
+  .card:hover,
+  .stat-card:hover,
+  .panel:hover {
+    transform: translateY(-2px) !important;
+  }
+  .btn:active:not(:disabled),
+  .btn.sm:active:not(:disabled),
+  .iconbtn:active:not(:disabled),
+  .zx-search-btn:active,
+  .zx-nav-cta:active,
+  .quick:active,
+  .root-picker-btn:active {
+    transform: translateY(0) scale(.975) !important;
+    transition-duration: var(--td-dur-1) !important;
+  }
+  .side-item:hover, .nav:hover, .tab:hover, .preset:hover, .root-opt:hover {
+    transform: translateX(2px) !important;
+  }
+  .side-item:active, .nav:active, .quick:active { transform: scale(.985) !important; }
+
+  /* 键盘可达性：焦点环柔和出现 */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--td-accent, #2f7d5b) !important;
+    outline-offset: 3px !important;
+    border-radius: 6px;
+  }
+
+  /* ── 4. 浮层：进入 / 退出对称 ─────────────────────────────────────── */
+  .modal {
+    transition: opacity var(--td-dur-2) var(--td-ease-soft) !important;
+  }
+  .modal.show { animation: tdFadeIn var(--td-dur-2) var(--td-ease-soft) both !important; }
+  .modal.show .modal-card,
+  .modal.show .box {
+    animation: tdPopIn var(--td-dur-3) var(--td-ease) both !important;
+  }
+  /* closing 由 closeModal() 挂上，动画结束才移除 .show，避免 display:none 硬切 */
+  .modal.closing {
+    animation: tdFadeOut var(--td-dur-2) var(--td-ease-soft) both !important;
+    pointer-events: none !important;
+  }
+  .modal.closing .modal-card,
+  .modal.closing .box {
+    animation: tdPopOut var(--td-dur-2) var(--td-ease-soft) both !important;
+  }
+
+  .notif-panel {
+    animation: tdDropIn var(--td-dur-2) var(--td-ease) both !important;
+    transform-origin: top right !important;
+  }
+  .notif-panel.out {
+    animation: tdDropOut var(--td-dur-1) var(--td-ease-soft) both !important;
+    pointer-events: none !important;
+  }
+  .user-menu.on {
+    animation: tdDropIn var(--td-dur-2) var(--td-ease) both !important;
+    transform-origin: top right !important;
+  }
+  .user-menu.on.out {
+    animation: tdDropOut var(--td-dur-1) var(--td-ease-soft) both !important;
+    pointer-events: none !important;
+  }
+  .toast { animation: tdToastIn var(--td-dur-3) var(--td-ease) both !important; }
+  .toast.out { animation: tdToastOut var(--td-dur-2) var(--td-ease-soft) both !important; }
+  .np-item { animation: tdRevealIn var(--td-dur-2) var(--td-ease) both !important; }
+  .np-item:nth-child(2) { animation-delay: 40ms !important; }
+  .np-item:nth-child(3) { animation-delay: 80ms !important; }
+  .np-item:nth-child(n+4) { animation-delay: 120ms !important; }
+
+  /* 抽屉与遮罩：统一缓动，不再各写各的 .28s */
+  .sidebar {
+    transition: transform var(--td-dur-3) var(--td-ease),
+                box-shadow var(--td-dur-3) var(--td-ease) !important;
+  }
+  body::after {
+    transition: opacity var(--td-dur-3) var(--td-ease-soft) !important;
+  }
+
+  /* ── 5. 加载态与状态呼吸 ─────────────────────────────────────────── */
+  .loading, .skeleton, .sk-line, [data-loading="1"] {
+    background-image: linear-gradient(100deg, transparent 20%, rgba(127, 127, 127, .12) 50%, transparent 80%) !important;
+    background-size: 200% 100% !important;
+    animation: tdShimmer 1.8s var(--td-ease-in-out) infinite !important;
+  }
+  .spin, .spinner, [data-spin="1"] { animation: tdSpin .9s linear infinite !important; }
+  .np-empty, .empty { animation: tdFadeIn var(--td-dur-3) var(--td-ease) both !important; }
+  .badge.pending, .badge.warn, .dot-live {
+    animation: tdPulseSoft 2.4s var(--td-ease-in-out) infinite !important;
+  }
+  #docProgress {
+    background: linear-gradient(90deg, var(--td-accent, #2f7d5b), #6fb98c) !important;
+    transition: width 120ms var(--td-ease-soft) !important;
+    border-radius: 0 2px 2px 0 !important;
+  }
+
+  /* 链接：颜色缓慢过渡，不闪 */
+  .link, .page-root a:not(.btn):not(.side-item):not(.nav) {
+    transition: color var(--td-dur-1) var(--td-ease-soft),
+                opacity var(--td-dur-1) var(--td-ease-soft) !important;
+  }
+}
+
+/* ── 6. 减少动态：彻底关掉，并保证 .reveal 不会把内容永久藏起来 ───────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: .001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}

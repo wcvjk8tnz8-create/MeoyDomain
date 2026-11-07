@@ -277,9 +277,12 @@ app.notFound((c) => fail(c, '页面不存在', 404));
  * 留下的 pending 不会被永久挂住。两条路径靠 ai_claim_at 原子锁互斥，
  * 不会重复调用模型或重复批准。
  */
+/* ctx / scheduledController 由 Workers 运行时提供，形状由运行时保证。
+   这里用 any 承接，避免依赖全局类型声明（本地无 workers-types 时会误报
+   TS2304，而 CI 已把 TS2304 设为阻断项）。 */
 export default {
-  fetch: (request: Request, env: any, ctx: ExecutionContext) => app.fetch(request, env, ctx),
-  async scheduled(_controller: ScheduledController, env: any, ctx: ExecutionContext) {
+  fetch: (request: Request, env: any, ctx: any) => app.fetch(request, env, ctx),
+  async scheduled(_controller: any, env: any, ctx: any) {
     ctx.waitUntil(runAiReviewBatch(env, 'cron'));
   },
 };
