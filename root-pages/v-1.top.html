@@ -268,6 +268,9 @@ body{
 <script>
 /* ── 部署配置：只改这两行 ── */
 var PANEL = "https://nic.299282.xyz";   /* 官网 / 控制台地址，不带结尾斜杠 */
+/* 过渡角色提前预热：点链接时图片已在缓存，不会等 760ms 才冒出来 */
+var pl = document.createElement("link"); pl.rel = "preload"; pl.as = "image";
+pl.href = PANEL + "/img/transition/miku-pop.png"; document.head.appendChild(pl);
 var ABUSE_EMAIL = "abuse@v-1.top";     /* 举报邮箱，改成你能收信的地址 */
 var ROOT = "v-1.top";                  /* 本页对应的根域名 */
 /* 跨域拉不到官网 /api/config 时的兜底清单；新增根域名时请同步加进来 */

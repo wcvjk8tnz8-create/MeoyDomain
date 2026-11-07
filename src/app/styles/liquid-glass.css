@@ -862,7 +862,8 @@ body.topbar-hidden .sidebar {
 }
 .td-trans[hidden] { display: none !important; }
 .td-trans.is-in { opacity: 1; }
-.td-trans.is-out { opacity: 0; }
+/* 淡出这 420ms 里新页面已经能用了，别再拿全屏遮罩拦点击 */
+.td-trans.is-out { opacity: 0; pointer-events: none; }
 
 .td-trans-panel {
   --td-miku: clamp(148px, 42vmin, 196px);
@@ -1120,7 +1121,8 @@ html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg {
   position: fixed !important;
   inset: 0 !important;
   z-index: -1 !important;
-  background-image: var(--bg-img, url('/img/wallpaper/miku-bouquet.webp')) !important;
+  /* 先用 5.8KB 氛围图立刻铺底，不让 179KB 主图阻塞首屏 */
+  background-image: var(--bg-haze, url('/img/wallpaper/miku-bouquet-haze.webp')) !important;
   background-repeat: no-repeat !important;
   background-size: auto 84vh !important;
   background-position: right -2vw bottom -2vh !important;
@@ -1129,12 +1131,22 @@ html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg {
   filter: saturate(.92) contrast(.96);
   transform: translateZ(0);
 }
+/* 高清主图解码完成后（runtime.ts 打 data-wp-loaded="1"）才换上并柔和淡入 */
+html body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"] {
+  background-image: var(--bg-img, url('/img/wallpaper/miku-bouquet.webp')) !important;
+  animation: bl-wp-fade .62s cubic-bezier(.22, 1, .36, 1) both;
+}
 html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg {
-  background-image: var(--bg-img-dark, url('/img/wallpaper/miku-bouquet-dark.webp')) !important;
   mix-blend-mode: normal;
   opacity: .40;
   filter: saturate(.76) brightness(.74);
 }
+html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"] {
+  background-image: var(--bg-img-dark, url('/img/wallpaper/miku-bouquet-dark.webp')) !important;
+  animation: bl-wp-fade-dark .62s cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes bl-wp-fade { from { opacity: .35; } to { opacity: .90; } }
+@keyframes bl-wp-fade-dark { from { opacity: .14; } to { opacity: .40; } }
 /* 老壁纸（樱花喵 / Miku / GUMI）是满屏照片，不能按插画方式裁切 */
 html body:not(.page-home):not(.page-login) #bg:not([data-wp="bouquet"]) {
   background-size: cover !important;
@@ -1296,6 +1308,10 @@ html[data-theme="dark"] body .bgswitch button.on { border-color: #8fd8ce !import
 }
 @media (prefers-reduced-motion: reduce) {
   html body:not(.page-home):not(.page-login) #bg::before { animation: none !important; }
+  html body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"],
+  html[data-theme="dark"] body:not(.page-home):not(.page-login) #bg[data-wp-loaded="1"] {
+    animation: none !important;
+  }
   html body .bgswitch button { transition: none !important; }
 }
 

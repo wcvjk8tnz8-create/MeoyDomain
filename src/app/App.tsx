@@ -103,8 +103,10 @@ export default function App() {
       const href = a.getAttribute('href') || '';
       if (!isInternal(href) || a.target === '_blank' || a.hasAttribute('download')) return;
       // 只允许左键、无修饰键；hash 变化仍交给浏览器
+      // 不立刻 pushState：先让 Miku 完整冒出，再换页。
+      // 否则页面切换比过渡还快，素材还没解码完就已经在渲染新页了。
       e.preventDefault();
-      navigate(href);
+      beginTransition(() => navigate(href));
     };
     window.addEventListener('popstate', onPop);
     document.addEventListener('click', onClick);

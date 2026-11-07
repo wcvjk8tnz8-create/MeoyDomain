@@ -138,17 +138,23 @@ check(/\/login\?q=/.test(read('src/app/legacy/whois.ts')) && /href="\/login"/.te
 /* 9. 切页过渡：Miku 冒出来 + 跳转中气泡（真实素材，不用 SVG 画角色） */
 const transition = read('src/app/lib/pageTransition.ts');
 check(/mountTransition\(\)/.test(main) && /from '\.\/lib\/pageTransition'/.test(main), '入口挂载切页过渡层');
-check(/addEventListener\('popstate', beginTransition\)/.test(transition), 'SPA 切页 / 后退触发过渡');
+check(/addEventListener\('popstate',\s*\(\)\s*=>\s*beginTransition\(\)\)/.test(transition), 'SPA 切页 / 后退触发过渡（popstate 事件对象不误当导航回调）');
 check(/addEventListener\('td:page-ready', endTransition\)/.test(transition), '页面资料就绪收起过渡');
 check(/td:page-ready/.test(runtime), 'refreshRuntime 派发页面就绪信号');
 check(/data-no-i18n/.test(transition), '气泡文案不被全局翻译改写');
 check(/kind:\s*'image'/.test(transition) && /miku-pop\.png/.test(transition), '默认使用真实 PNG 素材');
 check(/'gif'/.test(transition) && /'video'/.test(transition) && /<video/.test(transition), '预留 GIF / MP4 一行切换');
 check(!/<svg|createElementNS|image\/svg\+xml/i.test(transition), '角色不是 SVG 绘制');
-check(/SHOW_DELAY\s*=\s*80/.test(transition) && /MIN_VISIBLE\s*=\s*700/.test(transition) && /FORCE_HIDE\s*=\s*8000/.test(transition), '每页必显示、最短停留、8s 兜底防遮死');
-check(/DOM_QUIET\s*=\s*260/.test(transition) && /MutationObserver/.test(transition) && /getElementById\('root'\)/.test(transition), '按 #root 内容稳定判定资料就绪（fire-and-forget 页面不再提前收起）');
+check(/SHOW_DELAY\s*=\s*0/.test(transition) && /MIN_VISIBLE\s*=\s*1100/.test(transition) && /HIDE_ANIM\s*=\s*420/.test(transition) && /FORCE_HIDE\s*=\s*8000/.test(transition), '点击即播、停留拉长、慢收淡出、8s 兜底防遮死');
+check(/NAV_HOLD\s*=\s*320/.test(transition) && /MEDIA_WAIT\s*=\s*260/.test(transition), 'Miku 冒出后才换页，素材最多等 260ms');
+check(/DOM_QUIET\s*=\s*320/.test(transition) && /MutationObserver/.test(transition) && /getElementById\('root'\)/.test(transition), '按 #root 内容稳定判定资料就绪（fire-and-forget 页面不再提前收起）');
+check(/warmAssets\(/.test(transition) && /WARM_ASSETS/.test(transition) && /decodeAsset/.test(transition), '首屏预热 Miku 与三张壁纸，切页不再现拉素材');
+check(/Promise\.race/.test(transition) && /waitMedia\(\)/.test(transition), '素材等待有硬上限，网慢不卡死切页');
+check(/beginTransition\(action\?/.test(transition) && /navPending/.test(transition) && /runPendingAction/.test(transition), '站内导航延后到动画之后，且兜底隐藏必补一次换页');
+check(/if\s*\(navPending\)\s*return/.test(transition), '导航前旧页面派发的 page-ready 不算就绪');
 check(!/endTransition[\s\S]{0,200}clearTimeout\(showTimer\)/.test(transition), '就绪信号不能取消显示');
 check(/beginTransition\(\)/.test(read('src/app/App.tsx')) && /useLayoutEffect/.test(read('src/app/App.tsx')), 'App 路由 key 变化驱动，每个页面组件都覆盖');
+check(/beginTransition\(\(\)\s*=>\s*navigate\(href\)\)/.test(read('src/app/App.tsx')), '站内链接不再立刻 pushState，先播过渡再换页');
 check(/td-miku-rise/.test(glass) && /td-miku-breathe/.test(glass) && /td-trans-bubble/.test(glass), '玻璃层含冒出 / 呼吸 / 气泡样式');
 check(/\[data-theme="dark"\] \.td-trans/.test(glass) && /prefers-reduced-motion/.test(glass.split('页面切换过渡').pop() || ''), '过渡层深色与减少动态适配');
 check(fs.existsSync(path.join(root, 'public/img/transition/miku-pop.png')), 'Miku 透明素材已入库');
@@ -162,8 +168,10 @@ for (const f of rootPages) {
   check(/prefers-color-scheme: dark/.test(rp), `${f} 深色跟随系统`);
   // 只做仓库内自校验：CI 里没有仓库外的工作区交付副本，不能读它
   check(/location\.href\s*=\s*url/.test(rp) && /setTimeout/.test(rp), `${f} 过渡结束后才跳转`);
+  check(/rel\s*=\s*"preload"/.test(rp) && /miku-pop\.png/.test(rp), `${f} 页面加载即预热过渡角色，点击时不再现拉`);
   check((rp.match(/id="tdTransition"/g) || []).length === 1, `${f} 过渡层只挂一份`);
 }
+check(/\.td-trans\.is-out\s*\{[^}]*pointer-events:\s*none/.test(read('src/app/styles/liquid-glass.css')), '淡出期间放行交互，遮罩不多挡 420ms');
 
 /* 11. 花束 Miku 壁纸 / 控制台 UI 重构 */
 const runtimeJs = read('src/app/lib/runtime.ts');
@@ -178,6 +186,14 @@ for (const f of ['miku-bouquet.webp', 'miku-bouquet-dark.webp', 'miku-bouquet-ha
 }
 check(/display:\s*block\s*!important/.test(bloom), '历史层隐藏的 #bg 在控制台重新启用');
 check(/z-index:\s*-1/.test(bloom) && /mix-blend-mode:\s*multiply/.test(bloom), '白底插画以 multiply 融入纸面');
+check(/--bg-haze/.test(bloom) && /#bg\[data-wp-loaded="1"\]/.test(bloom) && /bl-wp-fade/.test(bloom), '壁纸先用轻量氛围图铺底，高清解码后淡入');
+check(/prefers-reduced-motion[\s\S]{0,300}#bg\[data-wp-loaded="1"\][\s\S]{0,160}animation:\s*none/.test(bloom), '减少动态时壁纸不做淡入');
+check(/dataset\.wpLoaded/.test(runtimeJs) && /img\.decode/.test(runtimeJs), 'runtime 解码完主图才打上淡入标记');
+check(/brandValue/.test(runtimeJs) && /brandRefreshing/.test(runtimeJs) && /Promise\.resolve\(brandValue\)/.test(runtimeJs), '品牌配置走 stale-while-revalidate，切页不再 await 接口');
+check(/brandPromise\s*=\s*null/.test(runtimeJs.split('resetBranding').pop() || ''), '后台保存后清缓存，下次切页拉新值');
+const shellHtml = read('index.html');
+check(/rel="preload" as="image" href="\/img\/transition\/miku-pop\.png"/.test(shellHtml), '首屏 preload 过渡角色');
+check(/miku-bouquet-haze\.webp/.test(shellHtml) && /miku-bouquet-dark\.webp/.test(shellHtml), '首屏 preload 壁纸浅/深/氛围版');
 check(/html\[data-theme="dark"\] body[\s\S]{0,400}background:\s*transparent\s*!important/.test(bloom), '深色 body 以同等特异性压成透明（否则盖住壁纸）');
 check(/background-color:\s*var\(--bl-paper\)/.test(bloom) || /html:not\(\[data-theme="dark"\]\)[\s\S]{0,200}background-color/.test(bloom), '纸面渐变移到根元素');
 check(/--bl-jade:\s*#2f8f83/.test(bloom) && /--bl-coral/.test(bloom), '取色自插画：青瓷绿主色 + 花色点缀');

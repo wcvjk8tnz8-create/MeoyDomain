@@ -152,6 +152,7 @@ export const WALLPAPERS = [
   { key: 'gumi', name: 'GUMI', url: '/img/gumi.jpg' },
 ];
 
+let wpSeq = 0;
 export function applyWallpaper(key) {
   const w = WALLPAPERS.find((x) => x.key === key) || WALLPAPERS[0];
   let el = document.getElementById('bg');
@@ -160,10 +161,24 @@ export function applyWallpaper(key) {
     el.id = 'bg';
     document.body.prepend(el);
   }
-  el.style.setProperty('--bg-img', `url('${w.url}')`);
-  el.style.setProperty('--bg-img-dark', `url('${w.dark || w.url}')`);
-  el.style.setProperty('--bg-haze', `url('${w.haze || w.url}')`);
-  el.dataset.wp = w.key;
+  const node = el as HTMLElement;
+  node.style.setProperty('--bg-img', `url('${w.url}')`);
+  node.style.setProperty('--bg-img-dark', `url('${w.dark || w.url}')`);
+  node.style.setProperty('--bg-haze', `url('${w.haze || w.url}')`);
+  node.dataset.wp = w.key;
+  // 先用 5.8KB 的 haze 氛围图顶上，高清主图解码完成再淡入。
+  // 以前 CSS 直接引用 179KB 主图，切页时要等它下载+解码，观感就是「东西加载慢」。
+  node.dataset.wpLoaded = '0';
+  const seq = ++wpSeq;
+  const mark = () => {
+    if (seq === wpSeq && node.dataset.wp === w.key) node.dataset.wpLoaded = '1';
+  };
+  [w.url, w.dark].filter(Boolean).forEach((src) => {
+    const img = new Image();
+    img.src = src;
+    if (typeof img.decode === 'function') img.decode().then(mark, mark);
+    else { img.onload = mark; img.onerror = mark; }
+  });
   document.documentElement.setAttribute('data-wallpaper', w.key);
   try { localStorage.setItem('meoy_wallpaper', w.key); } catch {}
   document.querySelectorAll('.bgswitch button').forEach((b) => b.classList.toggle('on', b.dataset.wp === w.key));
@@ -197,19 +212,40 @@ document.addEventListener('click', (e) => {
 /* ---------- 站点品牌（站点名 / Logo，管理员可在后台改） ---------- */
 export const DEFAULT_BRAND = { siteName: 'TerraDomain', logoUrl: '/img/logo.jpg', faviconUrl: '/favicon.ico' };
 export let brandPromise = null;
+/* stale-while-revalidate：切页先用上一次的值立刻渲染，网络刷新放后台。
+   以前每个页面都 await 一次 /api/config，接口一慢整页就卡在骨架上。 */
+let brandValue = null;
+let brandRefreshing = false;
+
+function normalizeBrand(d) {
+  return {
+    siteName: d.siteName || DEFAULT_BRAND.siteName,
+    logoUrl: d.logoUrl || DEFAULT_BRAND.logoUrl,
+    faviconUrl: d.faviconUrl || DEFAULT_BRAND.faviconUrl,
+    fontBody: d.fontBody || 'system',
+    fontDisplay: d.fontDisplay || 'system',
+  };
+}
 
 export function loadBranding() {
+  if (brandValue) {
+    if (!brandRefreshing) {
+      brandRefreshing = true;
+      api.get('/api/config')
+        .then((d) => { brandValue = normalizeBrand(d); })
+        .catch(() => { /* 保留旧值，不打断渲染 */ })
+        .finally(() => { brandRefreshing = false; });
+    }
+    return Promise.resolve(brandValue);
+  }
   if (!brandPromise) {
     brandPromise = api
       .get('/api/config')
-      .then((d) => ({
-        siteName: d.siteName || DEFAULT_BRAND.siteName,
-        logoUrl: d.logoUrl || DEFAULT_BRAND.logoUrl,
-        faviconUrl: d.faviconUrl || DEFAULT_BRAND.faviconUrl,
-        fontBody: d.fontBody || 'system',
-        fontDisplay: d.fontDisplay || 'system',
-      }))
-      .catch(() => ({ ...DEFAULT_BRAND }));
+      .then((d) => { brandValue = normalizeBrand(d); return brandValue; })
+      .catch(() => {
+        brandPromise = null;   // 失败清缓存，下一次切页自动重试
+        return { ...DEFAULT_BRAND };
+      });
   }
   return brandPromise;
 }
@@ -222,6 +258,7 @@ export function loadBranding() {
  */
 export function resetBranding() {
   brandPromise = null;
+  brandValue = null;
 }
 
 /** 应用站点名与 favicon */
