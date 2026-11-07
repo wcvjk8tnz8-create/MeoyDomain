@@ -100,7 +100,27 @@ export async function mountDashboard(_root: HTMLElement | null): Promise<void> {
     const sub = document.getElementById('wSub');
     const hour = new Date().getHours();
     const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
-    if (av) av.textContent = nm.charAt(0).toUpperCase();
+
+    /* 头像与「个人资料」页同源：读 /api/profile 里保存的 avatar，
+       没设置就用同一张默认 Miku；加载失败也退回默认，不留空白方块。 */
+    const DEFAULT_AV = '/img/avatar/miku-headset.webp';
+    if (av) {
+      const setAv = (url) => {
+        if (av instanceof HTMLImageElement) {
+          av.onerror = () => { av.onerror = null; av.src = DEFAULT_AV; };
+          av.src = url || DEFAULT_AV;
+          av.alt = nm;
+        } else {
+          av.textContent = nm.charAt(0).toUpperCase();
+        }
+      };
+      try {
+        const prof = await api.get('/api/profile');
+        setAv((prof && prof.profile && prof.profile.avatar) || DEFAULT_AV);
+      } catch {
+        setAv(DEFAULT_AV);
+      }
+    }
     if (hi) hi.textContent = `${greet}，${nm}`;
     if (sub) sub.textContent = [
       me.role === 'admin' ? '管理员' : '普通用户',

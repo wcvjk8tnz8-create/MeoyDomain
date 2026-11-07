@@ -28,7 +28,7 @@ export default function DashboardPage() {
           <div className="td-crumb-meta"><span>DNS ZONES</span><span>·</span><span>实时状态</span></div>
         </div>
           <div className="welcome td-pagehead" id="welcome">
-          <span className="w-av" id="wAv">M</span>
+          <img className="w-av" id="wAv" src="/img/avatar/miku-headset.webp" alt="" />
           <div className="w-txt">
             <div className="w-hi" id="wHi">欢迎回来</div>
             <div className="w-sub" id="wSub">二级域名分发控制台</div>

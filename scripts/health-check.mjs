@@ -73,6 +73,16 @@ check(/#toast\s*\{[^}]*background:\s*transparent/s.test(glass), '玻璃层保留
 check(/transform:\s*translateX\(calc\(-100%/s.test(glass), '玻璃层保留移动端抽屉收起位移');
 check(/body\.side-open \.sidebar\s*\{[^}]*transform:\s*translateX\(0\)/s.test(glass), '玻璃层保留移动端抽屉展开');
 check(/prefers-reduced-motion:\s*reduce/.test(glass), '玻璃层尊重减少动态偏好');
+/* 页头欢迎卡：四角全圆角玻璃卡，且不再残留直角细线框 */
+const welcomeBlock = (glass.match(/\.welcome\s*\{[^}]*\}/s) || [''])[0];
+check(/border-radius:\s*var\(--lg-r-lg\)/.test(welcomeBlock) && !/border-radius:\s*0/.test(welcomeBlock), '玻璃层欢迎卡为全圆角玻璃卡');
+check(/border:\s*1px solid var\(--lg-stroke\)/.test(welcomeBlock), '玻璃层欢迎卡为四边细线边框');
+check(/\.welcome \.w-av\s*\{[^}]*border-radius:\s*50%/s.test(glass), '玻璃层欢迎头像为圆形');
+/* 头像与个人资料页同源：Dashboard 用 img，控制器读 /api/profile */
+const dashTsx = read('src/app/pages/Dashboard.tsx');
+check(/<img\s+className="w-av"\s+id="wAv"/.test(dashTsx), '欢迎头像使用 img 而非首字母方块');
+const dashTs = read('src/app/legacy/dashboard.ts');
+check(/api\.get\('\/api\/profile'\)/.test(dashTs) && /prof\.profile\.avatar|prof && prof\.profile && prof\.profile\.avatar/.test(dashTs), '欢迎头像读取与个人资料同源的 /api/profile');
 const motion = read('src/app/styles/motion.css');
 check(/\.modal\s*\{[^}]*background:\s*rgba\(/s.test(motion), '弹窗遮罩为半透明（不是整屏白卡）');
 check(/#toast\s*\{[^}]*background:\s*transparent/s.test(motion), 'Toast 容器透明（不是黑色药丸）');

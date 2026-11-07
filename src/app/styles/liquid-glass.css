@@ -298,7 +298,33 @@ body:has(.main) .site-foot,
 .quick:hover { border-color: rgba(47, 125, 91, .42) !important; }
 .q-ico { color: var(--lg-green) !important; }
 
-.welcome { border-bottom: 1px solid var(--lg-hair) !important; }
+/* 页头欢迎卡：theme-terra 曾把 border-radius 钉成 0，只剩一圈直角细线框。
+   这里收口成与全站一致的玻璃卡片，四角全圆角；头像与「个人资料」同源，
+   因此同时把原先给首字母 span 用的粉色方块底改成圆形图片样式。 */
+.welcome {
+  background: var(--lg-glass) !important;
+  border: 1px solid var(--lg-stroke) !important;
+  border-bottom: 1px solid var(--lg-stroke) !important;
+  border-radius: var(--lg-r-lg) !important;
+  box-shadow: var(--lg-shadow) !important;
+  backdrop-filter: var(--lg-blur) !important;
+  -webkit-backdrop-filter: var(--lg-blur) !important;
+  padding: 16px 20px !important;
+  margin-bottom: 18px !important;
+  gap: 14px !important;
+}
+.welcome .w-av {
+  width: 46px !important;
+  height: 46px !important;
+  flex: 0 0 46px !important;
+  display: block !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+  background: var(--lg-glass-soft) !important;
+  border: 2px solid var(--lg-stroke) !important;
+  box-shadow: var(--lg-shadow-sm) !important;
+  color: var(--lg-ink) !important;
+}
 .crumb, .crumb *, .td-crumb, .td-crumb-meta, .td-cardhint { color: var(--lg-muted) !important; }
 .card h2, .card h3, .head-row h3, .w-hi { color: var(--lg-ink) !important; }
 
@@ -521,6 +547,7 @@ body.side-open .page-root::after {
   }
   .notif-panel, .user-menu, .root-picker-menu { border-radius: 20px !important; }
   .card, .pane, .reg-card, .auth-card { border-radius: 20px !important; }
+  .welcome { border-radius: 20px !important; padding: 14px !important; }
 }
 
 /* ≤360px 超窄 / 折叠外屏 */
