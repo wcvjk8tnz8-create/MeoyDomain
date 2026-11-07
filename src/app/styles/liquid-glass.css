@@ -652,3 +652,191 @@ body.side-open .page-root::after {
 @media (prefers-reduced-motion: reduce) {
   .sidebar, .topbar, .home-top, .btn, .card { transition: none !important; }
 }
+
+/* ───────────────── 7. 顶栏可一键收起 / 侧栏可折叠 ─────────────────
+   用户明确要「顶栏直接不见、侧边栏可收起」。滚动仍只收成悬浮胶囊（参考图），
+   不再自动滑出视口 —— 之前下滑 160px 就消失，导航/通知/搜索会整块找不到。
+   彻底隐藏改成显式动作：顶栏右端的收起钮 → 直接不见，状态写 localStorage，
+   顶部留一个极简玻璃把手随时唤回（Esc 也可以）。侧栏折叠成 72px 图标条。
+   两者都只认用户点击，刷新和切页保持；手机宽度下自动禁用，抽屉逻辑不受影响。 */
+
+/* 顶栏右端：收起钮 */
+.tb-stow {
+  flex: 0 0 34px !important;
+  width: 34px !important; height: 34px !important;
+  margin-left: 2px !important; padding: 0 !important;
+  border: 1px solid var(--lg-stroke) !important;
+  border-radius: 999px !important;
+  background: var(--lg-glass-soft) !important;
+  color: var(--lg-muted) !important;
+  box-shadow: none !important;
+  transition: color .28s var(--td-ease-soft, ease),
+              background .28s var(--td-ease-soft, ease),
+              transform .28s var(--td-ease, ease) !important;
+}
+.tb-stow svg { width: 16px; height: 16px; }
+.tb-stow:hover { color: var(--lg-green) !important; background: var(--lg-green-soft) !important; transform: translateY(-2px); }
+body.topbar-compact .tb-stow { width: 30px !important; height: 30px !important; flex-basis: 30px !important; }
+
+/* 顶栏收起后的唤回把手：默认藏起，只有真的隐藏了才落下 */
+.topbar-reveal {
+  position: fixed !important;
+  top: calc(var(--lg-inset) + var(--safe-t, 0px) + 4px) !important;
+  left: 50% !important;
+  transform: translate(-50%, -170%) !important;
+  z-index: 320 !important;
+  width: 94px !important; height: 26px !important;
+  padding: 0 !important;
+  border: 1px solid var(--lg-stroke) !important;
+  border-radius: 999px !important;
+  background: var(--lg-glass) !important;
+  backdrop-filter: var(--lg-blur) !important;
+  -webkit-backdrop-filter: var(--lg-blur) !important;
+  box-shadow: var(--lg-shadow-sm) !important;
+  color: var(--lg-muted) !important;
+  opacity: 0 !important; pointer-events: none !important;
+  transition: transform .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+              opacity .28s ease !important;
+}
+.topbar-reveal svg { width: 15px; height: 15px; }
+.topbar-reveal:hover { color: var(--lg-green) !important; }
+body.topbar-hidden .topbar-reveal {
+  transform: translate(-50%, 0) !important;
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* 顶栏真正隐藏后，正文和侧栏要补上那段高度，不能留空白也不能顶到浏览器栏 */
+body.topbar-hidden .main {
+  padding-top: calc(var(--lg-inset) + var(--safe-t, 0px) + 20px) !important;
+}
+body.topbar-hidden .sidebar {
+  top: calc(var(--lg-inset) + var(--safe-t, 0px) + 8px) !important;
+}
+@media (max-width: 700px) {
+  body.topbar-hidden .main { padding-top: calc(48px + 10px + var(--safe-t, 0px) + 14px) !important; }
+  body.topbar-hidden .sidebar { top: calc(48px + 10px + var(--safe-t, 0px) + 8px) !important; }
+  /* 手机顶栏装着汉堡（抽屉唯一入口），不允许收起；侧栏折叠钮也只属于桌面 */
+  .tb-stow, #sideCollapse { display: none !important; }
+}
+
+/* ── 侧栏折叠（只在桌面/平板宽度生效，手机仍是抽屉） ── */
+@media (min-width: 701px) {
+  /* 一个变量收口：.sidebar / .main / .site-foot 全都引用它，无需逐个改偏移 */
+  body.side-collapsed {
+    --lg-side-w: 72px;
+    --lg-side-total: calc(72px + var(--lg-inset) * 2);
+  }
+  #sideCollapse {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 9px !important;
+    width: calc(100% - 8px) !important;
+    margin: 10px 4px 2px !important;
+    padding: 9px 12px !important;
+    border: 1px solid var(--lg-stroke) !important;
+    border-radius: 14px !important;
+    background: var(--lg-glass-soft) !important;
+    color: var(--lg-muted) !important;
+    font-size: 12.5px !important;
+    letter-spacing: .02em;
+    box-shadow: none !important;
+    transition: color .28s var(--td-ease-soft, ease),
+                background .28s var(--td-ease-soft, ease) !important;
+  }
+  #sideCollapse svg { width: 15px; height: 15px; flex: 0 0 15px; transition: transform .36s var(--td-ease, ease); }
+  #sideCollapse:hover { color: var(--lg-green) !important; background: var(--lg-green-soft) !important; }
+
+  body.side-collapsed .sidebar {
+    width: 72px !important;
+    padding-left: 8px !important; padding-right: 8px !important;
+    overflow: visible !important;
+  }
+  body.side-collapsed .sidebar .side-txt,
+  body.side-collapsed .sidebar .side-gtitle,
+  body.side-collapsed .sidebar .side-brand b,
+  body.side-collapsed .sidebar .side-brand .sb-sub,
+  body.side-collapsed #sideCollapse .sc-label { display: none !important; }
+  body.side-collapsed .side-brand {
+    justify-content: center !important;
+    padding: 0 0 12px !important;
+  }
+  body.side-collapsed .side-brand img { width: 30px !important; height: 30px !important; flex: 0 0 30px !important; }
+  body.side-collapsed .side-item,
+  body.side-collapsed .nav {
+    justify-content: center !important;
+    padding: 10px 0 !important;
+    width: calc(100% - 4px) !important;
+    margin: 3px 2px !important;
+  }
+  body.side-collapsed .side-item .side-ico { flex: 0 0 auto !important; }
+  body.side-collapsed .side-group + .side-group {
+    margin-top: 8px !important; padding-top: 8px !important;
+    border-top: 1px solid var(--lg-hair) !important;
+  }
+  body.side-collapsed #sideCollapse {
+    justify-content: center !important;
+    padding-left: 0 !important; padding-right: 0 !important;
+  }
+  body.side-collapsed #sideCollapse svg { transform: rotate(180deg); }
+  /* 折叠态侧栏要让气泡能溢出，滚动交给内部列表 */
+  body.side-collapsed .side-in {
+    max-height: calc(100dvh - 190px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* 折叠后只剩图标，悬停用原生 title 的译文做气泡（i18n 会翻 title 属性） */
+  body.side-collapsed .side-item::after {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    padding: 7px 11px;
+    border: 1px solid var(--lg-stroke);
+    border-radius: 10px;
+    background: var(--lg-glass);
+    backdrop-filter: var(--lg-blur);
+    -webkit-backdrop-filter: var(--lg-blur);
+    box-shadow: var(--lg-shadow-sm);
+    color: var(--lg-ink);
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .24s ease, transform .28s var(--td-ease, ease);
+    z-index: 40;
+  }
+  body.side-collapsed .side-item:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  /* 折叠/展开的尺寸变化走同一条缓动，不跳帧 */
+  .sidebar, .main, .site-foot, .main-foot, .side-item, .side-brand, #sideCollapse {
+    transition: width .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+                padding .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+                margin .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)),
+                top .42s var(--td-ease, cubic-bezier(.22, 1, .36, 1)) !important;
+  }
+}
+
+/* 平板断点里写死的 208px / 236px 要跟着折叠走 */
+@media (min-width: 701px) and (max-width: 1000px) {
+  body.side-collapsed .sidebar { width: 72px !important; }
+  body.side-collapsed .main { padding-left: calc(var(--lg-side-total) + var(--safe-l, 0px)) !important; }
+  body.side-collapsed .site-foot, body.side-collapsed .main-foot { margin-left: var(--lg-side-total) !important; }
+  body.side-collapsed #sideCollapse { width: calc(100% - 8px) !important; }
+}
+
+/* 矮横屏：顶栏收起后侧栏也要跟着上移，别留一条缝 */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.topbar-hidden .sidebar { top: calc(8px + var(--safe-t, 0px) + 8px) !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-stow, .topbar-reveal, #sideCollapse, #sideCollapse svg,
+  .sidebar, .main, .site-foot, .main-foot, .side-item, .side-brand { transition: none !important; }
+  body.side-collapsed .side-item::after { transition: none !important; }
+}

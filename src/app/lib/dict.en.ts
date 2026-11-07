@@ -20,6 +20,8 @@ export const EXTRA_DICT: Record<string, string> = {
   '已锁': 'Locked', '解锁': 'Unlock', '锁定': 'Lock', '变动': 'Changes',
   '余额': 'Balance', '代理': 'Proxied', '编辑': 'Edit', '区域': 'Zone',
   '重试': 'Retry', '过期': 'Expired', '收起': 'Collapse', '启用': 'Enable',
+  '收起顶栏': 'Hide toolbar', '展开顶栏': 'Show toolbar',
+  '收起侧边栏': 'Collapse sidebar', '展开侧边栏': 'Expand sidebar',
   '本人': 'You', '原因': 'Reason', '托管': 'Delegate', '名称': 'Name',
   '协议': 'Protocol', '权重': 'Weight', '端口': 'Port', '标志': 'Flags',
   '标签': 'Tag', '写回复': 'Write a reply', '主机名': 'Hostname',

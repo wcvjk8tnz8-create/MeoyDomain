@@ -48,6 +48,7 @@ export function navigate(path: string) {
 /* 每次切页后重新扫描动效/装饰/页脚/主题按钮/语言 */
 export function refreshRuntime() {
   try { syncTopbarState(); } catch {}
+  try { applyLayoutPrefs(); } catch {}
   try { mountDecor(); } catch {}
   try { mountMotion(); } catch {}
   try { mountSiteFooter(); } catch {}
@@ -805,15 +806,67 @@ let __motionBoot: { io: IntersectionObserver | null; reduced: boolean } | null =
 let __lastTopbarY = 0;
 function syncTopbarState() {
   const y = Math.max(window.scrollY || 0, 0);
-  const b = document.body;
-  const compact = y > 24;
-  const down = y > __lastTopbarY + 4;
-  const up = y < __lastTopbarY - 4;
-  if (compact) b.classList.add('topbar-compact');
-  else b.classList.remove('topbar-compact', 'topbar-hidden');
-  if (compact && down && y > 160) b.classList.add('topbar-hidden');
-  else if (up || y <= 24) b.classList.remove('topbar-hidden');
+  // 自动「滑出视口」已移除：滚动只把顶栏收成悬浮胶囊，始终可见（参考图）。
+  // 彻底隐藏只由用户点「收起顶栏」触发，存在 localStorage，刷新/切页都保持；
+  // 顶部会留一个小把手随时唤回，不会再也找不到导航。
+  document.body.classList.toggle('topbar-compact', y > 24);
   __lastTopbarY = y;
+}
+
+/* ── 侧栏 / 顶栏收起偏好 ──
+   两个状态都只认用户点击，不再和滚动方向绑定；手机端侧栏本来就是抽屉，
+   不套用折叠宽度，避免把抽屉挤成 76px。 */
+const SIDE_KEY = 'td_side_collapsed';
+const TOPBAR_KEY = 'td_topbar_hidden';
+let __layoutBoot = false;
+
+function setSideCollapsed(on) {
+  const narrow = window.innerWidth <= 700;
+  const val = !!on && !narrow;
+  document.body.classList.toggle('side-collapsed', val);
+  try { if (val) localStorage.setItem(SIDE_KEY, '1'); else localStorage.removeItem(SIDE_KEY); } catch {}
+  syncLayoutButtons(val);
+}
+
+function syncLayoutButtons(collapsed: boolean) {
+  const b = document.getElementById('sideCollapse');
+  if (b) {
+    const en = currentLang() === 'en';
+    const label = collapsed
+      ? (en ? 'Expand sidebar' : '展开侧边栏')
+      : (en ? 'Collapse sidebar' : '收起侧边栏');
+    b.setAttribute('aria-pressed', String(collapsed));
+    b.setAttribute('aria-label', label);
+    b.setAttribute('title', label);
+    const txt = b.querySelector('.sc-label');
+    if (txt) txt.textContent = collapsed ? (en ? 'Expand' : '展开侧边栏') : (en ? 'Collapse sidebar' : '收起侧边栏');
+  }
+}
+
+function setTopbarHidden(on) {
+  const val = !!on;
+  document.body.classList.toggle('topbar-hidden', val);
+  try { if (val) localStorage.setItem(TOPBAR_KEY, '1'); else localStorage.removeItem(TOPBAR_KEY); } catch {}
+}
+
+export function applyLayoutPrefs() {
+  const narrow = window.innerWidth <= 700;
+  // 公共页（home-top）没有控制台顶栏，不该被上一页残留的隐藏状态影响
+  const shell = !!document.getElementById('topbar');
+  let side = false, top = false;
+  try {
+    side = localStorage.getItem(SIDE_KEY) === '1';
+    top = localStorage.getItem(TOPBAR_KEY) === '1';
+  } catch {}
+  const collapsed = side && !narrow && shell;
+  document.body.classList.toggle('side-collapsed', collapsed);
+  // 手机顶栏是唯一入口（汉堡、搜索、通知都在里面），不允许被记忆状态隐藏
+  document.body.classList.toggle('topbar-hidden', top && shell && !narrow);
+  syncLayoutButtons(collapsed);
+  if (!__layoutBoot) {
+    __layoutBoot = true;
+    window.addEventListener('resize', () => { try { applyLayoutPrefs(); } catch {} }, { passive: true });
+  }
 }
 
 function bootMotion() {
@@ -1002,7 +1055,7 @@ export function pawBurst(anchor) {
 export function shellItem(it, active, isAdmin) {
   if (it.key === 'admin' && !isAdmin) return '';
   const on = it.key === active;
-  return `<a class="side-item${on ? ' on' : ''}" href="${it.href}" data-key="${it.key}">
+  return `<a class="side-item${on ? ' on' : ''}" href="${it.href}" data-key="${it.key}" title="${esc(it.name)}" data-tip="${esc(it.name)}">
     <span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON[it.icon] || SHELL_ICON.globe}</svg></span>
     <span class="side-txt">${it.name}</span>
   </a>`;
@@ -1112,7 +1165,26 @@ export async function mountShell(active, opt = {}) {
           </div>
         </div>
       ` : `<a class="btn sm" href="/">登录</a>`}
+      <button class="tb-stow" id="tbStow" type="button" title="收起顶栏" aria-label="收起顶栏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
     </div>`;
+
+  // 顶栏收起后的唤回把手：独立于顶栏挂载，顶栏滑出后仍可一键展开
+  let reveal = document.getElementById('tbReveal');
+  if (!reveal) {
+    reveal = document.createElement('button');
+    reveal.id = 'tbReveal';
+    reveal.className = 'topbar-reveal';
+    reveal.type = 'button';
+    reveal.title = '展开顶栏';
+    reveal.setAttribute('aria-label', '展开顶栏');
+    reveal.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    document.body.appendChild(reveal);
+    reveal.addEventListener('click', () => setTopbarHidden(false));
+  }
+  const stow = document.getElementById('tbStow');
+  if (stow) stow.onclick = () => setTopbarHidden(true);
 
   const items = [...SHELL_NAV, { key: 'admin', name: '管理后台', icon: 'admin', href: '/admin', group: '系统' }];
   const visible = items.filter((it) => it.key !== 'admin' || isAdmin);
@@ -1137,15 +1209,27 @@ export async function mountShell(active, opt = {}) {
         </div>`).join('')}
       <div class="side-group">
         <div class="side-gtitle">其它</div>
-        <a class="side-item" href="/terms"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.terms}</svg></span><span class="side-txt">服务条款</span></a>
-        ${me ? `<a class="side-item" href="#" id="sideLogout"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.logout}</svg></span><span class="side-txt">退出登录</span></a>` : ''}
+        <a class="side-item" href="/terms" title="服务条款" data-tip="服务条款"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.terms}</svg></span><span class="side-txt">服务条款</span></a>
+        ${me ? `<a class="side-item" href="#" id="sideLogout" title="退出登录" data-tip="退出登录"><span class="side-ico"><svg viewBox="0 0 24 24">${SHELL_ICON.logout}</svg></span><span class="side-txt">退出登录</span></a>` : ''}
       </div>
-    </div>`;
+    </div>
+    <button class="side-collapse" id="sideCollapse" type="button" title="收起侧边栏" aria-label="收起侧边栏" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
+      <span class="sc-label">收起侧边栏</span>
+    </button>`;
   side.querySelectorAll('[data-brand-name]').forEach((el) => setBrandName(el, brand.siteName));
 
   const tg = document.getElementById('sideToggle');
   const setSide = (open) => document.body.classList.toggle('side-open', open);
   if (tg) tg.onclick = () => setSide(!document.body.classList.contains('side-open'));
+
+  const sc = document.getElementById('sideCollapse');
+  if (sc) sc.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSideCollapsed(!document.body.classList.contains('side-collapsed'));
+  };
+  applyLayoutPrefs();
   // 移动端：点遮罩关闭、Esc 关闭、点菜单项后自动关闭（此前只能再点汉堡，容易「卡住」）
   __docOn('click', (e) => {
     if (!document.body.classList.contains('side-open')) return;
@@ -1156,7 +1240,7 @@ export async function mountShell(active, opt = {}) {
     setSide(false);   // 点遮罩/其它区域 → 关闭
   });
   __docOn('keydown', (e) => {
-    if (e.key === 'Escape') { setSide(false); setMenu(false); }
+    if (e.key === 'Escape') { setSide(false); setMenu(false); setTopbarHidden(false); }
   });
 
   /* 用户菜单：点 chip 展开，点外部或按 Esc 关闭（关闭也播一段淡出） */
