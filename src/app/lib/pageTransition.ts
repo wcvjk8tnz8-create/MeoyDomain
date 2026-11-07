@@ -64,6 +64,8 @@ const CHECK_TICK = 70;
 const HIDE_ANIM = 340;
 /** 接口挂死也不会把页面遮住 */
 const FORCE_HIDE = 8000;
+/** 页面忘了派发就绪信号时，才退回「DOM 静默」判据收起，避免永远盖着 */
+const READY_FALLBACK = 2600;
 
 let root: HTMLElement | null = null;
 let host: HTMLElement | null = null;
@@ -208,7 +210,12 @@ function watchDom() {
   } catch { /* 老浏览器：只靠时长与就绪信号 */ }
 }
 
-/** 满足「导航已发生 + 最短显示 + DOM 静默」才收起；ready 信号可跳过静默等待。 */
+/**
+ * 只有页面自己宣告「整屏写完」才收起。
+ * 以前 (stable || readySignaled) 让 DOM 静默 180ms 单独放行：预取数据一到、
+ * 第一波骨架渲染完就收起，后面 profile / points 陆续回来继续改 DOM ——
+ * 用户看到的就是「一阶段、二阶段、三阶段慢慢加载出来」。
+ */
 function scheduleCheck() {
   clearTimeout(checkTimer);
   checkTimer = window.setTimeout(() => {
@@ -216,7 +223,8 @@ function scheduleCheck() {
     const now = performance.now();
     const shown = now - shownAt >= MIN_VISIBLE;
     const stable = now - lastMutation >= DOM_QUIET;
-    if (shown && !navPending && dataReady && (stable || readySignaled)) { hide(); return; }
+    const settled = readySignaled || (now - shownAt >= READY_FALLBACK && stable);
+    if (shown && !navPending && dataReady && settled) { hide(); return; }
     scheduleCheck();
   }, CHECK_TICK);
 }
@@ -274,6 +282,8 @@ export function beginTransition(action?: () => void, ready?: Promise<void>) {
       const wasPending = navPending;
       pendingAction = action;
       navPending = true;
+      // 旧页面的就绪信号不能沿用，否则换目标后会被当成新页面已完成
+      readySignaled = false;
       if (ready) { dataReady = false; navReady = ready; ready.then(markDataReady); }
       // 已经换过页了还再点一次：重新排一次导航，别等兜底隐藏才跳
       if (!wasPending && !starting) {

@@ -212,6 +212,35 @@ check(/\.bgswitch button[\s\S]{0,300}border-radius:\s*50%/.test(bloom), '壁纸�
 check(/min-width:\s*620px\s*!important/.test(bloom), '窄屏表格不再竖排断字');
 check(imports.at(-1) === 'liquid-glass.css', '重构层仍位于最后加载的样式层');
 
+/* 12. 首屏一次性就绪：不再「一阶段 / 二阶段 / 三阶段慢慢加载出来」 */
+const gate = read('src/app/lib/runtime.ts');
+const dash = read('src/app/legacy/dashboard.ts');
+const dashPage = read('src/app/pages/Dashboard.tsx');
+const appSrc = read('src/app/App.tsx');
+check(/SHARED_TTL/.test(gate) && /sharedGet/.test(gate) && /pageFetchStart/.test(gate), '同路径在飞 GET 合并成一次，首屏请求纳入在途计数');
+check(/sharedGet\.get\(p\)/.test(gate) && /takePrefetched\(p\)/.test(gate), 'api.get 先复用共享 / 预取结果，未命中才发真实请求');
+check(/method !== 'GET'[\s\S]{0,80}clearSharedGet\(\)/.test(gate), '写操作立刻清共享缓存，签到 / 释放域名不读旧值');
+check(/whenPageFetchesIdle/.test(gate) && /setTimeout\(r, 2500\)/.test(gate), '就绪门控有 2.5s 硬兜底，单个挂死接口不会藏住整页');
+check(/page-root\[data-ready="0"\]/.test(gate) && /dataset\.ready = '1'/.test(gate) && /td:page-ready/.test(gate), '全部首屏 GET 结算后才放出页面并宣告过渡收起');
+check(/opt\.deferAvatar/.test(gate), '骨架支持由页面快照一次性提供头像，不再先默认后替换');
+check(/async function snapshot\(\)/.test(dash) && /Promise\.all\(\[/.test(dash), '控制台首屏五个数据源一次并行出发');
+for (const p of ['/api/subdomains', '/api/config', '/api/points/me', '/api/auth/me', '/api/profile']) {
+  check(dash.includes(`'${p}'`), `首屏快照包含 ${p}`);
+}
+check(/function renderAll\(/.test(dash) && /renderPoints\(snap\.points\)/.test(dash), '欢迎卡 / 统计卡 / 积分卡 / 列表由同一个同步函数一次写完');
+check(!/async function fillWelcome/.test(dash) && !/api\.get\('\/api\/points\/me'\)\.then\(/.test(dash), '不再有 fire-and-forget 的欢迎语与积分异步补写');
+check(/await Promise\.all\(\[\s*snapshot\(\),\s*mountShell\('domains', \{ deferAvatar: true \}\)/.test(dash), 'mountDashboard 真的 await 完整首屏，就绪信号不会提前派发');
+check(/renderAvatars\(/.test(dash), '顶栏头像与欢迎卡头像同一帧落地');
+check(/data-ready="0"/.test(dashPage) && /id="stDomains">—/.test(dashPage) && /id="wHi">&nbsp;/.test(dashPage), '骨架不放假的 0 / 欢迎回来，数据未到齐前不露脸');
+check(/dataset\.ready = '0'/.test(appSrc) && /3000\)/.test(appSrc) && /clearTimeout\(failsafe\)/.test(appSrc), '每个页面挂载先隐藏内容区，并有 3s 放出兜底');
+const pageFiles = fs.readdirSync(path.join(root, 'src/app/pages')).filter((f) => f.endsWith('.tsx'));
+for (const f of pageFiles) {
+  check(/refreshRuntime\(\)/.test(read('src/app/pages/' + f)), `${f} 会触发就绪门控`);
+}
+check(/READY_FALLBACK/.test(read('src/app/lib/pageTransition.ts')) && /readySignaled \|\| \(now - shownAt >= READY_FALLBACK && stable\)/.test(read('src/app/lib/pageTransition.ts')), '过渡必须等页面宣告整屏就绪，DOM 静默不再单独放行');
+check(/readySignaled = false/.test(read('src/app/lib/pageTransition.ts').split('if \(active \|\| starting\)').pop() || ''), '过渡中改点别的页面会作废旧页面的就绪信号');
+check(/\.page-root\[data-ready="0"\] \.main/.test(read('src/app/styles/liquid-glass.css')) && /tdPageIn/.test(read('src/app/styles/liquid-glass.css').split('首屏一次性显现').pop() || ''), '未就绪时只藏内容区，就绪后整屏一次淡入（壁纸与玻璃框架照常可见）');
+
 for (const m of ok) console.log('  ✓ ' + m);
 for (const m of errors) console.error('  ✗ ' + m);
 console.log(`健康巡检：${ok.length} 通过，${errors.length} 失败`);

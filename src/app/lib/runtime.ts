@@ -46,6 +46,36 @@ export function navigate(path: string) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
+/* ────────────────────────────────────────────────────────────────
+   首屏「一次性就绪」门控
+   ────────────────────────────────────────────────────────────────
+   同一个 GET 常被好几处同时要（侧栏 / 欢迎卡 / 统计卡 / 顶栏头像），
+   过去各自发请求、各自 .then 写 DOM，页面就会「先出 0，再补 4，
+   最后补 ∞」分三阶段慢慢吐出来。这里做两件事：
+   1) 在飞的同路径 GET 合并成一次；刚结算的结果留很短时间给同页复用。
+   2) 统计仍在飞的首屏 GET，全部结算后才允许宣告页面就绪。
+   写操作立刻清缓存，不会让「签到 / 释放域名」读到旧值。
+   ──────────────────────────────────────────────────────────────── */
+const SHARED_TTL = 1500;
+const sharedGet = new Map<string, { at: number; promise: Promise<any> }>();
+let pageFetches = 0;
+const pageIdleWaiters: Array<() => void> = [];
+
+function pageFetchStart() { pageFetches++; }
+function pageFetchEnd() {
+  pageFetches = Math.max(0, pageFetches - 1);
+  if (pageFetches === 0) pageIdleWaiters.splice(0).forEach((f) => f());
+}
+function whenPageFetchesIdle(): Promise<void> {
+  if (pageFetches === 0) return Promise.resolve();
+  // 某个接口挂死也不能把整页藏住：2.5s 后照常放出，页面自带的失败兜底会显示占位
+  return Promise.race([
+    new Promise<void>((r) => pageIdleWaiters.push(r)),
+    new Promise<void>((r) => window.setTimeout(r, 2500)),
+  ]);
+}
+export function clearSharedGet() { sharedGet.clear(); }
+
 /* 每次切页后重新扫描动效/装饰/页脚/主题按钮/语言 */
 export function refreshRuntime() {
   try { syncTopbarState(); } catch {}
@@ -57,8 +87,22 @@ export function refreshRuntime() {
   // 动效已由 mountMotion() 统一为全局单例，不再叠加第二套引擎
   // 语言常驻监听只需启动一次；每次切页补挂顶栏切换器并翻译新 DOM
   try { startI18n(); } catch (e) { console.warn('[i18n]', e); }
-  // 本页控制器（await 资料加载）已完成 —— 收起切页过渡层
-  try { window.dispatchEvent(new CustomEvent('td:page-ready')); } catch {}
+  // 「资料到齐 + 整屏写完」才算就绪。fire-and-forget 控制器里仍在飞的
+  // GET 会继续改 DOM，不能让过渡层在第一波数据后就收起。
+  // 就绪时统一把页面从隐藏态放出：所有卡片、数字、头像同一帧出现。
+  void whenPageFetchesIdle().then(() => {
+    const fire = () => {
+      try {
+        document.querySelectorAll('.page-root[data-ready="0"]').forEach((el) => {
+          (el as HTMLElement).dataset.ready = '1';
+        });
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent('td:page-ready')); } catch {}
+    };
+    // rAF 让 .then 链里最后一波 DOM 写入落地；后台标签页 rAF 不触发时有定时器兜底
+    requestAnimationFrame(fire);
+    window.setTimeout(fire, 60);
+  });
 }
 
 // 前端通用工具：接口封装、提示、渲染辅助、壁纸切换
@@ -89,14 +133,28 @@ export const api = {
     }
     if (!data.success) throw new Error(data.message || '请求失败');
     // 写过数据就丢掉预取缓存，避免切回页面时看到旧值
-    if (method !== 'GET') invalidatePrefetch();
+    if (method !== 'GET') { invalidatePrefetch(); clearSharedGet(); }
     return data;
   },
   // 切页预取的结果优先用：点击链接时接口就已并行发出，页面挂载瞬间就有数据。
-  // 缓存里非 success / 超期的条目不会被消费，仍走正常请求（401 等逻辑不绕过）。
-  get: async (p) => {
-    const pre = takePrefetched(p);
-    return pre === null ? api.req('GET', p) : pre;
+  // 同路径在飞请求合并成一次，并把首屏 GET 计入就绪门控。
+  get: (p) => {
+    const hit = sharedGet.get(p);
+    if (hit && Date.now() - hit.at < SHARED_TTL) return hit.promise;
+    const promise = (async () => {
+      const pre = takePrefetched(p);
+      if (pre !== null) return pre;
+      pageFetchStart();
+      try { return await api.req('GET', p); }
+      finally { pageFetchEnd(); }
+    })();
+    sharedGet.set(p, { at: Date.now(), promise });
+    // 失败不留缓存，下一次重试必须真的发请求（401 / 网络抖动不吞掉）；
+    // 只删自己这条，别误删期间新建的同路径请求
+    promise.catch(() => {
+      if (sharedGet.get(p)?.promise === promise) sharedGet.delete(p);
+    });
+    return promise;
   },
   post: (p, b) => api.req('POST', p, b),
   patch: (p, b) => api.req('PATCH', p, b),
@@ -1127,7 +1185,12 @@ export function shellItem(it, active, isAdmin) {
  * @param {string} active  当前页签
  * @param {object} opt     { optional: 未登录也允许停留 }
  */
-export async function mountShell(active, opt = {}) {
+export async function mountShell(active, opt: {
+  optional?: boolean;
+  title?: string;
+  deferAvatar?: boolean;
+  avatar?: string;
+} = {}) {
   const host = document.getElementById('topbar');
   const side = document.getElementById('sidebar');
   if (!host || !side) return;
@@ -1483,12 +1546,17 @@ export async function mountShell(active, opt = {}) {
   mountDecor();
   mountMotion();
 
-  // 顶栏头像与个人资料页保持同源：先显示默认 Miku，拿到已保存头像后再就地替换
-  renderAvatars('');
-  api.get('/api/profile').then((d) => {
-    const av = (d && d.profile && d.profile.avatar) || '';
-    if (av) renderAvatars(av);
-  }).catch(() => {});
+  // 顶栏头像与个人资料页保持同源。
+  // opt.deferAvatar：页面自己已在首屏快照里取到头像，会在整屏渲染时一次写好，
+  // 这里就不要「先默认 Miku → 再异步替换」，否则切页后头像还会跳一帧。
+  // 其它页面保持原行为，其 profile 请求会计入就绪门控，过渡同样不会提前收起。
+  if (!opt.deferAvatar) {
+    renderAvatars('');
+    api.get('/api/profile').then((d) => {
+      const av = (d && d.profile && d.profile.avatar) || '';
+      if (av) renderAvatars(av);
+    }).catch(() => {});
+  }
 
   bindPrefetch(side);
   // 空闲时预取其余常用页（不抢占当前页资源）

@@ -1351,3 +1351,21 @@ html[data-theme="dark"] body:not(.page-home) .top-search kbd {
     overflow-wrap: anywhere !important;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────
+   首屏一次性显现：资料没到齐前只藏内容区，壁纸与玻璃框架照常可见。
+   以前骨架自带「0 / 欢迎回来 / 默认头像」，接口分几波回来再逐个改，
+   用户就会看到一阶段、二阶段、三阶段慢慢加载出来。
+   refreshRuntime() 在全部首屏 GET 结算后把 data-ready 置 1，
+   欢迎卡、四张统计卡、积分卡、列表、头像同一帧写完再一起淡入。
+   ────────────────────────────────────────────────────────────── */
+.page-root[data-ready="0"] .main {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.page-root[data-ready="1"] .main {
+  animation: tdPageIn var(--td-dur-3, 420ms) var(--td-ease, cubic-bezier(.22, 1, .36, 1)) both !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-root[data-ready="1"] .main { animation: none !important; opacity: 1 !important; }
+}

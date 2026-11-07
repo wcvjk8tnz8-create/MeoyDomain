@@ -17,7 +17,7 @@ export default function DashboardPage() {
     return () => { alive = false; cleanupPage(); };
   }, []);
   return (
-    <div className="page-root" ref={ref}>
+    <div className="page-root" ref={ref} data-ready="0">
       <div id="bg"></div>
       <header className="topbar" id="topbar"></header>
       <aside className="sidebar" id="sidebar"></aside>
@@ -30,8 +30,9 @@ export default function DashboardPage() {
           <div className="welcome td-pagehead" id="welcome">
           <img className="w-av" id="wAv" src="/img/avatar/miku-headset.webp" alt="" />
           <div className="w-txt">
-            <div className="w-hi" id="wHi">欢迎回来</div>
-            <div className="w-sub" id="wSub">二级域名分发控制台</div>
+            {/* 骨架不放假数据：数据到齐前整块隐藏，避免「欢迎回来 → 下午好」跳一帧 */}
+            <div className="w-hi" id="wHi">&nbsp;</div>
+            <div className="w-sub" id="wSub">&nbsp;</div>
           </div>
           <div className="row" style={{marginLeft: "auto", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end"}}>
             <span className="sub" id="quotaTip" style={{margin: "0"}}></span>
@@ -43,19 +44,19 @@ export default function DashboardPage() {
         <div className="stat-row td-stats">
           <div className="stat-card sc-pink">
             <span className="sc-ico"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2c1.3 0 2.6 2 3.2 5H8.8C9.4 6 10.7 4 12 4ZM4.3 9h3.1c-.1 1-.2 2.1-.2 3s.1 2 .2 3H4.3a8 8 0 0 1 0-6Zm1.1 8h3.4c.6 3 1.9 5 3.2 5-2.5 0-4.8-2-6.6-5Zm4.6 0h7.9c-1.8 3-4.1 5-6.6 5 1.3 0 2.6-2 3.2-5h-4.5Zm8.6-2c.1-1 .2-2.1.2-3s-.1-2-.2-3h3.1a8 8 0 0 1 0 6h-3.1Z" /></svg></span>
-            <div><div className="sc-num" id="stDomains">0</div><div className="sc-lbl">域名总数</div></div>
+            <div><div className="sc-num" id="stDomains">—</div><div className="sc-lbl">域名总数</div></div>
           </div>
           <div className="stat-card sc-blue">
             <span className="sc-ico"><svg viewBox="0 0 24 24"><path d="M4 4h16a1 1 0 0 1 1 1v4H3V5a1 1 0 0 1 1-1Zm-1 7h18v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8Zm3 3v2h4v-2H6Z" /></svg></span>
-            <div><div className="sc-num" id="stRecords">0</div><div className="sc-lbl">DNS 记录</div></div>
+            <div><div className="sc-num" id="stRecords">—</div><div className="sc-lbl">DNS 记录</div></div>
           </div>
           <div className="stat-card sc-green">
             <span className="sc-ico"><svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.6 3.8 10.7 9 12 5.2-1.3 9-6.4 9-12V5l-9-4Zm0 3.2 7 3.1V11c0 4.4-3 8.3-7 9.4-4-1.1-7-5-7-9.4V7.3l7-3.1Zm-1 5v2H7.5v2H11v2h2v-2h3.5v-2H13v-2h-2Z" /></svg></span>
-            <div><div className="sc-num" id="stPoints">0</div><div className="sc-lbl">我的积分</div></div>
+            <div><div className="sc-num" id="stPoints">—</div><div className="sc-lbl">我的积分</div></div>
           </div>
           <div className="stat-card sc-amber">
             <span className="sc-ico"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5-3 6-3 6h20s-3-1-3-6a7 7 0 0 0-7-7Zm0 2a5 5 0 0 1 5 5c0 2.3.5 3.8 1.3 5H5.7C6.5 12.8 7 11.3 7 9a5 5 0 0 1 5-5Zm-2.2 12h4.4a2.2 2.2 0 0 1-2.2 1.8A2.2 2.2 0 0 1 9.8 16Z" /></svg></span>
-            <div><div className="sc-num" id="stPending">0</div><div className="sc-lbl">待审核</div></div>
+            <div><div className="sc-num" id="stPending">—</div><div className="sc-lbl">待审核</div></div>
           </div>
         </div>
       
@@ -71,7 +72,7 @@ export default function DashboardPage() {
       <div className="card" id="pointsCard" style={{display: "none"}}>
           <div className="row between" style={{flexWrap: "wrap", gap: "10px"}}>
             <div>
-              <div style={{fontFamily: "var(--display)", fontSize: "26px", lineHeight: "1.1", color: "var(--c1)"}} id="ptVal">0</div>
+              <div style={{fontFamily: "var(--display)", fontSize: "26px", lineHeight: "1.1", color: "var(--c1)"}} id="ptVal">—</div>
               <div className="sub" id="ptRules" style={{margin: "2px 0 0"}}></div>
             </div>
             <div className="row" style={{gap: "6px"}}>

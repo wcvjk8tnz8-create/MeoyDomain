@@ -118,12 +118,26 @@ export default function App() {
   }, []);
 
   useLayoutEffect(() => {
+    // 首屏数据没到齐前整页先藏着：否则骨架里的占位「0 / 欢迎回来 /
+    // 默认头像」会先露一帧，之后数据分几波补上，就是「一阶段二阶段三阶段」。
+    // refreshRuntime() 在全部首屏 GET 结算后统一把 data-ready 置 1，整屏同帧出现。
+    document.querySelectorAll('.page-root').forEach((el) => {
+      (el as HTMLElement).dataset.ready = '0';
+    });
+    // 控制器异常时的兜底：3 秒后强制放出，绝不把页面永久藏住
+    const failsafe = window.setTimeout(() => {
+      document.querySelectorAll('.page-root[data-ready="0"]').forEach((el) => {
+        (el as HTMLElement).dataset.ready = '1';
+      });
+    }, 3000);
+
     // 每个页面组件挂载都算一次切页：不依赖 popstate，避免某些路由路径漏掉动画
     beginTransition(undefined, prefetchRoute(location.href));
     mountPageVisuals(key);
     // 语言切换器与翻译在每次切页后补挂（内部幂等）。
     // 用 layout effect 而非 effect：绘制前就完成首次翻译，英文模式不会先闪一帧中文。
     try { startI18n(); } catch { /* 不影响页面功能 */ }
+    return () => window.clearTimeout(failsafe);
   }, [key]);
 
   const Page = ROUTES[key] || HomePage;
