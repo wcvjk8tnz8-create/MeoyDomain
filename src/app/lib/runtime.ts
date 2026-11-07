@@ -56,6 +56,8 @@ export function refreshRuntime() {
   // 动效已由 mountMotion() 统一为全局单例，不再叠加第二套引擎
   // 语言常驻监听只需启动一次；每次切页补挂顶栏切换器并翻译新 DOM
   try { startI18n(); } catch (e) { console.warn('[i18n]', e); }
+  // 本页控制器（await 资料加载）已完成 —— 收起切页过渡层
+  try { window.dispatchEvent(new CustomEvent('td:page-ready')); } catch {}
 }
 
 // 前端通用工具：接口封装、提示、渲染辅助、壁纸切换

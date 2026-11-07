@@ -135,6 +135,21 @@ check(/zx-nav-cta"\s+href="\/register"/.test(read('src/app/pages/Home.tsx')), '�
 check(!/href="\/">登录/.test(runtime) && !/location\.href\s*=\s*'\/\?login=1'/.test(runtime), '不再有把根路径当登录页的入口');
 check(/\/login\?q=/.test(read('src/app/legacy/whois.ts')) && /href="\/login"/.test(read('src/app/legacy/report.ts')), 'WHOIS / 举报的登录链接指向 /login');
 
+/* 9. 切页过渡：Miku 冒出来 + 跳转中气泡（真实素材，不用 SVG 画角色） */
+const transition = read('src/app/lib/pageTransition.ts');
+check(/mountTransition\(\)/.test(main) && /from '\.\/lib\/pageTransition'/.test(main), '入口挂载切页过渡层');
+check(/addEventListener\('popstate', beginTransition\)/.test(transition), 'SPA 切页 / 后退触发过渡');
+check(/addEventListener\('td:page-ready', endTransition\)/.test(transition), '页面资料就绪收起过渡');
+check(/td:page-ready/.test(runtime), 'refreshRuntime 派发页面就绪信号');
+check(/data-no-i18n/.test(transition), '气泡文案不被全局翻译改写');
+check(/kind:\s*'image'/.test(transition) && /miku-pop\.png/.test(transition), '默认使用真实 PNG 素材');
+check(/'gif'/.test(transition) && /'video'/.test(transition) && /<video/.test(transition), '预留 GIF / MP4 一行切换');
+check(!/<svg|createElementNS|image\/svg\+xml/i.test(transition), '角色不是 SVG 绘制');
+check(/SHOW_DELAY\s*=\s*160/.test(transition) && /MIN_VISIBLE\s*=\s*520/.test(transition) && /FORCE_HIDE\s*=\s*8000/.test(transition), '快页不闪、最短停留、8s 兜底防遮死');
+check(/td-miku-rise/.test(glass) && /td-miku-breathe/.test(glass) && /td-trans-bubble/.test(glass), '玻璃层含冒出 / 呼吸 / 气泡样式');
+check(/\[data-theme="dark"\] \.td-trans/.test(glass) && /prefers-reduced-motion/.test(glass.split('页面切换过渡').pop() || ''), '过渡层深色与减少动态适配');
+check(fs.existsSync(path.join(root, 'public/img/transition/miku-pop.png')), 'Miku 透明素材已入库');
+
 for (const m of ok) console.log('  ✓ ' + m);
 for (const m of errors) console.error('  ✗ ' + m);
 console.log(`健康巡检：${ok.length} 通过，${errors.length} 失败`);

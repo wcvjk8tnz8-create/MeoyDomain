@@ -15,10 +15,13 @@ import './styles/motion.css';
 /* 布局重构层必须最后加载：浮起的玻璃侧栏 / 顶栏 + 全站液态玻璃材质 +
    墨绿主题。以同等 specificity 收口前五层的 !important，不再叠加第 7 层。 */
 import './styles/liquid-glass.css';
+/* 切页过渡：Miku 冒出来 + 跳转中气泡。挂在 body 上，不随 SPA 页面卸载。 */
+import { mountTransition } from './lib/pageTransition';
 
 const host = document.getElementById('root');
 if (!host) throw new Error('#root 挂载点缺失');
 
+mountTransition();
 createRoot(host).render(
   <App />
 );
