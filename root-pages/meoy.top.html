@@ -139,6 +139,69 @@ a,.lang button,.nav a,.legal a,.foot a,.checker button.check,.suffix select,.pil
     transition-duration:.001ms!important;transition-delay:0ms!important;scroll-behavior:auto!important}
 }
 </style>
+<style id="td-liquid-glass">
+/* TerraDomain · Liquid Glass（根域名单屏页）
+   只换材质与绿色主题，保留 Zerexa 的衬线标题、等宽小标、细线与单屏布局 */
+:root{
+  --lg-glass:linear-gradient(152deg,rgba(255,255,255,.78) 0%,rgba(255,255,255,.50) 58%,rgba(240,248,242,.46) 100%);
+  --lg-soft:linear-gradient(152deg,rgba(255,255,255,.64),rgba(255,255,255,.36));
+  --lg-stroke:rgba(255,255,255,.90);
+  --lg-blur:blur(30px) saturate(180%);
+  --lg-sh:0 24px 60px rgba(22,62,44,.12),0 4px 14px rgba(22,62,44,.06),inset 0 1px 0 rgba(255,255,255,.9);
+  --lg-sh-sm:0 10px 26px rgba(22,62,44,.08),inset 0 1px 0 rgba(255,255,255,.8);
+  --lg-hair:rgba(31,91,67,.12);
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --lg-glass:linear-gradient(152deg,rgba(34,50,42,.78),rgba(20,32,26,.60) 60%,rgba(16,28,22,.64));
+    --lg-soft:linear-gradient(152deg,rgba(34,50,42,.64),rgba(20,32,26,.42));
+    --lg-stroke:rgba(190,230,205,.16);
+    --lg-sh:0 24px 60px rgba(0,0,0,.48),0 4px 14px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.10);
+    --lg-sh-sm:0 10px 26px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08);
+    --lg-hair:rgba(190,230,205,.14);
+  }
+}
+body{
+  background-image:
+    radial-gradient(1000px 620px at 6% -12%,rgba(120,205,160,.30),transparent 64%),
+    radial-gradient(900px 620px at 102% 4%,rgba(186,224,198,.34),transparent 62%),
+    radial-gradient(1100px 780px at 76% 112%,rgba(118,190,152,.24),transparent 66%),
+    linear-gradient(158deg,#fafcf8 0%,#f2f7f0 56%,#edf4ec 100%);
+}
+@media(prefers-color-scheme:dark){
+  body{background-image:
+    radial-gradient(1000px 620px at 6% -12%,rgba(48,120,84,.32),transparent 64%),
+    radial-gradient(900px 620px at 102% 4%,rgba(38,92,68,.30),transparent 62%),
+    radial-gradient(1100px 780px at 76% 112%,rgba(34,96,68,.26),transparent 66%),
+    linear-gradient(158deg,#101a15 0%,#0c1410 56%,#0a120e 100%);}
+}
+.head,.foot{border-color:var(--lg-hair)}
+.lang,.pill{
+  background:var(--lg-soft);border:1px solid var(--lg-stroke);
+  backdrop-filter:var(--lg-blur);-webkit-backdrop-filter:var(--lg-blur);
+  box-shadow:var(--lg-sh-sm);
+}
+.pill.live{border-color:rgba(47,125,91,.40)}
+.checker{
+  background:var(--lg-glass);border:1px solid var(--lg-stroke);
+  border-radius:24px;box-shadow:var(--lg-sh);
+  backdrop-filter:var(--lg-blur);-webkit-backdrop-filter:var(--lg-blur);
+}
+.checker .field{border-bottom-color:var(--lg-hair)}
+.suffix{border-left-color:var(--lg-hair)}
+.checker button.check{
+  background:linear-gradient(150deg,#3d9a6e,#24704f);
+  color:#fff;border-radius:18px;
+  box-shadow:0 12px 26px rgba(36,112,79,.24),inset 0 1px 0 rgba(255,255,255,.30);
+}
+.metrics{
+  background:var(--lg-glass);border:1px solid var(--lg-stroke);
+  border-radius:20px;box-shadow:var(--lg-sh);overflow:hidden;
+  backdrop-filter:var(--lg-blur);-webkit-backdrop-filter:var(--lg-blur);
+}
+.metric{border-right-color:var(--lg-hair)}
+.field input,.suffix select{background:transparent}
+</style>
 </head>
 <body>
 <div class="stage">

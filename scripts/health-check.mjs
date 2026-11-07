@@ -19,6 +19,7 @@ const css = [
   'src/app/styles/responsive.css',
   'src/app/styles/theme-terra.css',
   'src/app/styles/motion.css',
+  'src/app/styles/liquid-glass.css',
 ];
 for (const p of css) {
   const t = read(p);
@@ -56,10 +57,22 @@ for (const p of srcFiles) {
   check(!/\b(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,})\b/.test(t), `${p} 无明文密钥`);
 }
 
-/* 4. 动效层必须最后加载，且遮罩 / Toast / 抽屉三类修复仍在 */
+/* 4. 样式层顺序：动效层在前、液态玻璃层收口在最后，且遮罩 / Toast / 抽屉修复仍在。
+      iOS 26 玻璃重构后最后加载的不再是 motion.css —— 玻璃层用同等 !important
+      收口前五层，必须同时复刻动效层的修复，否则会静默回退成旧 bug。 */
 const main = read('src/app/main.tsx');
 const imports = [...main.matchAll(/import\s+['"]\.\/styles\/([^'"]+)['"]/g)].map((m) => m[1]);
-check(imports.at(-1) === 'motion.css', `motion.css 为最后加载的样式层（实际 ${imports.at(-1)}）`);
+check(imports.at(-1) === 'liquid-glass.css', `liquid-glass.css 为最后加载的样式层（实际 ${imports.at(-1)}）`);
+check(
+  imports.includes('motion.css') && imports.indexOf('motion.css') < imports.indexOf('liquid-glass.css'),
+  '动效层在玻璃层之前加载（玻璃层不得跳过动效层）',
+);
+const glass = read('src/app/styles/liquid-glass.css');
+check(/\.modal\s*\{[^}]*background:\s*rgba\(/s.test(glass), '玻璃层保留半透明弹窗遮罩');
+check(/#toast\s*\{[^}]*background:\s*transparent/s.test(glass), '玻璃层保留透明 Toast 容器');
+check(/transform:\s*translateX\(calc\(-100%/s.test(glass), '玻璃层保留移动端抽屉收起位移');
+check(/body\.side-open \.sidebar\s*\{[^}]*transform:\s*translateX\(0\)/s.test(glass), '玻璃层保留移动端抽屉展开');
+check(/prefers-reduced-motion:\s*reduce/.test(glass), '玻璃层尊重减少动态偏好');
 const motion = read('src/app/styles/motion.css');
 check(/\.modal\s*\{[^}]*background:\s*rgba\(/s.test(motion), '弹窗遮罩为半透明（不是整屏白卡）');
 check(/#toast\s*\{[^}]*background:\s*transparent/s.test(motion), 'Toast 容器透明（不是黑色药丸）');

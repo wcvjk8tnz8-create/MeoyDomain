@@ -12,6 +12,9 @@ import './styles/theme-terra.css';
 /* 统一动效层必须最后加载：压过 theme-terra 里 6 处 transform:none!important，
    并把四层各写各的时长/缓动收口到同一组令牌。 */
 import './styles/motion.css';
+/* 布局重构层必须最后加载：浮起的玻璃侧栏 / 顶栏 + 全站液态玻璃材质 +
+   墨绿主题。以同等 specificity 收口前五层的 !important，不再叠加第 7 层。 */
+import './styles/liquid-glass.css';
 
 const host = document.getElementById('root');
 if (!host) throw new Error('#root 挂载点缺失');
