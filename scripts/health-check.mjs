@@ -145,10 +145,24 @@ check(/data-no-i18n/.test(transition), '气泡文案不被全局翻译改写');
 check(/kind:\s*'image'/.test(transition) && /miku-pop\.png/.test(transition), '默认使用真实 PNG 素材');
 check(/'gif'/.test(transition) && /'video'/.test(transition) && /<video/.test(transition), '预留 GIF / MP4 一行切换');
 check(!/<svg|createElementNS|image\/svg\+xml/i.test(transition), '角色不是 SVG 绘制');
-check(/SHOW_DELAY\s*=\s*160/.test(transition) && /MIN_VISIBLE\s*=\s*520/.test(transition) && /FORCE_HIDE\s*=\s*8000/.test(transition), '快页不闪、最短停留、8s 兜底防遮死');
+check(/SHOW_DELAY\s*=\s*80/.test(transition) && /MIN_VISIBLE\s*=\s*700/.test(transition) && /FORCE_HIDE\s*=\s*8000/.test(transition), '每页必显示、最短停留、8s 兜底防遮死');
+check(/DOM_QUIET\s*=\s*260/.test(transition) && /MutationObserver/.test(transition) && /getElementById\('root'\)/.test(transition), '按 #root 内容稳定判定资料就绪（fire-and-forget 页面不再提前收起）');
+check(!/endTransition[\s\S]{0,200}clearTimeout\(showTimer\)/.test(transition), '就绪信号不能取消显示');
+check(/beginTransition\(\)/.test(read('src/app/App.tsx')) && /useLayoutEffect/.test(read('src/app/App.tsx')), 'App 路由 key 变化驱动，每个页面组件都覆盖');
 check(/td-miku-rise/.test(glass) && /td-miku-breathe/.test(glass) && /td-trans-bubble/.test(glass), '玻璃层含冒出 / 呼吸 / 气泡样式');
 check(/\[data-theme="dark"\] \.td-trans/.test(glass) && /prefers-reduced-motion/.test(glass.split('页面切换过渡').pop() || ''), '过渡层深色与减少动态适配');
 check(fs.existsSync(path.join(root, 'public/img/transition/miku-pop.png')), 'Miku 透明素材已入库');
+
+/* 10. 根域名静态页：跳控制台时也走同一套过渡，且副本同步 */
+const rootPages = ['meoy.top.html', 'v-1.top.html'];
+for (const f of rootPages) {
+  const rp = read(`root-pages/${f}`);
+  const wp = fs.readFileSync(path.join(root, '..', f), 'utf8');
+  check(/id="tdTransition"/.test(rp) && /td-miku-rise/.test(rp), `${f} 含 Miku 跳页过渡`);
+  check(/addEventListener\("click"/.test(rp) && /preventDefault\(\)/.test(rp), `${f} 拦截控制台链接`);
+  check(/prefers-color-scheme: dark/.test(rp), `${f} 深色跟随系统`);
+  check(wp === rp, `${f} 工作区副本与仓库一致`);
+}
 
 for (const m of ok) console.log('  ✓ ' + m);
 for (const m of errors) console.error('  ✗ ' + m);

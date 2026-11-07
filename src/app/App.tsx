@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, type JSX } from 'react';
 import { navigate } from './lib/runtime';
 import { startI18n } from './lib/i18n';
+import { beginTransition } from './lib/pageTransition';
 import LoginPage from './pages/Login';
 import HomePage from './pages/Home';
 import DashboardPage from './pages/Dashboard';
@@ -114,6 +115,8 @@ export default function App() {
   }, []);
 
   useLayoutEffect(() => {
+    // 每个页面组件挂载都算一次切页：不依赖 popstate，避免某些路由路径漏掉动画
+    beginTransition();
     mountPageVisuals(key);
     // 语言切换器与翻译在每次切页后补挂（内部幂等）。
     // 用 layout effect 而非 effect：绘制前就完成首次翻译，英文模式不会先闪一帧中文。
