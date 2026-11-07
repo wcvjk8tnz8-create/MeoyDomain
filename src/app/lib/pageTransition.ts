@@ -11,13 +11,16 @@
  * 所以就绪判据改成：#root 内容稳定（MutationObserver 静默窗口）
  * + 最短显示时长；refreshRuntime 的信号只作为加速，不再能取消显示。
  *
- * ── 节奏：解决「素材加载慢 / 页面切太快」──
+ * ── 节奏：解决「素材加载慢 / 页面切太快 / 切完还要干等」──
  * 1. 首屏 mountTransition() → warmAssets() 立刻解码 Miku 与壁纸，
  *    切页时素材已在内存，不再现用现拉。
- * 2. 站内链接不再立刻 pushState：beginTransition(() => navigate(href))
- *    先让 Miku 完整冒出 NAV_HOLD，再真正换页。页面切换不会比动画快。
- * 3. 资料回来后仍至少停留 MIN_VISIBLE，再淡出 HIDE_ANIM，不闪一下就走。
- * 4. 导航未发生前，旧页面控制器提前派发的 page-ready 一律不算数。
+ * 2. 点击链接的同一瞬间 prefetchRoute(href) 并行发起目标页首屏接口；
+ *    目标页控制器读缓存直接渲染，不再「切过去 → 空壳 → 串行等接口」。
+ * 3. 换页时机 = 数据到手（或 NAV_MAX_WAIT 上限）+ Miku 起手动画，
+ *    两者取较晚者；快页几百毫秒就进，慢页才真的等。
+ * 4. 不再固定按住 1.1 秒：只保底 MIN_VISIBLE 让动画看得见，
+ *    数据一就绪就收起。导航未发生前旧页面的 page-ready 一律不算数。
+ * 5. 过渡期间再点别的链接会改目标并重新预取，不会把点击吞掉。
  *
  * ── 换成 GIF 或 MP4（拿到素材后改顶部一行即可）──
  *   1. 文件丢进 public/img/transition/，如 miku.gif / miku.mp4
@@ -25,6 +28,8 @@
  *   GIF 走 <img>；MP4 自动静音循环内联播放（符合自动播放策略）。
  *   两者都保留冒出 / 缩回动画，不冲突。
  */
+import { prefetchRoute } from './prefetch';
+
 const MEDIA: { kind: 'image' | 'gif' | 'video'; src: string } = {
   kind: 'image',
   src: '/img/transition/miku-pop.png',
@@ -42,19 +47,21 @@ const I18N = {
   en: { bubble: 'Heading over', hint: 'Getting things ready', aria: 'Loading page' },
 };
 
-/** 每次切页都要出现；0ms = 点击即开始播，不再有「等 80ms 才露面」的空窗 */
+/** 每次切页都要出现；0ms = 点击即开始播 */
 const SHOW_DELAY = 0;
-/** 素材最多等这么久，网慢也不会把切页卡死（首屏已预热，通常 0ms） */
-const MEDIA_WAIT = 260;
-/** Miku 先冒出这么久，再真正换页 */
-const NAV_HOLD = 320;
-/** 出现后至少停留这么久，资料秒回也不一闪而过 */
-const MIN_VISIBLE = 1100;
-/** #root 静默这么久才算「资料真的渲染完」 */
-const DOM_QUIET = 320;
-const CHECK_TICK = 90;
-/** 收起淡出时长，与 motion.css 的慢收缓动一致 */
-const HIDE_ANIM = 420;
+/** 素材最多等这么久（首屏已预热，通常 0ms） */
+const MEDIA_WAIT = 180;
+/** 换页前至少让 Miku 起手这么久，避免动画还没露面就切走 */
+const NAV_HOLD_MIN = 200;
+/** 数据最久等这么久；网慢也不把切页卡死，遮罩继续盖着等页面自己渲染 */
+const NAV_MAX_WAIT = 1400;
+/** 只保底让动画看得见，数据一好就收起 —— 不再固定按住 1.1 秒 */
+const MIN_VISIBLE = 360;
+/** #root 静默这么久才算「资料真的渲染完」；预取命中后通常一帧就稳 */
+const DOM_QUIET = 180;
+const CHECK_TICK = 70;
+/** 收起淡出时长，与 CSS 的 opacity .28s / sink .34s 对齐 */
+const HIDE_ANIM = 340;
 /** 接口挂死也不会把页面遮住 */
 const FORCE_HIDE = 8000;
 
@@ -64,6 +71,8 @@ let active = false;
 let starting = false;
 let navPending = false;
 let pendingAction: (() => void) | null = null;
+let navReady: Promise<void> = Promise.resolve();
+let dataReady = true;
 let shownAt = 0;
 let lastMutation = 0;
 let readySignaled = false;
@@ -124,11 +133,22 @@ function warmMedia(): Promise<void> {
   return mediaWarm;
 }
 
-/** 首屏空闲就预热全部重素材：Miku + 壁纸浅/深/氛围版 */
+/** 首屏空闲只预热「当前主题那张壁纸 + 氛围图」。
+ *  以前连浅/深两张 175K/135K 都拉，没用上的那张纯属抢首屏带宽。
+ *  切主题时 applyWallpaper 自己会解码另一张，不影响切换。 */
 export function warmAssets() {
   warmMedia();
+  const el = document.documentElement;
+  const theme = el.getAttribute('data-theme');
+  const dark = theme === 'dark'
+    || (theme !== 'light' && typeof (window as any).matchMedia === 'function'
+      && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const picks = [
+    '/img/wallpaper/miku-bouquet-haze.webp',
+    dark ? WARM_ASSETS[1] : WARM_ASSETS[0],
+  ];
   const idle = (window as any).requestIdleCallback as ((cb: () => void) => void) | undefined;
-  const run = () => { WARM_ASSETS.forEach((src) => { void decodeAsset(src); }); };
+  const run = () => { picks.forEach((src) => { void decodeAsset(src); }); };
   if (idle) idle(run); else window.setTimeout(run, 120);
 }
 
@@ -196,7 +216,7 @@ function scheduleCheck() {
     const now = performance.now();
     const shown = now - shownAt >= MIN_VISIBLE;
     const stable = now - lastMutation >= DOM_QUIET;
-    if (shown && !navPending && (stable || readySignaled)) { hide(); return; }
+    if (shown && !navPending && dataReady && (stable || readySignaled)) { hide(); return; }
     scheduleCheck();
   }, CHECK_TICK);
 }
@@ -247,12 +267,29 @@ function hide() {
  *  - popstate / App 路由 key 变化：beginTransition()（URL 已变，只播过渡）
  *  - mountTransition()：首次加载 / 整页跳转
  */
-export function beginTransition(action?: () => void) {
-  if (active || starting) return;
+export function beginTransition(action?: () => void, ready?: Promise<void>) {
+  // 过渡中又点了别的页面：改目标 + 重新预取，不重播动画、不吞点击
+  if (active || starting) {
+    if (action) {
+      const wasPending = navPending;
+      pendingAction = action;
+      navPending = true;
+      if (ready) { dataReady = false; navReady = ready; ready.then(markDataReady); }
+      // 已经换过页了还再点一次：重新排一次导航，别等兜底隐藏才跳
+      if (!wasPending && !starting) {
+        clearTimeout(navTimer);
+        navTimer = window.setTimeout(() => { runPendingAction(); scheduleCheck(); }, 120);
+      }
+    }
+    return;
+  }
   starting = true;
   readySignaled = false;
   navPending = !!action;
   pendingAction = action || null;
+  navReady = ready || Promise.resolve();
+  dataReady = !ready;
+  if (ready) ready.then(markDataReady);
   clearTimeout(showTimer);
   clearTimeout(navTimer);
   showTimer = window.setTimeout(async () => {
@@ -261,13 +298,26 @@ export function beginTransition(action?: () => void) {
     show();
     starting = false;
     if (pendingAction) {
-      // Miku 完整冒出之后再换页：切换不会比动画快
+      const t0 = performance.now();
+      const pre = Promise.race([
+        navReady,
+        // 超过上限就先换页，之后交给 #root 静默判据，不让遮罩无限盖着
+        new Promise<void>((r) => window.setTimeout(() => { dataReady = true; r(); }, NAV_MAX_WAIT)),
+      ]);
+      // 数据到手（或上限）+ Miku 起手，两者取较晚者再换页
+      await pre;
+      const wait = Math.max(0, NAV_HOLD_MIN - (performance.now() - t0));
       navTimer = window.setTimeout(() => {
         runPendingAction();
         scheduleCheck();
-      }, NAV_HOLD);
+      }, wait);
     }
   }, SHOW_DELAY);
+}
+
+function markDataReady() {
+  dataReady = true;
+  if (active) scheduleCheck();
 }
 
 /** 页面控制器已完成（refreshRuntime 派发）—— 导航前的旧信号不算数。 */
@@ -285,8 +335,17 @@ export function mountTransition() {
   applyLang();
 
   // 必须包一层：事件对象不能被当成「延后导航回调」传进 beginTransition
-  window.addEventListener('popstate', () => beginTransition());
+  window.addEventListener('popstate', () => beginTransition(undefined, prefetchRoute(location.href)));
   window.addEventListener('td:page-ready', endTransition);
+  // 过渡盖着的时候仍能点别的页面链接（改目标并重新预取），
+  // 但不要误触旧页面上的按钮 / 表单。捕获阶段先于页面自身的事件。
+  document.addEventListener('click', (e) => {
+    if (!active && !starting) return;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('a[href]')) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
   // 语言切换时气泡立刻跟着变（切换器改的是 html[data-lang]）
   try {
     new MutationObserver(applyLang).observe(document.documentElement, {
@@ -295,5 +354,11 @@ export function mountTransition() {
     });
   } catch { /* 老浏览器忽略 */ }
 
-  beginTransition();
+  // 从两个根域名静态页跳过来时那一页已经播过 Miku，首屏不重播第二遍
+  let hopped = false;
+  try {
+    const h = new URL(document.referrer || '', location.href).hostname;
+    hopped = /(^|\.)(meoy\.top|v-1\.top)$/i.test(h);
+  } catch { /* referrer 被隐私策略掐掉时按普通首屏处理 */ }
+  if (!hopped) beginTransition();
 }

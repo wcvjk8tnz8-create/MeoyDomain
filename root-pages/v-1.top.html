@@ -584,8 +584,8 @@ document.querySelectorAll("[data-lang]").forEach(function(b){
     if (going) return; going = true;
     el.hidden = false;
     requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add("is-in"); }); });
-    /* 让 Miku 完整冒出来再跳；新页面自己会接上控制台那套过渡 */
-    setTimeout(function(){ location.href = url; }, 760);
+    /* Miku 起手就跳，不再干等 760ms；控制台首屏会识别 referrer 不重播过渡 */
+    setTimeout(function(){ location.href = url; }, 300);
   }
   /* 所有指向控制台的链接都走过渡（含品牌、导航、页脚、举报、条款） */
   document.addEventListener("click", function(e){

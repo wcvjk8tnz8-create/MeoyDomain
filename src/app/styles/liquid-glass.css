@@ -857,7 +857,8 @@ body.topbar-hidden .sidebar {
               rgba(238, 246, 241, .58);
   -webkit-backdrop-filter: blur(16px) saturate(1.15);
   backdrop-filter: blur(16px) saturate(1.15);
-  opacity: 0; pointer-events: auto;
+  /* 不吞点击：过渡期间还能点别的页面链接（改目标）；非链接交互由脚本守卫拦下 */
+  opacity: 0; pointer-events: none;
   transition: opacity .28s var(--td-ease, cubic-bezier(.22, 1, .36, 1));
 }
 .td-trans[hidden] { display: none !important; }

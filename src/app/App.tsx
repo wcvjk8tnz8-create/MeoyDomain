@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState, type JSX } from 'react';
 import { navigate } from './lib/runtime';
 import { startI18n } from './lib/i18n';
 import { beginTransition } from './lib/pageTransition';
+import { prefetchRoute } from './lib/prefetch';
 import LoginPage from './pages/Login';
 import HomePage from './pages/Home';
 import DashboardPage from './pages/Dashboard';
@@ -103,10 +104,10 @@ export default function App() {
       const href = a.getAttribute('href') || '';
       if (!isInternal(href) || a.target === '_blank' || a.hasAttribute('download')) return;
       // 只允许左键、无修饰键；hash 变化仍交给浏览器
-      // 不立刻 pushState：先让 Miku 完整冒出，再换页。
-      // 否则页面切换比过渡还快，素材还没解码完就已经在渲染新页了。
+      // 点击这一瞬间就并行拉目标页首屏数据；Miku 冒出 + 数据到手才换页，
+      // 换过去直接渲染完整内容，不再「切过去 → 空壳 → 串行等接口」。
       e.preventDefault();
-      beginTransition(() => navigate(href));
+      beginTransition(() => navigate(href), prefetchRoute(href));
     };
     window.addEventListener('popstate', onPop);
     document.addEventListener('click', onClick);
@@ -118,7 +119,7 @@ export default function App() {
 
   useLayoutEffect(() => {
     // 每个页面组件挂载都算一次切页：不依赖 popstate，避免某些路由路径漏掉动画
-    beginTransition();
+    beginTransition(undefined, prefetchRoute(location.href));
     mountPageVisuals(key);
     // 语言切换器与翻译在每次切页后补挂（内部幂等）。
     // 用 layout effect 而非 effect：绘制前就完成首次翻译，英文模式不会先闪一帧中文。

@@ -6,6 +6,7 @@
  */
 import type { LegacyCtx } from './types';
 import { startI18n, currentLang, translateText } from './i18n';
+import { takePrefetched, invalidatePrefetch } from './prefetch';
 
 /* SPA 切页清理注册表：document / window 事件与定时器都登记在这里 */
 let cleanups: Array<() => void> = [];
@@ -87,9 +88,16 @@ export const api = {
       if (!['/', '/index', '/index.html', '/login', '/login.html', '/home', '/home.html'].includes(p)) location.href = '/login';
     }
     if (!data.success) throw new Error(data.message || '请求失败');
+    // 写过数据就丢掉预取缓存，避免切回页面时看到旧值
+    if (method !== 'GET') invalidatePrefetch();
     return data;
   },
-  get: (p) => api.req('GET', p),
+  // 切页预取的结果优先用：点击链接时接口就已并行发出，页面挂载瞬间就有数据。
+  // 缓存里非 success / 超期的条目不会被消费，仍走正常请求（401 等逻辑不绕过）。
+  get: async (p) => {
+    const pre = takePrefetched(p);
+    return pre === null ? api.req('GET', p) : pre;
+  },
   post: (p, b) => api.req('POST', p, b),
   patch: (p, b) => api.req('PATCH', p, b),
   put: (p, b) => api.req('PUT', p, b),

@@ -138,23 +138,33 @@ check(/\/login\?q=/.test(read('src/app/legacy/whois.ts')) && /href="\/login"/.te
 /* 9. 切页过渡：Miku 冒出来 + 跳转中气泡（真实素材，不用 SVG 画角色） */
 const transition = read('src/app/lib/pageTransition.ts');
 check(/mountTransition\(\)/.test(main) && /from '\.\/lib\/pageTransition'/.test(main), '入口挂载切页过渡层');
-check(/addEventListener\('popstate',\s*\(\)\s*=>\s*beginTransition\(\)\)/.test(transition), 'SPA 切页 / 后退触发过渡（popstate 事件对象不误当导航回调）');
+check(/addEventListener\('popstate',\s*\(\)\s*=>\s*beginTransition\(undefined, prefetchRoute\(location\.href\)\)\)/.test(transition), 'SPA 切页 / 后退触发过渡并预取（事件对象不误当导航回调）');
 check(/addEventListener\('td:page-ready', endTransition\)/.test(transition), '页面资料就绪收起过渡');
 check(/td:page-ready/.test(runtime), 'refreshRuntime 派发页面就绪信号');
 check(/data-no-i18n/.test(transition), '气泡文案不被全局翻译改写');
 check(/kind:\s*'image'/.test(transition) && /miku-pop\.png/.test(transition), '默认使用真实 PNG 素材');
 check(/'gif'/.test(transition) && /'video'/.test(transition) && /<video/.test(transition), '预留 GIF / MP4 一行切换');
 check(!/<svg|createElementNS|image\/svg\+xml/i.test(transition), '角色不是 SVG 绘制');
-check(/SHOW_DELAY\s*=\s*0/.test(transition) && /MIN_VISIBLE\s*=\s*1100/.test(transition) && /HIDE_ANIM\s*=\s*420/.test(transition) && /FORCE_HIDE\s*=\s*8000/.test(transition), '点击即播、停留拉长、慢收淡出、8s 兜底防遮死');
-check(/NAV_HOLD\s*=\s*320/.test(transition) && /MEDIA_WAIT\s*=\s*260/.test(transition), 'Miku 冒出后才换页，素材最多等 260ms');
-check(/DOM_QUIET\s*=\s*320/.test(transition) && /MutationObserver/.test(transition) && /getElementById\('root'\)/.test(transition), '按 #root 内容稳定判定资料就绪（fire-and-forget 页面不再提前收起）');
-check(/warmAssets\(/.test(transition) && /WARM_ASSETS/.test(transition) && /decodeAsset/.test(transition), '首屏预热 Miku 与三张壁纸，切页不再现拉素材');
-check(/Promise\.race/.test(transition) && /waitMedia\(\)/.test(transition), '素材等待有硬上限，网慢不卡死切页');
-check(/beginTransition\(action\?/.test(transition) && /navPending/.test(transition) && /runPendingAction/.test(transition), '站内导航延后到动画之后，且兜底隐藏必补一次换页');
+check(/SHOW_DELAY\s*=\s*0/.test(transition) && /MIN_VISIBLE\s*=\s*360/.test(transition) && /HIDE_ANIM\s*=\s*340/.test(transition) && /FORCE_HIDE\s*=\s*8000/.test(transition), '点击即播、只保底 360ms、340ms 淡出、8s 兜底（不再固定按住 1.1s）');
+check(/NAV_HOLD_MIN\s*=\s*200/.test(transition) && /NAV_MAX_WAIT\s*=\s*1400/.test(transition) && /MEDIA_WAIT\s*=\s*180/.test(transition), '数据到手 + Miku 起手才换页，慢数据最多等 1400ms');
+check(/DOM_QUIET\s*=\s*180/.test(transition) && /MutationObserver/.test(transition) && /getElementById\('root'\)/.test(transition), '按 #root 内容稳定判定资料就绪（fire-and-forget 页面不再提前收起）');
+check(/warmAssets\(/.test(transition) && /WARM_ASSETS/.test(transition) && /decodeAsset/.test(transition), '首屏预热 Miku 与壁纸，切页不再现拉素材');
+check(/miku-bouquet-haze\.webp/.test(transition) && /theme === 'dark'/.test(transition) && /picks\.forEach/.test(transition), '只预热当前主题那张壁纸，不再多拉 310K 抢首屏带宽');
+check(/Promise\.race/.test(transition) && /waitMedia\(\)/.test(transition), '素材 / 数据等待都有硬上限，网慢不卡死切页');
+check(/beginTransition\(action\?/.test(transition) && /navPending/.test(transition) && /runPendingAction/.test(transition), '站内导航延后到数据之后，且兜底隐藏必补一次换页');
 check(/if\s*\(navPending\)\s*return/.test(transition), '导航前旧页面派发的 page-ready 不算就绪');
 check(!/endTransition[\s\S]{0,200}clearTimeout\(showTimer\)/.test(transition), '就绪信号不能取消显示');
-check(/beginTransition\(\)/.test(read('src/app/App.tsx')) && /useLayoutEffect/.test(read('src/app/App.tsx')), 'App 路由 key 变化驱动，每个页面组件都覆盖');
-check(/beginTransition\(\(\)\s*=>\s*navigate\(href\)\)/.test(read('src/app/App.tsx')), '站内链接不再立刻 pushState，先播过渡再换页');
+check(/beginTransition\(undefined, prefetchRoute/.test(read('src/app/App.tsx')) && /useLayoutEffect/.test(read('src/app/App.tsx')), 'App 路由 key 变化驱动，每个页面组件都覆盖');
+check(/beginTransition\(\(\)\s*=>\s*navigate\(href\), prefetchRoute\(href\)\)/.test(read('src/app/App.tsx')), '站内链接点击瞬间并行预取，不立刻 pushState');
+/* 预取层：数据并行、缓存消费、点击透传、根域名不重播 */
+const prefetch = read('src/app/lib/prefetch.ts');
+check(/ROUTE_DATA/.test(prefetch) && /fetch\(path/.test(prefetch) && /credentials:\s*'same-origin'/.test(prefetch), '预取层按路由并行发起只读同源 GET');
+check(/takePrefetched/.test(prefetch) && /TTL\s*=\s*6000/.test(prefetch) && /cache\.delete\(path\)/.test(prefetch), '预取结果一次性消费且有有效期，不会用旧数据');
+check(/takePrefetched\(p\)/.test(runtime) && /api\.req\('GET', p\)/.test(runtime), 'api.get 优先消费预取，未命中走正常请求（401 逻辑不绕过）');
+check(/if \(!active && !starting\) return/.test(transition) && /t\?\.closest\?\.\('a\[href\]'\)/.test(transition), '过渡期间链接可点改目标，非链接交互被守卫拦下');
+check(/\.td-trans \{[^}]*pointer-events:\s*none/.test(glass), '遮罩不吞点击，链接能透传');
+check(/meoy\\\.top\|v-1\\\.top/.test(transition) && /if \(!hopped\) beginTransition\(\)/.test(transition), '根域名页跳过来的首屏不重播第二遍过渡');
+check(/wasPending/.test(transition) && /重新排一次导航/.test(transition), '过渡中改点别的页面会重新排导航');
 check(/td-miku-rise/.test(glass) && /td-miku-breathe/.test(glass) && /td-trans-bubble/.test(glass), '玻璃层含冒出 / 呼吸 / 气泡样式');
 check(/\[data-theme="dark"\] \.td-trans/.test(glass) && /prefers-reduced-motion/.test(glass.split('页面切换过渡').pop() || ''), '过渡层深色与减少动态适配');
 check(fs.existsSync(path.join(root, 'public/img/transition/miku-pop.png')), 'Miku 透明素材已入库');
@@ -167,11 +177,11 @@ for (const f of rootPages) {
   check(/addEventListener\("click"/.test(rp) && /preventDefault\(\)/.test(rp), `${f} 拦截控制台链接`);
   check(/prefers-color-scheme: dark/.test(rp), `${f} 深色跟随系统`);
   // 只做仓库内自校验：CI 里没有仓库外的工作区交付副本，不能读它
-  check(/location\.href\s*=\s*url/.test(rp) && /setTimeout/.test(rp), `${f} 过渡结束后才跳转`);
+  check(/setTimeout\(function\(\)\{ location\.href = url; \}, 300\)/.test(rp), `${f} Miku 起手 300ms 就跳，不再干等 760ms`);
   check(/rel\s*=\s*"preload"/.test(rp) && /miku-pop\.png/.test(rp), `${f} 页面加载即预热过渡角色，点击时不再现拉`);
   check((rp.match(/id="tdTransition"/g) || []).length === 1, `${f} 过渡层只挂一份`);
 }
-check(/\.td-trans\.is-out\s*\{[^}]*pointer-events:\s*none/.test(read('src/app/styles/liquid-glass.css')), '淡出期间放行交互，遮罩不多挡 420ms');
+check(/\.td-trans\.is-out\s*\{[^}]*pointer-events:\s*none/.test(read('src/app/styles/liquid-glass.css')), '淡出期间放行交互，遮罩不多挡 340ms');
 
 /* 11. 花束 Miku 壁纸 / 控制台 UI 重构 */
 const runtimeJs = read('src/app/lib/runtime.ts');
